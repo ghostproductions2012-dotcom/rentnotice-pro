@@ -1,0 +1,6 @@
+Tenant Ledger Export
+Date,Description,Charges,Payments,Balance
+07/01/2026,Base Rent,"$2,000.00",,"$2,000.00"
+07/03/2026,Late Fee,$100.00,,"$2,100.00"
+07/05/2026,Payment - Check 1042,,"$1,500.00",$600.00
+08/01/2026,Base Rent,"$2,000.00",,"$2,600.00"

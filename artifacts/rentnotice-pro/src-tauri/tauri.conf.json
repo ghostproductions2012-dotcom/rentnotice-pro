@@ -1,0 +1,66 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RentNotice Pro",
+  "version": "0.1.0",
+  "identifier": "com.rentnotice.pro",
+  "build": {
+    "beforeDevCommand": "pnpm --filter @workspace/rentnotice-pro run desktop:dev:web",
+    "beforeBuildCommand": "pnpm --filter @workspace/rentnotice-pro run desktop:build:web",
+    "devUrl": "http://localhost:5000",
+    "frontendDist": "../dist/public"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "RentNotice Pro",
+        "width": 1440,
+        "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "nsis", "msi", "appimage", "deb"],
+    "category": "Business",
+    "shortDescription": "California 3-Day Pay or Quit notice preparation suite.",
+    "longDescription": "RentNotice Pro is an offline-first desktop suite that helps California property management staff import tenant ledgers, isolate rent-only balances, and prepare 3-Day Notices to Pay Rent or Quit with supporting service documents. It is not legal advice.",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "createUpdaterArtifacts": true,
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "perMachine"
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://releases.rentnotice.pro/updater/{{target}}/{{arch}}/{{current_version}}"
+      ],
+      "pubkey": "REPLACE_WITH_YOUR_TAURI_UPDATER_PUBLIC_KEY_BASE64"
+    }
+  }
+}

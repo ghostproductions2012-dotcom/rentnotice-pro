@@ -517,6 +517,7 @@ export interface DeadlineResult {
   excludedDates: { date: string; reason: "weekend" | "holiday"; name?: string }[];
   expirationDate: string;
   explanation: string[]; // step-by-step day counting
+  warnings: string[]; // e.g. holiday dataset coverage caveats
   disclaimer: string;
 }
 
