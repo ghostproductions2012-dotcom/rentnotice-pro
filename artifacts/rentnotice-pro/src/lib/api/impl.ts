@@ -90,6 +90,7 @@ import {
   classifyRow,
   computeDeadline as computeDeadlineEngine,
   confidenceToUnit,
+  unacknowledgedWarnings,
   validateNotice as validateNoticeEngine,
 } from "../engine";
 import {
@@ -821,12 +822,10 @@ function createServices(): AppServices {
         throw new Error(
           `Cannot finalize: ${validation.blockers} blocking issue(s) must be fixed first.`,
         );
-      const unacked = validation.issues.filter(
-        (i) => i.level === "warning" && !acknowledgedWarnings.some((a) => a.code === i.code),
-      );
+      const unacked = unacknowledgedWarnings(validation.issues, acknowledgedWarnings);
       if (unacked.length > 0)
         throw new Error(
-          `All warnings must be acknowledged with a reason before finalizing (${unacked.length} remaining).`,
+          `All warnings must be acknowledged with a non-empty reason before finalizing (${unacked.length} remaining).`,
         );
       for (const ack of acknowledgedWarnings) {
         logAudit(db, "warning_acknowledged", "notice", id, `Acknowledged warning ${ack.code}`, {

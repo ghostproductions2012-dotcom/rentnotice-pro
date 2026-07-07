@@ -163,24 +163,30 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
 
   // ----------------------------- duplicates --------------------------------
   const others = ctx.existingNotices ?? [];
-  const duplicates = others.filter(
-    (n) =>
-      n.id !== notice.id &&
-      n.revisedFromId !== notice.id &&
-      notice.revisedFromId !== n.id &&
-      n.tenantId === notice.tenantId &&
-      n.unit === notice.unit &&
-      n.noticeType === notice.noticeType &&
-      !["cancelled", "revised"].includes(n.status) &&
-      n.months.some((m) => notice.months.some((mm) => mm.month === m.month)),
-  );
-  if (duplicates.length > 0)
+  const duplicates = others.filter((n) => {
+    if (n.id === notice.id) return false;
+    if (n.revisedFromId === notice.id || notice.revisedFromId === n.id) return false;
+    if (n.tenantId !== notice.tenantId) return false;
+    if (n.unit !== notice.unit) return false;
+    if (n.noticeType !== notice.noticeType) return false;
+    if (["cancelled", "revised"].includes(n.status)) return false;
+    // Monetary notices carry rent months → duplicate only on month overlap.
+    // Non-monetary notices (entry, termination, rent increase) carry no months
+    // → any active same tenant/unit/type notice is a duplicate.
+    if (notice.months.length === 0 || n.months.length === 0) return true;
+    return n.months.some((m) => notice.months.some((mm) => mm.month === m.month));
+  });
+  if (duplicates.length > 0) {
+    const monthScoped = notice.months.length > 0 && duplicates.some((n) => n.months.length > 0);
     add(
       "duplicate_notice",
       "warning",
-      `A notice already exists for this tenant/unit covering the same rent month (${duplicates.length} found).`,
+      monthScoped
+        ? `A notice already exists for this tenant/unit covering the same rent month (${duplicates.length} found).`
+        : `An active ${notice.noticeType.replace(/_/g, " ")} notice already exists for this tenant/unit (${duplicates.length} found).`,
       null,
     );
+  }
 
   // ------------------------------- template --------------------------------
   if (ctx.settings?.requireAttorneyReviewedTemplate) {
@@ -305,4 +311,30 @@ function validateServiceInfo(notice: Notice, add: AddIssue): void {
     if (service.method === "post_and_mail" && !service.mailedDate)
       add("mailing_date_missing", "warning", "A mailing date is required for post-and-mail service.", "service.mailedDate");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Warning acknowledgment gate (shared by the finalize service + tests).
+//
+// A warning is only "acknowledged" when the caller supplies BOTH a matching
+// code AND a non-empty (non-whitespace) reason. This is a pure function so the
+// service layer and unit tests enforce the identical rule — a direct API call
+// cannot finalize a money notice with blank acknowledgment reasons.
+// ---------------------------------------------------------------------------
+
+export interface WarningAck {
+  code: string;
+  reason: string;
+}
+
+/** Return the subset of warning issues that are NOT validly acknowledged. */
+export function unacknowledgedWarnings(
+  issues: ValidationIssue[],
+  acks: WarningAck[],
+): ValidationIssue[] {
+  return issues.filter(
+    (i) =>
+      i.level === "warning" &&
+      !acks.some((a) => a.code === i.code && a.reason.trim().length > 0),
+  );
 }

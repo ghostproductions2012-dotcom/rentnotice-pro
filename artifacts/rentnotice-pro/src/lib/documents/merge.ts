@@ -109,13 +109,18 @@ export function officeHoursBlock(payment: PaymentProfile): string {
   return `Payment may be made in person at the address above${suffix}.`;
 }
 
-/** Multi-line itemized rent breakdown for the {{rent_breakdown}} field. */
+/**
+ * Multi-line itemized rent breakdown for the {{rent_breakdown}} field. Phrased
+ * to match the real-world California notices used by First Light PM, e.g.
+ * "$2,395.00 due on June 1, 2026 for rent from June 1, 2026 to June 30, 2026".
+ */
 export function rentBreakdownText(notice: Notice): string {
   if (!notice.months.length) return "(no rent periods selected)";
   return notice.months
-    .map((m) => {
-      return `${formatLongDate(m.periodStart)} through ${formatLongDate(m.periodEnd)}: ${formatCents(m.selectedAmountCents)}`;
-    })
+    .map(
+      (m) =>
+        `${formatCents(m.selectedAmountCents)} due on ${formatLongDate(m.periodStart)} for rent from ${formatLongDate(m.periodStart)} to ${formatLongDate(m.periodEnd)}`,
+    )
     .join("\n");
 }
 

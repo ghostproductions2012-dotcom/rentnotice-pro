@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Notice, NoticeMonth, ValidationResult } from "../../types";
+import type { Notice, NoticeMonth, ValidationIssue, ValidationResult } from "../../types";
 import { monthBounds } from "../dateUtils";
-import { validateNotice, type ValidationContext } from "../validation";
+import { unacknowledgedWarnings, validateNotice, type ValidationContext } from "../validation";
 
 function month(key: string, balanceCents: number, overrides: Partial<NoticeMonth> = {}): NoticeMonth {
   const { start, end } = monthBounds(key);
@@ -214,5 +214,106 @@ describe("notice validation engine", () => {
     expect(codes(r)).toContain("service_date_missing");
     expect(codes(r)).toContain("service_method_missing");
     expect(r.passed).toBe(false);
+  });
+
+  // --- duplicate detection for non-monetary notice types -------------------
+  // Non-monetary notices carry no rent months, so month-overlap can never fire.
+  // An active same tenant/unit/type notice must still be flagged as duplicate.
+  const NON_MONETARY: { type: Notice["noticeType"]; extra: Partial<Notice> }[] = [
+    { type: "entry_24hr", extra: { months: [], entryDate: "2026-07-10" } },
+    { type: "termination_30day", extra: { months: [], terminationDate: "2026-08-15" } },
+    { type: "termination_60day", extra: { months: [], terminationDate: "2026-09-15" } },
+    {
+      type: "rent_increase",
+      extra: { months: [], rentIncreaseNewAmountCents: 210000, rentIncreaseEffectiveDate: "2026-09-01" },
+    },
+  ];
+
+  for (const { type, extra } of NON_MONETARY) {
+    it(`warns on a duplicate ${type} notice even though it carries no rent months`, () => {
+      const notice = makeNotice({ noticeType: type, totalAmountCents: 0, ...extra });
+      const dupe = makeNotice({ id: "n2", noticeType: type, totalAmountCents: 0, ...extra });
+      const r = validateNotice({ notice, existingNotices: [dupe] });
+      expect(codes(r)).toContain("duplicate_notice");
+      expect(r.issues.find((i) => i.code === "duplicate_notice")!.level).toBe("warning");
+    });
+
+    it(`does not flag a duplicate ${type} for a different unit`, () => {
+      const notice = makeNotice({ noticeType: type, totalAmountCents: 0, ...extra });
+      const other = makeNotice({ id: "n2", noticeType: type, totalAmountCents: 0, unit: "9Z", ...extra });
+      const r = validateNotice({ notice, existingNotices: [other] });
+      expect(codes(r)).not.toContain("duplicate_notice");
+    });
+
+    it(`ignores a cancelled prior ${type} notice`, () => {
+      const notice = makeNotice({ noticeType: type, totalAmountCents: 0, ...extra });
+      const cancelled = makeNotice({
+        id: "n2",
+        noticeType: type,
+        totalAmountCents: 0,
+        status: "cancelled",
+        ...extra,
+      });
+      const r = validateNotice({ notice, existingNotices: [cancelled] });
+      expect(codes(r)).not.toContain("duplicate_notice");
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Warning-acknowledgment gate (shared by finalizeNotice). A warning is only
+// acknowledged when the ack has a matching code AND a non-empty reason.
+// ---------------------------------------------------------------------------
+
+describe("unacknowledgedWarnings gate", () => {
+  const warn = (code: string): ValidationIssue => ({
+    code,
+    level: "warning",
+    message: `warn ${code}`,
+    field: null,
+    acknowledgeable: true,
+  });
+  const blocker: ValidationIssue = {
+    code: "zero_amount",
+    level: "blocker",
+    message: "blocker",
+    field: null,
+    acknowledgeable: false,
+  };
+
+  it("treats a warning acknowledged with a non-empty reason as resolved", () => {
+    const issues = [warn("unapplied_payments")];
+    const acks = [{ code: "unapplied_payments", reason: "Reviewed with owner; applied manually." }];
+    expect(unacknowledgedWarnings(issues, acks)).toHaveLength(0);
+  });
+
+  it("rejects a warning acknowledged with a blank reason", () => {
+    const issues = [warn("unapplied_payments")];
+    expect(unacknowledgedWarnings(issues, [{ code: "unapplied_payments", reason: "" }])).toHaveLength(1);
+  });
+
+  it("rejects a warning acknowledged with a whitespace-only reason", () => {
+    const issues = [warn("duplicate_notice")];
+    expect(unacknowledgedWarnings(issues, [{ code: "duplicate_notice", reason: "   \n\t " }])).toHaveLength(1);
+  });
+
+  it("rejects a warning with no matching acknowledgment at all", () => {
+    const issues = [warn("deposit_applied")];
+    expect(unacknowledgedWarnings(issues, [{ code: "unapplied_payments", reason: "ok" }])).toHaveLength(1);
+  });
+
+  it("never treats blockers as acknowledgeable warnings", () => {
+    const issues = [blocker];
+    expect(unacknowledgedWarnings(issues, [{ code: "zero_amount", reason: "ignore" }])).toHaveLength(0);
+  });
+
+  it("returns only the unresolved warnings when mixed", () => {
+    const issues = [warn("a"), warn("b"), warn("c")];
+    const acks = [
+      { code: "a", reason: "valid reason" },
+      { code: "b", reason: "  " },
+    ];
+    const out = unacknowledgedWarnings(issues, acks).map((i) => i.code);
+    expect(out).toEqual(["b", "c"]);
   });
 });

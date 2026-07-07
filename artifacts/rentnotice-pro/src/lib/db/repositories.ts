@@ -866,13 +866,17 @@ export const noticesRepo = {
         params.propertyId,
       ])
       .map(rowToNotice)
-      .filter(
-        (n) =>
-          n.unit === params.unit &&
-          n.noticeType === params.noticeType &&
-          !["cancelled", "revised"].includes(n.status) &&
-          n.months.some((m) => params.months.includes(m.month)),
-      );
+      .filter((n) => {
+        if (n.unit !== params.unit) return false;
+        if (n.noticeType !== params.noticeType) return false;
+        if (["cancelled", "revised"].includes(n.status)) return false;
+        // Monetary notices (pay-or-quit, perform-covenant) carry rent months;
+        // treat them as duplicates only when a demanded month overlaps. Non-
+        // monetary notices (entry, termination, rent increase) carry no months,
+        // so any active same tenant/property/unit/type notice is a duplicate.
+        if (params.months.length === 0 || n.months.length === 0) return true;
+        return n.months.some((m) => params.months.includes(m.month));
+      });
     return { duplicate: existing.length > 0, existing };
   },
 };

@@ -57,6 +57,38 @@ describe("classification engine", () => {
     expect(r.confidence).toBeLessThanOrEqual(NEEDS_REVIEW_THRESHOLD);
   });
 
+  // First Light "Tenant Statement" ledgers — real-world descriptions.
+  it("classifies a positive EFT fee as a non-rent admin fee, not a payment", () => {
+    const r = classifyRow({ description: "EFT fee", amountCents: 129 });
+    expect(r.category).toBe("admin_fee");
+    expect(r.kind).toBe("non_rent_charge");
+    expect(r.includedInNotice).toBe(false);
+  });
+
+  it("classifies an EFT convenience fee as a non-rent fee", () => {
+    const r = classifyRow({ description: "EFT convenience fee", amountCents: 99 });
+    expect(r.kind).toBe("non_rent_charge");
+    expect(r.includedInNotice).toBe(false);
+  });
+
+  it("treats a negative 'by <tenant>' line as a payment (money in)", () => {
+    const r = classifyRow({ description: "by Sofia Garza", amountCents: -230089 });
+    expect(r.kind).toBe("payment");
+    expect(r.includedInNotice).toBe(false);
+  });
+
+  it("classifies a plain 'Rent' line as rent, included in the notice", () => {
+    const r = classifyRow({ description: "Rent", amountCents: 250000 });
+    expect(r.category).toBe("rent");
+    expect(r.includedInNotice).toBe(true);
+  });
+
+  it("classifies a security deposit as a deposit, excluded", () => {
+    const r = classifyRow({ description: "Security deposit", amountCents: 250000 });
+    expect(r.category).toBe("deposit");
+    expect(r.includedInNotice).toBe(false);
+  });
+
   it("is deterministic for identical inputs", () => {
     const a = classifyRow({ description: "Base Rent", amountCents: 100000 });
     const b = classifyRow({ description: "Base Rent", amountCents: 100000 });

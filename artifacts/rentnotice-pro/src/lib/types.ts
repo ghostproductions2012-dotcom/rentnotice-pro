@@ -125,6 +125,7 @@ export type PmVendor =
   | "yardi"
   | "propertyware"
   | "rent_manager"
+  | "first_light"
   | "generic";
 
 export interface MappingPreset {

@@ -49,7 +49,7 @@ const KEYWORD_RULES: KeywordRule[] = [
   { cls: "parking_fee", confidence: 90, words: ["parking", "garage", "carport"] },
   { cls: "storage_fee", confidence: 90, words: ["storage", "locker"] },
   { cls: "application_fee", confidence: 90, words: ["application fee", "application", "app fee", "screening", "background check", "credit check"] },
-  { cls: "admin_fee", confidence: 88, words: ["administrative fee", "admin fee", "administrative", "admin", "processing fee", "convenience fee"] },
+  { cls: "admin_fee", confidence: 88, words: ["administrative fee", "admin fee", "administrative", "admin", "processing fee", "convenience fee", "eft fee", "eft convenience fee", "ach fee", "e check fee", "echeck fee", "electronic payment fee"] },
   { cls: "hoa", confidence: 90, words: ["hoa", "homeowners association", "homeowner", "association due", "association dues"] },
   { cls: "insurance", confidence: 90, words: ["insurance", "renters ins", "liability ins"] },
   { cls: "payment", confidence: 88, words: ["payment", "rent payment", "pmt", "paid", "received", "e check", "ach", "eft", "auto pay", "autopay", "money order", "cashier"] },

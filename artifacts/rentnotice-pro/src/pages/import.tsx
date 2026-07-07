@@ -47,6 +47,7 @@ const VENDOR_LABELS: Record<PmVendor, string> = {
   yardi: "Yardi",
   propertyware: "Propertyware",
   rent_manager: "Rent Manager",
+  first_light: "First Light PM — Tenant Statement",
   generic: "Generic / Other",
 };
 
