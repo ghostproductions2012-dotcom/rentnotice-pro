@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "RentNotice Pro"
+version = "1.0.0"
+id = "artifacts/rentnotice-pro"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25069
+
+[services.development]
+run = "pnpm --filter @workspace/rentnotice-pro run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rentnotice-pro", "run", "build" ]
+publicDir = "artifacts/rentnotice-pro/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25069"
+BASE_PATH = "/"
