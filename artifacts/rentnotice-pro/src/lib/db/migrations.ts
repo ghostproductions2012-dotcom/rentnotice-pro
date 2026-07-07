@@ -21,6 +21,16 @@ export const MIGRATIONS: Migration[] = [
       db.exec(SCHEMA_SQL);
     },
   },
+  {
+    version: 2,
+    name: "notice_rent_only_attestation",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE notices ADD COLUMN rent_only_attested_by TEXT;
+        ALTER TABLE notices ADD COLUMN rent_only_attested_at TEXT;
+      `);
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

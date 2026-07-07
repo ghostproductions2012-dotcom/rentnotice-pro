@@ -707,6 +707,8 @@ function createServices(): AppServices {
         reviewerApprovedAt: null,
         finalizedBy: null,
         finalizedAt: null,
+        rentOnlyAttestedBy: null,
+        rentOnlyAttestedAt: null,
         attorneyExportFlag: false,
         service: emptyService(),
         deadlineDate: null,
@@ -805,10 +807,15 @@ function createServices(): AppServices {
       });
       return statusChange(db, withApproval, "reviewed", "Reviewer approval");
     },
-    async finalizeNotice(id, acknowledgedWarnings): Promise<Notice> {
+    async finalizeNotice(id, acknowledgedWarnings, attestation): Promise<Notice> {
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
+      const demandsMoney = n.totalAmountCents > 0 || n.months.length > 0;
+      if (demandsMoney && !attestation?.rentOnlyConfirmed)
+        throw new Error(
+          "Cannot finalize: you must confirm the demanded amounts contain scheduled rent only (no late fees, utilities, deposits, or other non-rent charges).",
+        );
       const validation = runValidation(db, n);
       if (!validation.passed)
         throw new Error(
@@ -826,9 +833,13 @@ function createServices(): AppServices {
           reason: ack.reason,
         });
       }
+      const t = nowIso();
       const withFinal = noticesRepo.update(db, id, {
         finalizedBy: session.user?.id ?? null,
-        finalizedAt: nowIso(),
+        finalizedAt: t,
+        ...(demandsMoney
+          ? { rentOnlyAttestedBy: session.user?.id ?? null, rentOnlyAttestedAt: t }
+          : {}),
       });
       const next = statusChange(db, withFinal, "finalized", "Notice finalized and locked");
       logAudit(
@@ -855,6 +866,8 @@ function createServices(): AppServices {
         reviewerApprovedAt: null,
         finalizedBy: null,
         finalizedAt: null,
+        rentOnlyAttestedBy: null,
+        rentOnlyAttestedAt: null,
         service: emptyService(),
         deadlineDate: null,
         createdAt: t,

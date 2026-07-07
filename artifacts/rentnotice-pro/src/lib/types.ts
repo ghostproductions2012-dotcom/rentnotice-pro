@@ -353,6 +353,11 @@ export interface Notice {
   reviewerApprovedAt: string | null;
   finalizedBy: Id | null;
   finalizedAt: string | null;
+  // Rent-only attestation: required before finalizing any notice that demands
+  // money. The preparer certifies the demand contains rent only (no fees,
+  // utilities, deposits, or other non-rent charges).
+  rentOnlyAttestedBy: Id | null;
+  rentOnlyAttestedAt: string | null;
   attorneyExportFlag: boolean;
   service: ServiceRecord;
   deadlineDate: string | null; // computed expiration

@@ -113,6 +113,15 @@ export interface CreateFieldAssignmentInput {
   instructions?: string;
 }
 
+export interface FinalizeAttestation {
+  /**
+   * The preparer certifies the amounts demanded contain scheduled rent only —
+   * no late fees, utilities, deposits, or other non-rent charges. Required
+   * (must be true) for any notice that demands money.
+   */
+  rentOnlyConfirmed: boolean;
+}
+
 export interface CreateMailTrackingInput {
   noticeId: Id;
   carrier: string;
@@ -187,6 +196,7 @@ export interface AppServices {
   finalizeNotice(
     id: Id,
     acknowledgedWarnings: { code: string; reason: string }[],
+    attestation: FinalizeAttestation,
   ): Promise<Notice>;
   reviseNotice(id: Id, reason: string): Promise<Notice>;
   recordService(id: Id, service: ServiceRecord): Promise<Notice>;

@@ -721,6 +721,8 @@ function rowToNotice(r: Row): Notice {
     reviewerApprovedAt: strOrNull(r.reviewer_approved_at),
     finalizedBy: strOrNull(r.finalized_by),
     finalizedAt: strOrNull(r.finalized_at),
+    rentOnlyAttestedBy: strOrNull(r.rent_only_attested_by),
+    rentOnlyAttestedAt: strOrNull(r.rent_only_attested_at),
     attorneyExportFlag: toBool(r.attorney_export_flag),
     service: {
       dateServed: strOrNull(r.service_date_served),
@@ -769,6 +771,8 @@ function noticeRow(n: Notice): Row {
     reviewer_approved_at: n.reviewerApprovedAt,
     finalized_by: n.finalizedBy,
     finalized_at: n.finalizedAt,
+    rent_only_attested_by: n.rentOnlyAttestedBy,
+    rent_only_attested_at: n.rentOnlyAttestedAt,
     attorney_export_flag: fromBool(n.attorneyExportFlag),
     service_date_served: n.service.dateServed,
     service_time_served: n.service.timeServed,

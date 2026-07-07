@@ -21,6 +21,7 @@ import type {
   CreateTemplateInput,
   CreateTenantInput,
   CreateUserInput,
+  FinalizeAttestation,
 } from "./services";
 import type {
   AppSettings,
@@ -447,10 +448,12 @@ export function useFinalizeNotice() {
     mutationFn: ({
       id,
       acknowledgedWarnings,
+      attestation,
     }: {
       id: Id;
       acknowledgedWarnings: { code: string; reason: string }[];
-    }) => getServices().finalizeNotice(id, acknowledgedWarnings),
+      attestation: FinalizeAttestation;
+    }) => getServices().finalizeNotice(id, acknowledgedWarnings, attestation),
     onSuccess: () => invalidate(qc, NOTICE_ROOTS),
   });
 }

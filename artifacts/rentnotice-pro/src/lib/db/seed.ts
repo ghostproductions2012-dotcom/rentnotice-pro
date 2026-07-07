@@ -596,6 +596,8 @@ function buildNotice(seed: NoticeSeed): Notice {
     reviewerApprovedAt: null,
     finalizedBy: null,
     finalizedAt: null,
+    rentOnlyAttestedBy: null,
+    rentOnlyAttestedAt: null,
     attorneyExportFlag: false,
     service: emptyService(),
     deadlineDate: null,
