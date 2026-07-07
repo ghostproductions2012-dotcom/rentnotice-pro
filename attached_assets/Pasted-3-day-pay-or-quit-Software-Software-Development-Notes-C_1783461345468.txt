@@ -1,0 +1,129 @@
+3-day pay or quit Software 
+
+Software Development Notes: California 3-Day Notice to Pay Rent or Quit Tool
+
+Purpose:
+Create downloadable desktop software that helps prepare California 3-Day Notices to Pay Rent or Quit by importing ledger data, calculating rent-only balances, and generating accurate notices and proof/service documents.
+
+Core Function:
+The software must review a tenant ledger and generate a 3-Day Notice to Pay Rent or Quit using rent-only charges. The software should exclude anything that is not rent, including late fees, NSF fees, utilities, maintenance charges, legal fees, deposits, pet fees, parking, or other non-rent balances.
+
+Ledger Requirements:
+
+* Import tenant ledger from PDF, Excel, CSV, or manual entry.
+* Recognize monthly rent charges.
+* Recognize payments, partial payments, credits, and reversals.
+* Match payments to the correct month when possible.
+* Calculate unpaid rent month by month.
+* Display a clear breakdown of rent charged, payments received, credits applied, and balance owed.
+* Flag any non-rent charge that was excluded from the notice amount.
+* Allow manual review/override before finalizing.
+
+Date Requirements:
+
+* Notice rent period must always begin on the 1st day of the month.
+* Notice rent period must always end on the final day of that same month.
+* Example: July 1, 2026 – July 31, 2026.
+* Software should automatically detect the final day of each month, including February/leap years.
+* If multiple months are owed, list each month separately.
+* Software should calculate the total rent-only balance across selected months.
+
+Tenant / Property Import Fields:
+
+* Tenant full legal name(s)
+* Property address
+* Unit number
+* Owner/landlord name
+* Management company name
+* Authorized payment recipient
+* Payment address
+* Phone number
+* Accepted payment methods
+* Office hours / days available for in-person payment, if applicable
+
+Notice Generation:
+
+* Generate California 3-Day Notice to Pay Rent or Quit.
+* Generate proof of service.
+* Generate posting/mailing checklist.
+* Generate internal review page showing how the amount was calculated.
+* Export final documents as PDF.
+* Option to save as draft before finalizing.
+* Option to lock finalized notices so they cannot be edited without creating a revised version.
+
+Compliance Safeguards:
+
+* Rent-only validation before notice generation.
+* Warning if non-rent charges appear in the balance.
+* Warning if tenant names are missing.
+* Warning if property address or unit number is missing.
+* Warning if payment recipient information is missing.
+* Warning if payment days/hours are missing when in-person payment is allowed.
+* Warning if the notice amount includes charges other than rent.
+* Warning if the selected date range does not start on the 1st or end on the last day of the month.
+* Warning if payments were received but not clearly applied.
+* Optional attorney-approved template review before launch.
+
+Calculation Logic:
+
+* Monthly rent charge minus payments and credits equals rent owed.
+* Multiple payments in one month must be recognized.
+* Partial payments must reduce the balance.
+* Overpayments or credits should carry forward only if the ledger supports that.
+* Security deposits should not be applied unless manually authorized and legally reviewed.
+* The software should show the user exactly how the final notice amount was reached.
+
+Useful Features:
+
+* Upload example ledgers and map columns.
+* Save recurring property information.
+* Save recurring owner/management company information.
+* Save tenant profiles.
+* Search past notices by tenant, property, month, or status.
+* Notice status tracking: Draft, Reviewed, Served, Mailed, Expired, Paid, Sent to Attorney.
+* Calendar deadline calculator excluding weekends and court holidays.
+* Judicial holiday database for California.
+* Duplicate notice prevention if one was already created for the same tenant/month.
+* Audit trail showing who created, reviewed, edited, and finalized the notice.
+* Notes section for internal staff.
+* Ability to attach ledger backup to the notice file.
+
+Documents / Examples I Will Provide:
+
+* Sample tenant ledger
+* Sample 3-Day Notice to Pay Rent or Quit
+* Sample proof of service
+* Sample completed notice package
+* Examples with partial payments
+* Examples with non-rent charges that should be excluded
+* Examples with multiple months owed
+* Examples where the tenant made payments during the month
+* Preferred formatting/logo/company information
+* LAHD Right to legal counsel letter
+
+Future Version Ideas:
+
+* Integration with AppFolio, Buildium, Yardi, Propertyware, Rent Manager, or Excel exports.
+* Field agent posting assignment.
+* GPS/time-stamped proof of posting.
+* Photo upload for posted notices.
+* Certified mail tracking.
+* Attorney export packet.
+* Multi-state notice templates.
+* Additional California notices, including 24-hour notices, 30-day notices, 60-day notices, rent increase notices, and notices to perform covenant or quit.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

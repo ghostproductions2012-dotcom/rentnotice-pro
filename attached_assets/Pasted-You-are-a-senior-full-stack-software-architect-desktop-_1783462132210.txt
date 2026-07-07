@@ -1,0 +1,1051 @@
+You are a senior full-stack software architect, desktop app engineer, UI/UX designer, legal-document workflow engineer, and corporate compliance systems designer.
+
+Build a professional standalone desktop software application for property management companies called:
+
+RentNotice Pro — California 3-Day Pay or Quit Notice Tool
+
+The application must help property management staff import tenant ledger data, identify rent-only balances, calculate unpaid rent by month, review exclusions, and generate California 3-Day Notices to Pay Rent or Quit with supporting service/proof documents.
+
+This software must be built in Replit, with final installer builds handled through GitHub.
+
+The software must be compatible with GPT, Claude/Fable 5, and Gemini coding workflows. Code must be clean, modular, non-redundant, maintainable, and production-ready.
+
+Do not create conflicting duplicate functions. Do not hard-code fragile assumptions. Use clear separation between UI, data parsing, calculation logic, document generation, validation, storage, audit logs, and export logic.
+
+This is legal-adjacent software. The application must include strong disclaimers that it does not provide legal advice and that notice templates should be reviewed by a qualified California landlord-tenant attorney before production use.
+
+The application should never silently include fees or non-rent charges in the notice amount.
+
+⸻
+
+1. Product Objective
+
+Create downloadable desktop software for California property management companies that prepares 3-Day Notices to Pay Rent or Quit by:
+
+1. Importing tenant ledgers.
+2. Detecting rent charges, payments, partial payments, credits, reversals, and non-rent charges.
+3. Calculating rent-only balances month by month.
+4. Excluding all non-rent balances.
+5. Allowing staff review and override.
+6. Generating:
+    * California 3-Day Notice to Pay Rent or Quit
+    * Proof of service
+    * Posting/mailing checklist
+    * Internal calculation review page
+    * Audit summary
+    * Optional attached ledger backup
+7. Exporting a final PDF notice package.
+8. Tracking notice status from draft through attorney handoff.
+
+⸻
+
+2. Target Users
+
+Primary users are property management staff, leasing office staff, accounting staff, compliance reviewers, supervisors, and company administrators.
+
+The UI must be simple enough for a non-technical office worker.
+
+The user should not need to understand software, coding, ledger parsing, or legal formatting.
+
+The workflow should feel like:
+
+Upload ledger → Review detected charges → Confirm rent-only amount → Fill missing info → Generate draft → Review → Finalize → Export PDF.
+
+⸻
+
+3. Recommended Tech Stack
+
+Use a modern desktop architecture.
+
+Preferred:
+
+* Frontend: React + TypeScript
+* Desktop shell: Tauri or Electron
+* Backend logic: Node.js/TypeScript or Python service layer
+* Local database: SQLite
+* PDF generation: PDFKit, Playwright PDF, or equivalent
+* Excel parsing: xlsx / SheetJS
+* CSV parsing: PapaParse
+* PDF ledger parsing: pdf-parse or equivalent
+* OCR fallback: optional future feature
+* State management: Zustand or Redux Toolkit
+* Styling: Tailwind CSS
+* Component library: shadcn/ui or equivalent
+* Date logic: date-fns or Luxon
+* Installer pipeline: GitHub Actions
+* Desktop installers:
+    * Windows .exe / .msi
+    * macOS .dmg
+    * optional Linux AppImage
+
+Graphics and branding:
+Use GPT Image 2.0 when possible to generate tasteful professional graphics, icons, empty-state illustrations, onboarding visuals, and subtle branded backgrounds. The app should feel clean, trustworthy, legal-office-grade, and modern.
+
+Do not use childish, cartoonish, flashy, or overly technical visuals.
+
+⸻
+
+4. Core Workflow
+
+Step 1: Create or Select Tenant File
+
+User can create/select:
+
+* Tenant full legal name(s)
+* Property address
+* Unit number
+* Owner/landlord name
+* Management company name
+* Authorized payment recipient
+* Payment address
+* Phone number
+* Accepted payment methods
+* Office hours
+* Days available for in-person payment
+* Whether in-person payment is accepted
+* Property manager contact
+* Internal notes
+
+All required fields must be validated before final notice generation.
+
+⸻
+
+Step 2: Import Ledger
+
+Support:
+
+* PDF
+* Excel
+* CSV
+* Manual entry
+
+The system must allow column mapping for imported ledgers.
+
+Possible ledger columns:
+
+* Date
+* Description
+* Charge amount
+* Payment amount
+* Credit amount
+* Balance
+* Transaction type
+* Category
+* Memo/reference
+* Month
+* Tenant/property/unit identifier
+
+If the import structure is unclear, present a clean column-mapping screen.
+
+The user must be able to save mapping presets for future imports.
+
+⸻
+
+Step 3: Parse Ledger
+
+The parser must identify:
+
+* Monthly rent charges
+* Payments
+* Partial payments
+* Multiple payments in one month
+* Credits
+* Reversals
+* Voids
+* Refunds
+* Adjustments
+* Non-rent charges
+
+The parser must exclude:
+
+* Late fees
+* NSF fees
+* Utilities
+* Maintenance charges
+* Legal fees
+* Deposits
+* Pet fees
+* Parking fees
+* Storage fees
+* Application fees
+* Administrative fees
+* RUBS
+* HOA charges
+* Insurance
+* Repairs
+* Damages
+* Court costs
+* Other non-rent balances
+
+The parser should use keyword classification, column/category recognition, and user-confirmed mapping.
+
+Every excluded charge must be visible in the review screen.
+
+Never hide exclusions.
+
+⸻
+
+5. Rent Classification Rules
+
+Create a dedicated rent-classification engine.
+
+Each transaction should receive:
+
+* Transaction date
+* Description
+* Original category
+* System classification
+* Confidence score
+* Included in notice amount: yes/no
+* Reason
+* User override value
+* Audit trail entry
+
+Classification examples:
+
+Included rent categories:
+
+* Rent
+* Monthly rent
+* Base rent
+* Apartment rent
+* Residential rent
+* Housing rent
+
+Excluded categories:
+
+* Late fee
+* NSF
+* Utility
+* Water
+* Sewer
+* Trash
+* Electric
+* Gas
+* Parking
+* Pet
+* Deposit
+* Security deposit
+* Legal
+* Attorney
+* Maintenance
+* Repair
+* Damage
+* Admin
+* Application
+* Insurance
+
+If classification confidence is low, require manual review.
+
+⸻
+
+6. Calculation Logic
+
+Calculation must be transparent and auditable.
+
+Formula:
+
+Monthly rent owed = rent charges for month − payments applied to rent − credits applied to rent
+
+Rules:
+
+1. Rent period must always begin on the 1st day of the month.
+2. Rent period must always end on the last day of that same month.
+3. Detect the final day of each month automatically.
+4. Handle February and leap years.
+5. Multiple unpaid months must be listed separately.
+6. Partial payments must reduce the balance.
+7. Multiple payments in one month must be recognized.
+8. Credits must reduce the balance only when clearly rent-related.
+9. Overpayments may carry forward only if the ledger clearly supports it.
+10. Security deposits must not be applied unless manually authorized and marked for legal review.
+11. Ambiguous payments must be flagged.
+12. Payments received but not clearly applied must trigger a warning.
+13. Non-rent charges must never be included by default.
+14. Manual overrides must require a reason.
+
+The calculation screen must show:
+
+* Month
+* Rent period
+* Rent charged
+* Payments received
+* Credits applied
+* Excluded charges
+* Rent-only balance
+* Warnings
+* Final selected amount
+
+Example:
+
+July 1, 2026 – July 31, 2026
+Rent charged: $2,500
+Payments applied: $1,000
+Credits: $0
+Excluded non-rent charges: $125 late fee, $85 utility charge
+Rent-only balance: $1,500
+
+⸻
+
+7. Date Requirements
+
+Every selected rent month must use:
+
+Start date: first day of month
+End date: final day of same month
+
+Examples:
+
+* July 1, 2026 – July 31, 2026
+* February 1, 2028 – February 29, 2028
+* February 1, 2027 – February 28, 2027
+
+If the user attempts to select a custom date range that does not begin on the 1st and end on the final day of the month, show a blocking warning.
+
+The software may allow advanced override only with supervisor permission and audit trail logging.
+
+⸻
+
+8. Compliance Safeguards
+
+Before generating a notice, run validation.
+
+Warnings/blockers:
+
+* Tenant name missing
+* Property address missing
+* Unit number missing
+* Owner/landlord missing
+* Payment recipient missing
+* Payment address missing
+* Accepted payment methods missing
+* Office hours missing when in-person payment is allowed
+* Payment days missing when in-person payment is allowed
+* Notice amount includes non-rent charges
+* Selected period does not begin on 1st
+* Selected period does not end on last day of month
+* Payment allocation unclear
+* Ledger contains unapplied payments
+* Multiple tenants but only one name selected
+* Duplicate notice already exists for same tenant/month
+* Rent amount was manually overridden
+* Security deposit applied
+* Template has not been marked attorney-reviewed
+
+There should be two validation levels:
+
+* Warning: user may continue with reason
+* Blocker: user cannot finalize until fixed
+
+⸻
+
+9. Notice Generation
+
+Generate a California 3-Day Notice to Pay Rent or Quit using an attorney-reviewable template system.
+
+Do not hard-code final legal language as permanent. Store templates as editable, version-controlled template files.
+
+Template fields:
+
+* Tenant name(s)
+* Property address
+* Unit number
+* Rent period(s)
+* Monthly rent breakdown
+* Total rent-only amount due
+* Authorized payment recipient
+* Payment address
+* Phone number
+* Accepted payment methods
+* Office hours
+* Date notice prepared
+* Owner/agent signature block
+* Management company name
+* Optional local addenda
+* Optional LAHD Right to Legal Counsel attachment
+
+Generated documents:
+
+1. 3-Day Notice to Pay Rent or Quit
+2. Proof of service
+3. Posting/mailing checklist
+4. Internal calculation review page
+5. Excluded charge summary
+6. Audit log summary
+7. Ledger backup attachment page
+8. Optional LAHD Right to Legal Counsel letter
+
+Allow export as:
+
+* Draft PDF with watermark
+* Final PDF
+* Internal packet PDF
+* Attorney packet PDF
+
+Final PDFs must be locked from direct editing inside the app.
+
+To revise a finalized notice, create a new revised version.
+
+⸻
+
+10. Proof of Service
+
+Generate proof of service form with:
+
+* Tenant name
+* Property address
+* Unit number
+* Date served
+* Time served
+* Method of service
+* Person serving
+* Server notes
+* Posting/mailing checklist
+* Signature line
+* Optional photo/GPS placeholder for future version
+
+Service methods should include:
+
+* Personal service
+* Substitute service
+* Posting and mailing
+* Other attorney-approved method placeholder
+
+Do not provide legal advice about which method is correct.
+
+⸻
+
+11. Calendar Deadline Calculator
+
+Include a deadline calculator.
+
+Requirements:
+
+* Calculate expiration deadline from service date.
+* Exclude weekends where applicable.
+* Include California judicial holiday database.
+* Allow yearly holiday updates.
+* Clearly label calculator as informational and subject to legal review.
+* Display:
+    * Service date
+    * Counted days
+    * Excluded days
+    * Court holidays
+    * Estimated expiration date
+    * Legal review disclaimer
+
+Store holidays in a local editable database.
+
+Include update function for future years.
+
+⸻
+
+12. Notice Status Tracking
+
+Each notice should have status:
+
+* Draft
+* Needs Review
+* Reviewed
+* Finalized
+* Served
+* Mailed
+* Expired
+* Paid
+* Sent to Attorney
+* Cancelled
+* Revised
+
+Status changes must be logged.
+
+Each notice should support:
+
+* Internal notes
+* Attachments
+* Ledger backup
+* Service documents
+* Staff comments
+* Reviewer approval
+* Attorney export flag
+
+⸻
+
+13. Audit Trail
+
+Every important action must be logged:
+
+* Created tenant
+* Imported ledger
+* Changed column mapping
+* Classified transaction
+* Excluded charge
+* Included charge
+* Manual override
+* Changed rent amount
+* Generated draft
+* Finalized notice
+* Revised notice
+* Exported PDF
+* Changed status
+* Added attachment
+* Deleted draft
+* Sent to attorney
+
+Audit entries must include:
+
+* Date/time
+* User
+* Action
+* Previous value
+* New value
+* Reason if required
+
+Finalized notice records cannot be edited directly.
+
+⸻
+
+14. User Roles
+
+Support local user roles:
+
+Admin:
+
+* Manage settings
+* Manage templates
+* Manage users
+* Finalize notices
+* Override calculations
+* Delete drafts
+
+Manager:
+
+* Review notices
+* Approve notices
+* Finalize notices
+* Override with reason
+
+Staff:
+
+* Import ledgers
+* Create drafts
+* Edit tenant/property info
+* Submit for review
+
+Read-only:
+
+* View notices
+* Export only if allowed
+
+⸻
+
+15. Database Design
+
+Use SQLite with migration support.
+
+Suggested tables:
+
+* users
+* properties
+* tenants
+* tenant_property_links
+* ledgers
+* ledger_imports
+* ledger_transactions
+* transaction_classifications
+* notices
+* notice_months
+* notice_documents
+* notice_status_history
+* audit_logs
+* company_profiles
+* payment_profiles
+* templates
+* template_versions
+* holiday_calendar
+* attachments
+* column_mapping_presets
+* settings
+
+Use stable IDs.
+
+Do not rely only on names for relationships.
+
+⸻
+
+16. UI/UX Requirements
+
+The app must look professional, clean, calm, and trustworthy.
+
+Design style:
+
+* Legal-office professional
+* Property-management friendly
+* Minimal clutter
+* Large readable text
+* Clear progress steps
+* Warm neutral colors
+* Subtle blue/gray/white palette
+* Good contrast
+* Simple icons
+* Clear warnings
+* Plain-English explanations
+
+Main navigation:
+
+* Dashboard
+* Tenants
+* Properties
+* Import Ledger
+* Notices
+* Calendar
+* Templates
+* Reports
+* Settings
+
+Dashboard should show:
+
+* Draft notices
+* Notices needing review
+* Notices served
+* Expiring notices
+* Paid/resolved notices
+* Recent imports
+* Compliance warnings
+
+Use GPT Image 2.0 for tasteful graphics:
+
+* App icon
+* Empty state illustrations
+* Onboarding graphics
+* Document review illustration
+* Ledger import illustration
+* Compliance warning illustration
+
+Graphics must remain professional and subtle.
+
+⸻
+
+17. Main Screens
+
+Dashboard
+
+Show notice pipeline and recent activity.
+
+Tenant Profile
+
+Show:
+
+* Tenant names
+* Contact info optional
+* Property/unit
+* Ledger history
+* Notice history
+* Attachments
+* Notes
+
+Property Profile
+
+Show:
+
+* Address
+* Unit list
+* Owner
+* Management company
+* Payment recipient settings
+* Office hours
+* Accepted payment methods
+
+Ledger Import Wizard
+
+Steps:
+
+1. Upload file
+2. Preview data
+3. Map columns
+4. Classify transactions
+5. Review exclusions
+6. Calculate rent-only balance
+7. Save ledger
+
+Calculation Review
+
+Show exact rent-only breakdown by month.
+
+User must confirm:
+
+“I have reviewed the calculation and confirm that only rent charges are included.”
+
+Notice Builder
+
+Guided document builder with missing-field alerts.
+
+Document Preview
+
+Show PDF preview before finalization.
+
+Finalization Screen
+
+Require:
+
+* Validation pass
+* User confirmation
+* Optional reviewer approval
+* Finalize button
+* Version lock
+
+Notice Archive
+
+Search by:
+
+* Tenant
+* Property
+* Unit
+* Month
+* Status
+* Date created
+* Date served
+* Amount
+* Staff member
+
+⸻
+
+18. Search and Filtering
+
+Search past notices by:
+
+* Tenant
+* Property
+* Unit
+* Rent month
+* Notice status
+* Created date
+* Served date
+* Amount
+* Owner
+* Management company
+
+Allow export of search results as CSV.
+
+⸻
+
+19. Duplicate Notice Prevention
+
+Before creating a new notice, check whether a notice already exists for:
+
+* Same tenant
+* Same property/unit
+* Same rent month
+* Same notice type
+
+If duplicate exists, warn the user and show existing notice.
+
+Allow creation of revised notice only with reason.
+
+⸻
+
+20. Attachments
+
+Allow attaching:
+
+* Original ledger
+* Cleaned ledger
+* Signed notice
+* Proof of service
+* Photos
+* Mailing receipts
+* Attorney correspondence
+* LAHD letter
+* Internal notes PDF
+
+Store attachment metadata.
+
+⸻
+
+21. Import Examples and Training Data
+
+The app should support uploaded examples:
+
+* Sample tenant ledger
+* Sample notice
+* Sample proof of service
+* Sample completed notice package
+* Partial payment examples
+* Non-rent exclusion examples
+* Multiple-month examples
+* Payments during month examples
+* Company logo and formatting examples
+* LAHD Right to Legal Counsel letter
+
+Create an “Example/Training Mode” where the user can map sample ledgers and save rules.
+
+⸻
+
+22. Template Management
+
+Admins should be able to manage templates.
+
+Template fields:
+
+* Template name
+* Notice type
+* Jurisdiction
+* Version
+* Attorney reviewed: yes/no
+* Reviewed by
+* Review date
+* Active/inactive
+* Template body
+* Merge fields
+* Revision history
+
+Do not allow production finalization if no active attorney-reviewed template exists, unless admin enables override with disclaimer.
+
+⸻
+
+23. Reports
+
+Include reports:
+
+* Notices created by month
+* Notices by property
+* Notices by status
+* Amounts noticed
+* Amounts paid after notice
+* Notices sent to attorney
+* Repeated tenant delinquencies
+* Excluded non-rent charges report
+* Staff activity report
+
+⸻
+
+24. Security and Data Handling
+
+Because the app handles tenant/payment/legal records:
+
+* Use local encrypted storage where possible.
+* Support app password/PIN.
+* Support role-based access.
+* Avoid unnecessary cloud transmission.
+* Do not send tenant data to AI services without explicit user consent.
+* If AI-assisted parsing is used, show privacy notice and opt-in.
+* Maintain local audit trail.
+* Allow local backup/export.
+* Allow secure restore.
+
+⸻
+
+25. AI-Assisted Features
+
+AI may assist with:
+
+* Ledger column detection
+* Transaction classification suggestions
+* Non-rent charge detection
+* Formatting internal summaries
+* Generating professional UI graphics through GPT Image 2.0
+
+AI must not:
+
+* Provide legal advice
+* Override rent-only validation
+* Finalize notices automatically
+* Include non-rent charges without user approval
+* Send tenant data externally without explicit consent
+
+AI outputs must be reviewable and explainable.
+
+⸻
+
+26. Installer and GitHub Build Requirements
+
+The app is built in Replit but final installers are created through GitHub.
+
+Set up:
+
+* Clean GitHub repository structure
+* README
+* Install instructions
+* Developer setup
+* Environment variable documentation
+* Build scripts
+* GitHub Actions workflow
+* Windows installer workflow
+* macOS installer workflow
+* Version tagging
+* Release notes generation
+* Auto-update-ready structure if feasible
+
+Repository structure should be clean:
+
+/src
+/components
+/pages
+/services
+/parsers
+/calculations
+/documents
+/templates
+/database
+/audit
+/utils
+/assets
+/tests
+/docs
+/build
+/.github/workflows
+
+⸻
+
+27. Testing Requirements
+
+Create comprehensive tests.
+
+Test:
+
+* Ledger parsing
+* CSV import
+* Excel import
+* PDF import
+* Column mapping
+* Rent classification
+* Non-rent exclusion
+* Partial payments
+* Multiple payments
+* Credits
+* Reversals
+* Overpayments
+* Multiple months owed
+* Leap-year February
+* Month-end detection
+* Duplicate notices
+* Missing required fields
+* Validation blockers
+* PDF generation
+* Audit logging
+* User role permissions
+* Template versioning
+
+Include test fixture files.
+
+⸻
+
+28. Required Sample Scenarios
+
+Build test examples for:
+
+1. One month unpaid rent.
+2. One month partially paid.
+3. Multiple partial payments.
+4. Multiple months owed.
+5. Ledger with late fees excluded.
+6. Ledger with utilities excluded.
+7. Ledger with pet fees excluded.
+8. Ledger with parking excluded.
+9. Ledger with legal fees excluded.
+10. Payment made mid-month.
+11. Unapplied payment.
+12. Credit carried forward.
+13. Overpayment.
+14. Security deposit present but excluded.
+15. Duplicate notice attempt.
+16. Missing tenant name.
+17. Missing payment recipient.
+18. February leap year.
+19. Finalized notice revision.
+20. Attorney-reviewed template missing.
+
+⸻
+
+29. Error Handling
+
+All errors must be user-friendly.
+
+Bad error:
+“Parser exception line 142.”
+
+Good error:
+“We could not identify which column contains payment amounts. Please select the payment column below.”
+
+Every import failure should offer:
+
+* Retry
+* Manual mapping
+* Manual entry
+* Save as draft
+* Contact support placeholder
+
+⸻
+
+30. Acceptance Criteria
+
+The app is complete when:
+
+* A user can create a property.
+* A user can create a tenant.
+* A user can import a ledger.
+* A user can map ledger columns.
+* The app identifies rent and non-rent charges.
+* The app excludes non-rent charges.
+* The app calculates rent-only balances by month.
+* The app shows a clear review screen.
+* The app flags missing compliance fields.
+* The app generates a draft notice package.
+* The app exports final PDFs.
+* The app locks finalized notices.
+* The app creates revised versions instead of editing finalized versions.
+* The app maintains audit logs.
+* The app prevents duplicate notices.
+* The app supports search/status tracking.
+* The app builds successfully on Replit.
+* The app can be pushed to GitHub.
+* GitHub can produce desktop installers.
+
+⸻
+
+31. Important Legal/Compliance Disclaimer
+
+Include this disclaimer inside the application:
+
+“This software is a document-preparation and ledger-calculation tool. It does not provide legal advice. California landlord-tenant law and local requirements may change. All templates, notices, service procedures, deadlines, and attachments should be reviewed and approved by a qualified California attorney before use.”
+
+⸻
+
+32. Build Method
+
+Proceed in phases:
+
+Phase 1:
+Create project architecture, database schema, core UI shell, routing, and local storage.
+
+Phase 2:
+Build tenant/property/company profile management.
+
+Phase 3:
+Build ledger import, parsing, column mapping, transaction classification, and rent-only calculation engine.
+
+Phase 4:
+Build validation system, warnings, blockers, and calculation review screen.
+
+Phase 5:
+Build notice templates, proof of service, checklist, PDF preview, and export.
+
+Phase 6:
+Build status tracking, audit trail, search, attachments, and duplicate prevention.
+
+Phase 7:
+Build calendar deadline calculator and California judicial holiday database.
+
+Phase 8:
+Build role permissions, template management, settings, backup/export, and security polish.
+
+Phase 9:
+Add professional UI polish, onboarding graphics, app icon, and document graphics using GPT Image 2.0 where appropriate.
+
+Phase 10:
+Add tests, sample data, GitHub Actions, installer workflows, release packaging, README, and documentation.
+
+At each phase, keep the app functional. Do not break working features while adding new ones.
+
+Prioritize correctness, clarity, auditability, and legal-safety safeguards over flashy features.
+
+The final product should feel like professional property management compliance software: simple, clean, trustworthy, accurate, and easy to use.
