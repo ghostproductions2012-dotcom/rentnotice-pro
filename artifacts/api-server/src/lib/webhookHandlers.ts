@@ -1,4 +1,5 @@
 import { getStripeSync } from "./stripeClient";
+import { dispatchBillingNotifications } from "./billingNotifications";
 
 export class WebhookHandlers {
   static async processWebhook(
@@ -18,5 +19,10 @@ export class WebhookHandlers {
 
     const sync = await getStripeSync();
     await sync.processWebhook(payload, signature);
+
+    // Signature verified & event synced above -- now send any billing
+    // warning emails. Best-effort and fire-and-forget: email problems must
+    // never fail webhook processing or delay the acknowledgement to Stripe.
+    void dispatchBillingNotifications(payload);
   }
 }

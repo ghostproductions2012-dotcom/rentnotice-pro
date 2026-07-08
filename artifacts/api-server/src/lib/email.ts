@@ -113,6 +113,15 @@ function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function formatDateLong(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 function emailShell(title: string, bodyHtml: string): string {
   return `<!DOCTYPE html>
 <html>
@@ -186,6 +195,160 @@ export async function sendInviteEmail(
     logger.warn(
       { err, to: input.to },
       "Failed to send invite email; copyable invite link remains available",
+    );
+    return false;
+  }
+}
+
+export interface PaymentFailedEmailInput {
+  to: string;
+  adminName: string;
+  companyName: string;
+  paidThrough: Date | null;
+  billingUrl: string;
+}
+
+/**
+ * Warns the billing contact that a subscription payment failed so they can
+ * update their card before the license pauses.
+ * Best-effort: returns true when sent, false on failure. Never throws.
+ */
+export async function sendPaymentFailedEmail(
+  input: PaymentFailedEmailInput,
+): Promise<boolean> {
+  const subject = "Action needed: payment failed for RentNotice Pro";
+  const paidThroughLine = input.paidThrough
+    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.paidThrough))}</strong>. If payment isn't resolved by then, the desktop app will pause until billing is fixed.`
+    : `If payment isn't resolved soon, the desktop app will pause until billing is fixed.`;
+  const paidThroughText = input.paidThrough
+    ? `Your team keeps full access through ${formatDateLong(input.paidThrough)}. ` +
+      `If payment isn't resolved by then, the desktop app will pause until billing is fixed.`
+    : `If payment isn't resolved soon, the desktop app will pause until billing is fixed.`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 12px;line-height:1.6;">
+      Hi ${escapeHtml(input.adminName)},
+    </p>
+    <p style="margin:0 0 12px;line-height:1.6;">
+      We couldn't process the latest subscription payment for
+      <strong>${escapeHtml(input.companyName)}</strong> on RentNotice Pro.
+      This usually means the card on file expired or was declined.
+    </p>
+    <p style="margin:0 0 24px;line-height:1.6;">
+      ${paidThroughLine}
+    </p>
+    <p style="text-align:center;margin:0 0 8px;">
+      <a href="${escapeHtml(input.billingUrl)}"
+         style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;">
+        Update Payment Method
+      </a>
+    </p>
+    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;text-align:center;">
+      Open your customer portal and choose &ldquo;Manage billing&rdquo; to
+      update your card. Stripe retries failed payments automatically once
+      billing is fixed.
+    </p>`;
+  const text =
+    `Hi ${input.adminName},\n\n` +
+    `We couldn't process the latest subscription payment for ` +
+    `${input.companyName} on RentNotice Pro. This usually means the card ` +
+    `on file expired or was declined.\n\n` +
+    `${paidThroughText}\n\n` +
+    `Update your payment method from your customer portal:\n${input.billingUrl}\n\n` +
+    `Stripe retries failed payments automatically once billing is fixed.`;
+
+  try {
+    await sendEmail({
+      to: input.to,
+      subject,
+      html: emailShell("Payment failed — action needed", bodyHtml),
+      text,
+    });
+    logger.info({ to: input.to }, "Sent payment-failed warning email");
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err, to: input.to },
+      "Failed to send payment-failed warning email",
+    );
+    return false;
+  }
+}
+
+export interface CancellationScheduledEmailInput {
+  to: string;
+  adminName: string;
+  companyName: string;
+  accessEndsAt: Date | null;
+  billingUrl: string;
+}
+
+/**
+ * Notifies the billing contact that their subscription is set to cancel at
+ * the end of the current period, with a link to resume it.
+ * Best-effort: returns true when sent, false on failure. Never throws.
+ */
+export async function sendCancellationScheduledEmail(
+  input: CancellationScheduledEmailInput,
+): Promise<boolean> {
+  const subject = "Your RentNotice Pro subscription is set to cancel";
+  const endsLineHtml = input.accessEndsAt
+    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.accessEndsAt))}</strong>. After that, the desktop app will pause until you resubscribe.`
+    : `Your team keeps full access through the end of the current billing period. After that, the desktop app will pause until you resubscribe.`;
+  const endsLineText = input.accessEndsAt
+    ? `Your team keeps full access through ${formatDateLong(input.accessEndsAt)}. ` +
+      `After that, the desktop app will pause until you resubscribe.`
+    : `Your team keeps full access through the end of the current billing period. ` +
+      `After that, the desktop app will pause until you resubscribe.`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 12px;line-height:1.6;">
+      Hi ${escapeHtml(input.adminName)},
+    </p>
+    <p style="margin:0 0 12px;line-height:1.6;">
+      The RentNotice Pro subscription for
+      <strong>${escapeHtml(input.companyName)}</strong> is scheduled to
+      cancel at the end of the current billing period.
+    </p>
+    <p style="margin:0 0 24px;line-height:1.6;">
+      ${endsLineHtml}
+    </p>
+    <p style="margin:0 0 24px;line-height:1.6;">
+      Changed your mind? You can resume the subscription any time before it
+      ends &mdash; no data is lost.
+    </p>
+    <p style="text-align:center;margin:0 0 8px;">
+      <a href="${escapeHtml(input.billingUrl)}"
+         style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;">
+        Manage Your Subscription
+      </a>
+    </p>
+    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;text-align:center;">
+      Open your customer portal and choose &ldquo;Manage billing&rdquo; to
+      resume your subscription.
+    </p>`;
+  const text =
+    `Hi ${input.adminName},\n\n` +
+    `The RentNotice Pro subscription for ${input.companyName} is scheduled ` +
+    `to cancel at the end of the current billing period.\n\n` +
+    `${endsLineText}\n\n` +
+    `Changed your mind? You can resume the subscription any time before it ` +
+    `ends -- no data is lost.\n\n` +
+    `Manage your subscription from your customer portal:\n${input.billingUrl}`;
+
+  try {
+    await sendEmail({
+      to: input.to,
+      subject,
+      html: emailShell("Subscription set to cancel", bodyHtml),
+      text,
+    });
+    logger.info({ to: input.to }, "Sent cancellation-scheduled email");
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err, to: input.to },
+      "Failed to send cancellation-scheduled email",
     );
     return false;
   }
