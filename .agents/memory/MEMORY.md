@@ -4,3 +4,4 @@
 - [RentNotice e2e testing quirks](rentnotice-e2e-testing.md) — in-memory session: page.goto logs you out; use SPA sidebar navigation in test plans; fresh context = fresh IndexedDB app.
 - Licensing adapter contract: transport failures MUST become LicensingUnavailableError ("offline, keep cached state"); anything else is a real error. Detail in replit.md licensing section.
 - TS gotcha (sql.js app): assignments inside `db.transaction(() => {...})` closures aren't tracked by narrowing — read results back after the transaction instead.
+- [stripe-replit-sync gotchas](stripe-replit-sync.md) — must be esbuild-external (silent migration skip when bundled); connector settings use `secret` not `secret_key`.

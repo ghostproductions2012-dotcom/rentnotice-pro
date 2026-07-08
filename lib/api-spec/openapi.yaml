@@ -10,6 +10,16 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: plans
+    description: Public pricing plans
+  - name: auth
+    description: Website account authentication
+  - name: checkout
+    description: Stripe checkout / signup flow
+  - name: portal
+    description: Authenticated company admin portal
+  - name: license
+    description: License verification API used by the desktop app
 paths:
   /healthz:
     get:
@@ -24,6 +34,359 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /www/plans:
+    get:
+      operationId: listPlans
+      tags: [plans]
+      summary: List pricing plans (public)
+      responses:
+        "200":
+          description: Available subscription tiers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Plan"
+  /www/checkout/session:
+    post:
+      operationId: startCheckout
+      tags: [checkout]
+      summary: Start signup + Stripe checkout for a plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupInput"
+      responses:
+        "200":
+          description: Stripe Checkout session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+        "400":
+          description: Invalid input (e.g. email already registered)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Payments unavailable (Stripe not configured)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/checkout/complete:
+    post:
+      operationId: completeCheckout
+      tags: [checkout]
+      summary: Finalize a paid checkout session, provisioning company, master admin and license key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckoutCompleteInput"
+      responses:
+        "200":
+          description: Company provisioned (idempotent - returns existing result on retry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionResult"
+        "400":
+          description: Session not paid or unknown
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Log out the current session
+      responses:
+        "204":
+          description: Logged out
+  /www/auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get the currently logged-in user
+      responses:
+        "200":
+          description: Current session user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "401":
+          description: Not logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/portal/overview:
+    get:
+      operationId: getPortalOverview
+      tags: [portal]
+      summary: Company overview - license key, live status, subscription details
+      responses:
+        "200":
+          description: Portal overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PortalOverview"
+        "401":
+          description: Not logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/portal/billing:
+    post:
+      operationId: createBillingSession
+      tags: [portal]
+      summary: Create a Stripe billing portal session (manage/upgrade/cancel subscription)
+      responses:
+        "200":
+          description: Billing portal session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckoutSession"
+        "401":
+          description: Not logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Requires admin role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/portal/users:
+    get:
+      operationId: listCompanyUsers
+      tags: [portal]
+      summary: List company users and their roles
+      responses:
+        "200":
+          description: Company user directory
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CompanyUser"
+        "401":
+          description: Not logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: inviteCompanyUser
+      tags: [portal]
+      summary: Invite a user by email with a role (returns a shareable invite link)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InviteInput"
+      responses:
+        "201":
+          description: Invitation created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteResult"
+        "400":
+          description: Email already in company or over seat limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Requires admin role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/portal/users/{userId}:
+    patch:
+      operationId: updateCompanyUser
+      tags: [portal]
+      summary: Change a user's role or deactivate/reactivate them
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CompanyUserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompanyUser"
+        "400":
+          description: Invalid change (e.g. demoting the master admin)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Requires admin role
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/invites/{token}:
+    get:
+      operationId: getInvite
+      tags: [auth]
+      summary: Look up a pending invitation by token
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Invitation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteDetails"
+        "404":
+          description: Invalid or already-used invite
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /www/invites/accept:
+    post:
+      operationId: acceptInvite
+      tags: [auth]
+      summary: Accept an invitation by setting name and password (logs the user in)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AcceptInviteInput"
+      responses:
+        "200":
+          description: Account activated and logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionUser"
+        "400":
+          description: Invalid token or password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /license/activate:
+    post:
+      operationId: activateLicense
+      tags: [license]
+      summary: Activate a license key from the desktop app
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LicenseActivateInput"
+      responses:
+        "200":
+          description: License activated - returns company, status and user directory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseInfo"
+        "404":
+          description: Unknown license key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: License is paused or cancelled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /license/verify:
+    post:
+      operationId: verifyLicense
+      tags: [license]
+      summary: Re-verify a license key and sync the company user directory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LicenseVerifyInput"
+      responses:
+        "200":
+          description: Current license status and user directory (also returned for paused/cancelled keys)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LicenseInfo"
+        "404":
+          description: Unknown license key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +396,317 @@ components:
           type: string
       required:
         - status
-
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: Machine-readable error code
+    Plan:
+      type: object
+      required: [tier, name, description, seats, priceMonthlyCents, features, available]
+      properties:
+        tier:
+          type: string
+          description: Stable tier key (starter, professional, enterprise)
+        name:
+          type: string
+        description:
+          type: string
+        seats:
+          type: integer
+          description: Maximum number of user seats included
+        priceMonthlyCents:
+          type: integer
+        features:
+          type: array
+          items:
+            type: string
+        stripePriceId:
+          type: ["string", "null"]
+          description: Live Stripe price id (null until Stripe products are seeded)
+        available:
+          type: boolean
+          description: Whether checkout is currently available for this tier
+        highlighted:
+          type: boolean
+    SignupInput:
+      type: object
+      required: [companyName, adminName, email, password, tier]
+      properties:
+        companyName:
+          type: string
+          minLength: 1
+        adminName:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        tier:
+          type: string
+    CheckoutSession:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: URL to redirect the browser to
+    CheckoutCompleteInput:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId:
+          type: string
+          description: Stripe checkout session id from the success redirect
+    ProvisionResult:
+      type: object
+      required: [licenseKey, companyName, tier, email]
+      properties:
+        licenseKey:
+          type: string
+        companyName:
+          type: string
+        tier:
+          type: string
+        email:
+          type: string
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    SessionUser:
+      type: object
+      required: [id, email, name, role, isMasterAdmin, companyId, companyName]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, staff, readonly]
+        isMasterAdmin:
+          type: boolean
+        companyId:
+          type: string
+        companyName:
+          type: string
+    LicenseSummary:
+      type: object
+      required: [key, status, statusReason]
+      properties:
+        key:
+          type: string
+        status:
+          type: string
+          enum: [active, paused, cancelled]
+          description: Effective status derived from the subscription lifecycle
+        statusReason:
+          type: string
+          description: Human-readable explanation of the current status
+        activatedAt:
+          type: ["string", "null"]
+          format: date-time
+        lastVerifiedAt:
+          type: ["string", "null"]
+          format: date-time
+        paidThrough:
+          type: ["string", "null"]
+          format: date-time
+          description: End of the last paid billing period
+    SubscriptionSummary:
+      type: object
+      required: [tier, tierName, seats, status]
+      properties:
+        tier:
+          type: string
+        tierName:
+          type: string
+        seats:
+          type: integer
+        status:
+          type: string
+          description: Raw Stripe subscription status (active, past_due, canceled, ...)
+        currentPeriodEnd:
+          type: ["string", "null"]
+          format: date-time
+        cancelAtPeriodEnd:
+          type: boolean
+        priceMonthlyCents:
+          type: ["integer", "null"]
+    PortalOverview:
+      type: object
+      required: [company, license, subscription, seatsUsed]
+      properties:
+        company:
+          type: object
+          required: [id, name, contactEmail]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            contactEmail:
+              type: string
+        license:
+          $ref: "#/components/schemas/LicenseSummary"
+        subscription:
+          $ref: "#/components/schemas/SubscriptionSummary"
+        seatsUsed:
+          type: integer
+    CompanyUser:
+      type: object
+      required: [id, email, name, role, active, isMasterAdmin, status]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, staff, readonly]
+        active:
+          type: boolean
+        isMasterAdmin:
+          type: boolean
+        status:
+          type: string
+          enum: [active, invited, deactivated]
+        createdAt:
+          type: ["string", "null"]
+          format: date-time
+    InviteInput:
+      type: object
+      required: [email, role]
+      properties:
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, manager, staff, readonly]
+    InviteResult:
+      type: object
+      required: [user, inviteUrl]
+      properties:
+        user:
+          $ref: "#/components/schemas/CompanyUser"
+        inviteUrl:
+          type: string
+          description: Shareable link the invited user opens to set their password
+    CompanyUserUpdate:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [admin, manager, staff, readonly]
+        active:
+          type: boolean
+    InviteDetails:
+      type: object
+      required: [email, role, companyName]
+      properties:
+        email:
+          type: string
+        role:
+          type: string
+        companyName:
+          type: string
+    AcceptInviteInput:
+      type: object
+      required: [token, name, password]
+      properties:
+        token:
+          type: string
+        name:
+          type: string
+          minLength: 1
+        password:
+          type: string
+          minLength: 8
+    DirectoryUser:
+      type: object
+      required: [id, email, name, role, active, isMasterAdmin]
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, staff, readonly]
+        active:
+          type: boolean
+        isMasterAdmin:
+          type: boolean
+    LicenseActivateInput:
+      type: object
+      required: [licenseKey, deviceId]
+      properties:
+        licenseKey:
+          type: string
+        deviceId:
+          type: string
+          description: Stable identifier for the installation
+        deviceName:
+          type: string
+    LicenseVerifyInput:
+      type: object
+      required: [licenseKey]
+      properties:
+        licenseKey:
+          type: string
+        deviceId:
+          type: string
+    LicenseInfo:
+      type: object
+      required: [status, statusReason, company, tier, seats, users, graceDays, verifiedAt]
+      properties:
+        status:
+          type: string
+          enum: [active, paused, cancelled]
+        statusReason:
+          type: string
+        company:
+          type: object
+          required: [id, name]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+        tier:
+          type: string
+        seats:
+          type: integer
+        paidThrough:
+          type: ["string", "null"]
+          format: date-time
+        users:
+          type: array
+          items:
+            $ref: "#/components/schemas/DirectoryUser"
+        graceDays:
+          type: integer
+          description: Days the desktop app may keep working offline before requiring re-verification
+        verifiedAt:
+          type: string
+          format: date-time
