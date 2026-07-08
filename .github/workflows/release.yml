@@ -51,20 +51,6 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
-    # Job-level env so signing secrets are available to tauri-action AND to the
-    # `if:` guards below. Unset secrets resolve to empty strings (graceful no-op).
-    env:
-      # --- Apple code signing + notarization ---
-      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      # --- Windows code signing ---
-      WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-      WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -105,8 +91,26 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install --frozen-lockfile
 
+      # Signing is optional. IMPORTANT: the signing env vars must only be set
+      # when the secrets are non-empty — Tauri's bundler treats an EMPTY
+      # APPLE_CERTIFICATE as "present" and fails trying to import it.
+      - name: Enable Apple code signing (only if certificate secret is set)
+        if: startsWith(matrix.platform, 'macos') && secrets.APPLE_CERTIFICATE != ''
+        run: |
+          {
+            echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
+            echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
+
       - name: Import Windows signing certificate
-        if: matrix.platform == 'windows-latest' && env.WINDOWS_CERTIFICATE != ''
+        if: matrix.platform == 'windows-latest' && secrets.WINDOWS_CERTIFICATE != ''
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         shell: pwsh
         run: |
           $pfxBytes = [System.Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
