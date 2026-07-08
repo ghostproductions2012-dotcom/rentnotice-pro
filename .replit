@@ -22,19 +22,3 @@ timeoutMs = 20000
 
 [nix]
 channel = "stable-25_05"
-
-[[ports]]
-localPort = 8081
-externalPort = 80
-
-[[ports]]
-localPort = 24772
-externalPort = 3002
-
-[[ports]]
-localPort = 25069
-externalPort = 3000
-
-[[ports]]
-localPort = 25116
-externalPort = 3001
