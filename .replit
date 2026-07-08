@@ -22,3 +22,8 @@ timeoutMs = 120000
 
 [nix]
 channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+EMAIL_FROM = "RentNotice Pro <noreply@rentnoticepro.com>"
