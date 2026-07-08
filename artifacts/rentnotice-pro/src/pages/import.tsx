@@ -4,6 +4,7 @@ import {
   useImportLedger,
   useMappingPresets,
   useParseLedgerFile,
+  usePermissions,
   useTenants,
 } from "@/lib/api/hooks";
 import type { ColumnMapping, Ledger, ParsedLedgerFile, PmVendor } from "@/lib/types";
@@ -87,6 +88,7 @@ export default function ImportWizard() {
   const { data: presets } = useMappingPresets();
   const parseFile = useParseLedgerFile();
   const importLedger = useImportLedger();
+  const { can } = usePermissions();
 
   const activeTenants = useMemo(() => (tenants ?? []).filter((t) => !t.archived), [tenants]);
 
@@ -117,6 +119,7 @@ export default function ImportWizard() {
   const amountMapped =
     !!mapping && (!!mapping.chargeAmount || !!mapping.paymentAmount || !!mapping.creditAmount || !!mapping.amount);
   const canImport =
+    can("ledger.manage") &&
     !!parsed && !!mapping && !!mapping.date && amountMapped && !!tenantId && ledgerName.trim().length > 0 &&
     (!savePreset || presetName.trim().length > 0);
 

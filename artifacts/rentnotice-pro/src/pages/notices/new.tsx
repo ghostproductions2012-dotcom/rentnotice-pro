@@ -6,6 +6,7 @@ import {
   useCreateNotice,
   useLedgers,
   useProperty,
+  usePermissions,
   useTemplates,
   useTenants,
 } from "@/lib/api/hooks";
@@ -113,6 +114,8 @@ export default function NoticeNew() {
 
   const checkDuplicate = useCheckDuplicateNotice();
   const createNotice = useCreateNotice();
+  const { can } = usePermissions();
+  const canCreate = can("notice.create");
 
   const activeTenants = useMemo(() => (tenants ?? []).filter((t) => !t.archived), [tenants]);
   const jurisdiction = property?.state || "CA";
@@ -596,11 +599,13 @@ export default function NoticeNew() {
               </Button>
               <Button
                 onClick={handleCreate}
-                disabled={!step1Valid || !step2Valid || !typeFieldsValid || !templateId || busy}
+                disabled={
+                  !step1Valid || !step2Valid || !typeFieldsValid || !templateId || busy || !canCreate
+                }
                 data-testid="button-create-notice"
               >
                 {busy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Create Draft Notice
+                {canCreate ? "Create Draft Notice" : "Insufficient permissions"}
               </Button>
             </div>
           </CardContent>

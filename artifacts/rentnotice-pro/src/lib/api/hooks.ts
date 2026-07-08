@@ -12,6 +12,7 @@ import {
 } from "@tanstack/react-query";
 import "./impl"; // registers the AppServices implementation
 import { getServices } from "./services";
+import { type Permission, can } from "./permissions";
 import type {
   AddAttachmentInput,
   ClassificationOverrideInput,
@@ -107,6 +108,22 @@ const NOTICE_ROOTS = [
 
 export function useSession() {
   return useQuery({ queryKey: qk.session, queryFn: () => getServices().getSession() });
+}
+
+/**
+ * Frontend view of the RBAC rules enforced in the service layer. Use `can(...)`
+ * to hide or disable privileged controls. The backend remains the source of
+ * truth — every gated action is also enforced in impl.ts.
+ */
+export function usePermissions() {
+  const { data: session } = useSession();
+  const role = session?.user?.role ?? null;
+  const locked = session?.locked ?? false;
+  return {
+    role,
+    isReadOnly: role === "readonly",
+    can: (permission: Permission) => !locked && can(role, permission),
+  };
 }
 
 export function useUsers() {

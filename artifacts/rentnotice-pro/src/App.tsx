@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useSession, useSelectUser, useLockApp, useUsers } from "@/lib/api/hooks";
+import { useSession, useSelectUser, useLockApp, useUsers, usePermissions } from "@/lib/api/hooks";
 import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +121,7 @@ function Sidebar() {
   const [location, setLocation] = useLocation();
   const lockApp = useLockApp();
   const { data: session } = useSession();
+  const { isReadOnly } = usePermissions();
 
   const navGroups = [
     {
@@ -195,6 +196,15 @@ function Sidebar() {
               <span className="text-xs text-muted-foreground mt-1 capitalize">{session?.user?.role}</span>
             </div>
           </div>
+          {isReadOnly && (
+            <span
+              className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border/50"
+              title="Read-only access: you can view records but cannot make changes."
+              data-testid="badge-readonly"
+            >
+              View only
+            </span>
+          )}
           <Button variant="ghost" size="icon" onClick={() => lockApp.mutate()} title="Lock Workspace">
             <Lock className="w-4 h-4" />
           </Button>

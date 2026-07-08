@@ -53,6 +53,7 @@ import type {
   LedgerDetail,
 } from "./services";
 import { registerServicesFactory } from "./services";
+import { type Permission, checkPermission } from "./permissions";
 import {
   type AppDatabase,
   attachmentsRepo,
@@ -121,6 +122,13 @@ function getDb(): Promise<AppDatabase> {
 // ------------------------------- session ------------------------------------
 
 const session: SessionInfo = { user: null, locked: false };
+
+// Authoritative RBAC gate. Every state-changing service method calls this
+// before touching the database; the UI mirrors the same rules (see
+// usePermissions) but the enforcement here is the source of truth.
+function requirePermission(permission: Permission): void {
+  checkPermission({ role: session.user?.role, locked: session.locked }, permission);
+}
 
 // Object URLs are session-scoped; rebuild them from stored bytes on demand.
 const blobUrlCache = new Map<Id, string>();
@@ -345,6 +353,7 @@ function createServices(): AppServices {
       return { user: session.user ? { ...session.user } : null, locked: true };
     },
     async createUser(input): Promise<User> {
+      requirePermission("user.manage");
       const db = await getDb();
       const user: User = {
         id: uid("user"),
@@ -360,6 +369,7 @@ function createServices(): AppServices {
       return user;
     },
     async updateUser(id, patch): Promise<User> {
+      requirePermission("user.manage");
       const db = await getDb();
       const next = { ...patch };
       if (looksLikeRawPin(next.pin)) next.pin = await sha256Hex(next.pin);
@@ -376,6 +386,7 @@ function createServices(): AppServices {
       return requireCompany(db);
     },
     async updateCompanyProfile(patch): Promise<CompanyProfile> {
+      requirePermission("settings.manage");
       const db = await getDb();
       const current = requireCompany(db);
       const next = companyRepo.update(db, current.id, patch);
@@ -389,6 +400,7 @@ function createServices(): AppServices {
       return settings;
     },
     async updateSettings(patch) {
+      requirePermission("settings.manage");
       const db = await getDb();
       const next = settingsRepo.update(db, patch);
       logAudit(db, "settings_changed", "settings", "app", "Updated application settings");
@@ -405,6 +417,7 @@ function createServices(): AppServices {
       return propertiesRepo.get(db, id);
     },
     async createProperty(input): Promise<Property> {
+      requirePermission("property.manage");
       const db = await getDb();
       const t = nowIso();
       const property: Property = {
@@ -431,12 +444,14 @@ function createServices(): AppServices {
       return property;
     },
     async updateProperty(id, patch): Promise<Property> {
+      requirePermission("property.manage");
       const db = await getDb();
       const next = propertiesRepo.update(db, id, patch);
       logAudit(db, "property_updated", "property", id, `Updated property ${next.nickname}`);
       return next;
     },
     async deleteProperty(id: Id): Promise<void> {
+      requirePermission("property.manage");
       const db = await getDb();
       const property = propertiesRepo.get(db, id);
       propertiesRepo.remove(db, id);
@@ -453,6 +468,7 @@ function createServices(): AppServices {
       return tenantsRepo.get(db, id);
     },
     async createTenant(input): Promise<Tenant> {
+      requirePermission("tenant.manage");
       const db = await getDb();
       const t = nowIso();
       const tenant: Tenant = {
@@ -475,12 +491,14 @@ function createServices(): AppServices {
       return tenant;
     },
     async updateTenant(id, patch): Promise<Tenant> {
+      requirePermission("tenant.manage");
       const db = await getDb();
       const next = tenantsRepo.update(db, id, patch);
       logAudit(db, "tenant_updated", "tenant", id, `Updated tenant ${next.names.join(", ")}`);
       return next;
     },
     async deleteTenant(id: Id): Promise<void> {
+      requirePermission("tenant.manage");
       const db = await getDb();
       const tenant = tenantsRepo.get(db, id);
       tenantsRepo.remove(db, id);
@@ -502,6 +520,7 @@ function createServices(): AppServices {
       return toParsedLedgerFile(file.name, parsed);
     },
     async importLedger(input: ImportLedgerInput): Promise<Ledger> {
+      requirePermission("ledger.manage");
       const db = await getDb();
       const t = nowIso();
       const ledger: Ledger = {
@@ -617,12 +636,14 @@ function createServices(): AppServices {
       return ledger;
     },
     async deleteLedger(id: Id): Promise<void> {
+      requirePermission("ledger.manage");
       const db = await getDb();
       calculationsRepo.remove(db, id);
       ledgersRepo.remove(db, id);
       logAudit(db, "ledger_deleted", "ledger", id, "Deleted ledger");
     },
     async overrideClassification(input: ClassificationOverrideInput): Promise<LedgerTransaction> {
+      requirePermission("ledger.manage");
       const db = await getDb();
       if (!input.reason.trim()) throw new Error("A reason is required for manual overrides");
       const current = ledgersRepo.getTransaction(db, input.transactionId);
@@ -644,10 +665,12 @@ function createServices(): AppServices {
       return mappingPresetsRepo.list(db);
     },
     async saveMappingPreset(preset) {
+      requirePermission("ledger.manage");
       const db = await getDb();
       return mappingPresetsRepo.create(db, { ...preset, id: uid("preset"), createdAt: nowIso() });
     },
     async deleteMappingPreset(id: Id): Promise<void> {
+      requirePermission("ledger.manage");
       const db = await getDb();
       mappingPresetsRepo.remove(db, id);
     },
@@ -672,6 +695,7 @@ function createServices(): AppServices {
       return noticesRepo.checkDuplicate(db, params);
     },
     async createNotice(input: NoticeInput): Promise<Notice> {
+      requirePermission("notice.create");
       const db = await getDb();
       const tenant = tenantsRepo.get(db, input.tenantId);
       const property = propertiesRepo.get(db, input.propertyId);
@@ -739,6 +763,7 @@ function createServices(): AppServices {
       return notice;
     },
     async updateNotice(id, patch): Promise<Notice> {
+      requirePermission("notice.create");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
@@ -773,6 +798,7 @@ function createServices(): AppServices {
       return next;
     },
     async deleteNotice(id: Id, reason: string): Promise<void> {
+      requirePermission("notice.delete");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) return;
@@ -790,6 +816,9 @@ function createServices(): AppServices {
       return runValidation(db, n);
     },
     async changeNoticeStatus(id, toStatus, reason): Promise<Notice> {
+      requirePermission("notice.status");
+      if (toStatus === "reviewed") requirePermission("notice.approve");
+      if (toStatus === "finalized") requirePermission("notice.finalize");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
@@ -799,6 +828,7 @@ function createServices(): AppServices {
       return next;
     },
     async approveNotice(id: Id): Promise<Notice> {
+      requirePermission("notice.approve");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
@@ -809,6 +839,7 @@ function createServices(): AppServices {
       return statusChange(db, withApproval, "reviewed", "Reviewer approval");
     },
     async finalizeNotice(id, acknowledgedWarnings, attestation): Promise<Notice> {
+      requirePermission("notice.finalize");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
@@ -851,6 +882,7 @@ function createServices(): AppServices {
       return next;
     },
     async reviseNotice(id: Id, reason: string): Promise<Notice> {
+      requirePermission("notice.status");
       const db = await getDb();
       const orig = noticesRepo.get(db, id);
       if (!orig) throw new Error("Notice not found");
@@ -894,6 +926,7 @@ function createServices(): AppServices {
       return copy;
     },
     async recordService(id, service: ServiceRecord): Promise<Notice> {
+      requirePermission("notice.status");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
@@ -915,6 +948,7 @@ function createServices(): AppServices {
 
     // --- documents ---
     async generateDocuments(input: GenerateDocumentsInput): Promise<NoticeDocument[]> {
+      requirePermission("notice.generate");
       const db = await getDb();
       const notice = noticesRepo.get(db, input.noticeId);
       if (!notice) throw new Error("Notice not found");
@@ -1017,6 +1051,7 @@ function createServices(): AppServices {
       return templatesRepo.get(db, id);
     },
     async createTemplate(input): Promise<NoticeTemplate> {
+      requirePermission("template.manage");
       const db = await getDb();
       const t = nowIso();
       const template: NoticeTemplate = {
@@ -1049,6 +1084,7 @@ function createServices(): AppServices {
       return template;
     },
     async updateTemplate(id, patch): Promise<NoticeTemplate> {
+      requirePermission("template.manage");
       const db = await getDb();
       const current = templatesRepo.get(db, id);
       if (!current) throw new Error("Template not found");
@@ -1086,6 +1122,7 @@ function createServices(): AppServices {
       return holidaysRepo.list(db, year);
     },
     async addHoliday(input): Promise<Holiday> {
+      requirePermission("settings.manage");
       const db = await getDb();
       const holiday: Holiday = { ...input, id: uid("holiday"), builtIn: false };
       holidaysRepo.create(db, holiday);
@@ -1093,6 +1130,7 @@ function createServices(): AppServices {
       return holiday;
     },
     async deleteHoliday(id: Id): Promise<void> {
+      requirePermission("settings.manage");
       const db = await getDb();
       const holiday = holidaysRepo.get(db, id);
       if (holiday?.builtIn) throw new Error("Built-in court holidays cannot be removed");
@@ -1118,6 +1156,7 @@ function createServices(): AppServices {
       return attachmentsRepo.list(db, entityType, entityId);
     },
     async addAttachment(input): Promise<Attachment> {
+      requirePermission("attachment.manage");
       const db = await getDb();
       let sizeBytes = 0;
       try {
@@ -1143,6 +1182,7 @@ function createServices(): AppServices {
       return attachment;
     },
     async deleteAttachment(id: Id): Promise<void> {
+      requirePermission("attachment.manage");
       const db = await getDb();
       const att = attachmentsRepo.get(db, id);
       attachmentsRepo.remove(db, id);
@@ -1161,6 +1201,7 @@ function createServices(): AppServices {
       return fieldAssignmentsRepo.list(db, noticeId);
     },
     async createFieldAssignment(input): Promise<FieldAssignment> {
+      requirePermission("field.manage");
       const db = await getDb();
       const t = nowIso();
       const assignment: FieldAssignment = {
@@ -1179,10 +1220,12 @@ function createServices(): AppServices {
       return assignment;
     },
     async updateFieldAssignment(id, patch): Promise<FieldAssignment> {
+      requirePermission("field.manage");
       const db = await getDb();
       return fieldAssignmentsRepo.update(db, id, patch);
     },
     async addFieldEvidence(assignmentId, evidence): Promise<FieldAssignment> {
+      requirePermission("field.manage");
       const db = await getDb();
       const full: FieldEvidence = { ...evidence, id: uid("ev") };
       return fieldAssignmentsRepo.addEvidence(db, assignmentId, full);
@@ -1194,6 +1237,7 @@ function createServices(): AppServices {
       return mailTrackingRepo.list(db, noticeId);
     },
     async createMailTracking(input): Promise<MailTracking> {
+      requirePermission("mail.manage");
       const db = await getDb();
       const t = nowIso();
       const mailed = input.mailedDate ?? null;
@@ -1212,6 +1256,7 @@ function createServices(): AppServices {
       return tracking;
     },
     async updateMailTracking(id, patch): Promise<MailTracking> {
+      requirePermission("mail.manage");
       const db = await getDb();
       const current = mailTrackingRepo.get(db, id);
       if (!current) throw new Error("Tracking record not found");
@@ -1387,12 +1432,14 @@ function createServices(): AppServices {
 
     // --- backup / restore ---
     async exportBackup(): Promise<Blob> {
+      requirePermission("settings.manage");
       const db = await getDb();
       logAudit(db, "backup_exported", "settings", null, "Exported local backup");
       const { blob } = await exportDbBackup(db);
       return blob;
     },
     async importBackup(file: File): Promise<BackupMeta> {
+      requirePermission("settings.manage");
       const db = await getDb();
       const meta = await importDbBackup(db, file);
       for (const url of blobUrlCache.values()) URL.revokeObjectURL(url);

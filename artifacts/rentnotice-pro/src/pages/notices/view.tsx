@@ -9,6 +9,7 @@ import {
   useNoticeDocuments,
   useRecordService,
   useReviseNotice,
+  usePermissions,
   useValidation,
 } from "@/lib/api/hooks";
 import {
@@ -93,6 +94,7 @@ export default function NoticeView() {
   const revise = useReviseNotice();
   const recordService = useRecordService();
   const generateDocs = useGenerateDocuments();
+  const { can } = usePermissions();
 
   const [finalizeOpen, setFinalizeOpen] = useState(false);
   const [warningReasons, setWarningReasons] = useState<Record<string, string>>({});
@@ -449,7 +451,7 @@ export default function NoticeView() {
               {notice.status === "draft" && (
                 <Button
                   className="w-full"
-                  disabled={busy}
+                  disabled={busy || !can("notice.status")}
                   onClick={() => statusAction("needs_review", "Submitted for review")}
                   data-testid="button-submit-review"
                 >
@@ -461,7 +463,7 @@ export default function NoticeView() {
                 <>
                   <Button
                     className="w-full"
-                    disabled={busy}
+                    disabled={busy || !can("notice.approve")}
                     onClick={() =>
                       approve.mutate(notice.id, {
                         onSuccess: () => toast({ title: "Notice approved" }),
@@ -476,7 +478,7 @@ export default function NoticeView() {
                   <Button
                     className="w-full"
                     variant="outline"
-                    disabled={busy}
+                    disabled={busy || !can("notice.status")}
                     onClick={() => setReviseOpen(true)}
                     data-testid="button-request-revision"
                   >
@@ -487,7 +489,7 @@ export default function NoticeView() {
               {notice.status === "reviewed" && (
                 <Button
                   className="w-full"
-                  disabled={busy}
+                  disabled={busy || !can("notice.finalize")}
                   onClick={() => {
                     setWarningReasons({});
                     setAttested(false);
@@ -502,7 +504,7 @@ export default function NoticeView() {
               {notice.status === "finalized" && (
                 <Button
                   className="w-full"
-                  disabled={busy}
+                  disabled={busy || !can("notice.status")}
                   onClick={() => setServiceOpen(true)}
                   data-testid="button-record-service"
                 >
@@ -514,7 +516,7 @@ export default function NoticeView() {
                 <>
                   <Button
                     className="w-full"
-                    disabled={busy}
+                    disabled={busy || !can("notice.status")}
                     onClick={() => statusAction("paid", "Marked as paid")}
                     data-testid="button-mark-paid"
                   >
@@ -524,7 +526,7 @@ export default function NoticeView() {
                   <Button
                     className="w-full"
                     variant="outline"
-                    disabled={busy}
+                    disabled={busy || !can("notice.status")}
                     onClick={() => statusAction("sent_to_attorney", "Flagged for attorney")}
                     data-testid="button-send-attorney"
                   >
@@ -536,7 +538,7 @@ export default function NoticeView() {
                 <Button
                   className="w-full"
                   variant="outline"
-                  disabled={busy}
+                  disabled={busy || !can("notice.status")}
                   onClick={() => setReviseOpen(true)}
                   data-testid="button-revise"
                 >
@@ -547,7 +549,7 @@ export default function NoticeView() {
                 <Button
                   variant="ghost"
                   className="w-full text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  disabled={busy}
+                  disabled={busy || !can("notice.status")}
                   onClick={() => setCancelOpen(true)}
                   data-testid="button-cancel-notice"
                 >
@@ -565,7 +567,7 @@ export default function NoticeView() {
               <Button
                 variant="outline"
                 className="w-full justify-start"
-                disabled={generateDocs.isPending}
+                disabled={generateDocs.isPending || !can("notice.generate")}
                 onClick={doPreviewDraft}
                 data-testid="button-preview-draft"
               >
