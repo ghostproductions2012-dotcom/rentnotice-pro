@@ -5,7 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, useSyncLicense } from "@/lib/api/hooks";
 import { FirstRunScreen, ActivationWizard } from "@/components/first-run";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
-import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin } from "lucide-react";
+import { evaluateGraceWarning } from "@/lib/licensing/gate";
+import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -250,6 +251,9 @@ function Layout({ children }: { children: React.ReactNode }) {
   const { data: workspace, isLoading: workspaceLoading } = useWorkspaceState();
   const syncLicense = useSyncLicense();
   const launchSyncDone = useRef(false);
+  // Days-remaining value at which the user last dismissed the grace warning;
+  // the banner reappears when the countdown drops below that value.
+  const [graceWarningDismissedAt, setGraceWarningDismissedAt] = useState<number | null>(null);
 
   // Launch-time re-verification: refresh license status and user directory
   // once per app boot. Offline is fine — cached state + grace period apply.
@@ -278,6 +282,16 @@ function Layout({ children }: { children: React.ReactNode }) {
   if (isLoading || workspaceLoading) return null;
   if (workspace?.mode === "unset") return <FirstRunScreen />;
   if (!session?.user || session.locked) return <LockScreen />;
+
+  // Grace-period countdown warning: shown a few days before the offline grace
+  // window expires (never alongside the blocked banner, which takes over at expiry).
+  const graceWarning =
+    workspace && !workspace.licenseBlocked
+      ? evaluateGraceWarning(workspace.mode, workspace.activation)
+      : null;
+  const showGraceWarning =
+    graceWarning !== null &&
+    (graceWarningDismissedAt === null || graceWarning.daysRemaining < graceWarningDismissedAt);
 
   return (
     <div className="flex min-h-[100dvh] w-full bg-background text-foreground">
@@ -308,6 +322,39 @@ function Layout({ children }: { children: React.ReactNode }) {
             >
               {syncLicense.isPending ? "Syncing…" : "Sync now"}
             </Button>
+          </div>
+        )}
+        {showGraceWarning && (
+          <div
+            className="px-8 py-3 bg-amber-500/10 border-b border-amber-500/20 text-sm flex items-center justify-between gap-4 shrink-0"
+            data-testid="banner-grace-warning"
+          >
+            <span className="text-amber-700 dark:text-amber-400 font-medium">
+              {graceWarning.daysRemaining <= 0
+                ? "Your offline grace period ends today. Reconnect and re-check your license now to keep working."
+                : `Reconnect within ${graceWarning.daysRemaining} ${graceWarning.daysRemaining === 1 ? "day" : "days"} to keep working. This device hasn't verified your company license recently, and editing will lock when the offline grace period ends.`}
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => syncLicense.mutate(undefined, { onError: () => {} })}
+                disabled={syncLicense.isPending}
+                data-testid="button-grace-recheck"
+              >
+                {syncLicense.isPending ? "Checking…" : "Re-check now"}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8 text-muted-foreground"
+                onClick={() => setGraceWarningDismissedAt(graceWarning.daysRemaining)}
+                title="Dismiss"
+                data-testid="button-grace-dismiss"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         )}
         <main className="flex-1 overflow-y-auto p-8 relative">
