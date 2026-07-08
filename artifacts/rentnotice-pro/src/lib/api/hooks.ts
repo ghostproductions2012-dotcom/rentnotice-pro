@@ -22,6 +22,7 @@ import type {
   CreateTemplateInput,
   CreateTenantInput,
   CreateUserInput,
+  DeadlineContext,
   FinalizeAttestation,
 } from "./services";
 import type {
@@ -73,8 +74,12 @@ export const qk = {
     ["templates", f ?? {}] as const,
   template: (id: Id) => ["template", id] as const,
   holidays: (year?: number) => ["holidays", year ?? 0] as const,
-  deadline: (serviceDate: string, noticeType: NoticeType, jurisdiction: string) =>
-    ["deadline", serviceDate, noticeType, jurisdiction] as const,
+  deadline: (
+    serviceDate: string,
+    noticeType: NoticeType,
+    jurisdiction: string,
+    context?: DeadlineContext,
+  ) => ["deadline", serviceDate, noticeType, jurisdiction, context ?? {}] as const,
   audit: (filters?: AuditFilters) => ["audit", filters ?? {}] as const,
   attachments: (entityType: Attachment["entityType"], entityId: Id) =>
     ["attachments", entityType, entityId] as const,
@@ -574,10 +579,12 @@ export function useDeadline(
   serviceDate: string | null | undefined,
   noticeType: NoticeType,
   jurisdiction: string,
+  context?: DeadlineContext,
 ) {
   return useQuery({
-    queryKey: qk.deadline(serviceDate ?? "none", noticeType, jurisdiction),
-    queryFn: () => getServices().computeDeadline(serviceDate as string, noticeType, jurisdiction),
+    queryKey: qk.deadline(serviceDate ?? "none", noticeType, jurisdiction, context),
+    queryFn: () =>
+      getServices().computeDeadline(serviceDate as string, noticeType, jurisdiction, context),
     enabled: !!serviceDate,
   });
 }

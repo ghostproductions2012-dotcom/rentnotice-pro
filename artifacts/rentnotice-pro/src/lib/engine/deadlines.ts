@@ -23,14 +23,31 @@ import {
   generateCaHolidays,
   getCourtHoliday,
 } from "./holidays";
-import { getNoticeTypeRule } from "./noticeRules";
+import {
+  RENT_INCREASE_LARGE_PERIOD_DAYS,
+  getNoticeTypeRule,
+  isLargeRentIncrease,
+} from "./noticeRules";
 
 const DISCLAIMER =
   "This calculator is informational only and is not legal advice. Deadlines must be confirmed by a qualified California attorney.";
 
+export interface RentIncreaseContext {
+  /** Proposed new monthly rent, in cents. */
+  newRentCents: number | null;
+  /** Tenant's current scheduled monthly rent, in cents. */
+  currentRentCents: number | null;
+}
+
 export interface DeadlineOptions {
   /** Custom holidays merged with the built-in CA judicial holiday dataset. */
   holidays?: Holiday[];
+  /**
+   * Amount context for rent-increase notices. When the new rent exceeds a 10%
+   * increase over the current scheduled rent, Cal. Civ. Code §827(b)(2)
+   * requires 90 days' notice instead of the standard 30.
+   */
+  rentIncrease?: RentIncreaseContext;
 }
 
 /**
@@ -44,6 +61,16 @@ export function computeDeadline(
 ): DeadlineResult {
   const rule = getNoticeTypeRule(noticeType);
   const warnings: string[] = [];
+
+  // Cal. Civ. Code §827(b)(2): rent increases over 10% of scheduled rent
+  // require 90 days' notice instead of the standard 30.
+  const largeRentIncrease =
+    noticeType === "rent_increase" &&
+    isLargeRentIncrease(
+      options.rentIncrease?.newRentCents,
+      options.rentIncrease?.currentRentCents,
+    );
+  const periodDays = largeRentIncrease ? RENT_INCREASE_LARGE_PERIOD_DAYS : rule.periodDays;
 
   // The built-in CA judicial holiday dataset covers a fixed year range. If the
   // counting window falls outside it, compute those years' holidays on demand
@@ -62,12 +89,17 @@ export function computeDeadline(
 
   const excludedDates: DeadlineResult["excludedDates"] = [];
   const explanation: string[] = [`Service date: ${serviceDate} (day 0 — not counted).`];
+  if (largeRentIncrease) {
+    explanation.push(
+      `Rent increase exceeds 10% of the tenant's scheduled rent — ${RENT_INCREASE_LARGE_PERIOD_DAYS} days' notice required (Cal. Civ. Code §827(b)(2)).`,
+    );
+  }
 
   let expirationDate: string;
   let countedDays: number;
 
   if (rule.countingMethod === "court_days") {
-    countedDays = rule.periodDays;
+    countedDays = periodDays;
     let cursor = serviceDate;
     let counted = 0;
     while (counted < countedDays) {
@@ -97,7 +129,7 @@ export function computeDeadline(
   } else {
     // calendar_days: count straight calendar days, then roll forward off
     // weekends/holidays so the tenant is not forced to act on a closed day.
-    countedDays = rule.periodDays;
+    countedDays = periodDays;
     let cursor = addDays(serviceDate, countedDays);
     explanation.push(
       `${cursor}: ${countedDays} calendar days after service (day after service is day 1).`,

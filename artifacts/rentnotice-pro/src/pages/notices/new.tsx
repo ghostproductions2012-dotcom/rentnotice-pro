@@ -4,12 +4,14 @@ import {
   useCalculation,
   useCheckDuplicateNotice,
   useCreateNotice,
+  useDeadline,
   useLedgers,
   useProperty,
   usePermissions,
   useTemplates,
   useTenants,
 } from "@/lib/api/hooks";
+import { isLargeRentIncrease } from "@/lib/engine/noticeRules";
 import {
   NOTICE_TYPE_LABELS,
   formatCents,
@@ -119,6 +121,26 @@ export default function NoticeNew() {
 
   const activeTenants = useMemo(() => (tenants ?? []).filter((t) => !t.archived), [tenants]);
   const jurisdiction = property?.state || "CA";
+
+  // Rent-increase notice-period preview: >10% over scheduled rent triggers the
+  // 90-day period under Cal. Civ. Code §827(b)(2) instead of the standard 30.
+  const rentIncreaseNewCents = rentIncreaseAmount
+    ? Math.round(Number(rentIncreaseAmount) * 100)
+    : null;
+  const largeIncrease = isLargeRentIncrease(rentIncreaseNewCents, tenant?.monthlyRentCents);
+  const noticePeriodDays = largeIncrease ? 90 : 30;
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const { data: deadlinePreview } = useDeadline(
+    noticeType === "rent_increase" && rentIncreaseNewCents ? today : null,
+    noticeType,
+    jurisdiction,
+    {
+      rentIncrease: {
+        newRentCents: rentIncreaseNewCents,
+        currentRentCents: tenant?.monthlyRentCents ?? null,
+      },
+    },
+  );
   const jurisdictionTemplates = useMemo(() => {
     const all = templates ?? [];
     const local = all.filter((t) => t.jurisdiction === jurisdiction);
@@ -566,6 +588,45 @@ export default function NoticeNew() {
                     data-testid="input-rent-increase-date"
                   />
                 </div>
+                {rentIncreaseNewCents != null && rentIncreaseNewCents > 0 && (
+                  <div
+                    className={`sm:col-span-2 rounded-lg border p-4 text-sm space-y-1 ${
+                      largeIncrease ? "border-accent/40 bg-accent/5" : "bg-muted/40"
+                    }`}
+                    data-testid="text-rent-increase-period"
+                  >
+                    <p className="flex gap-2 font-medium">
+                      {largeIncrease && (
+                        <AlertTriangle className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                      )}
+                      Required notice period: {noticePeriodDays} calendar days
+                      {largeIncrease
+                        ? " — the increase exceeds 10% of the tenant's scheduled rent (Cal. Civ. Code §827(b)(2))."
+                        : " (increase is 10% or less of the tenant's scheduled rent)."}
+                    </p>
+                    {tenant?.monthlyRentCents != null && tenant.monthlyRentCents > 0 ? (
+                      <p className="text-muted-foreground">
+                        Scheduled rent {formatCents(tenant.monthlyRentCents)} → new rent{" "}
+                        {formatCents(rentIncreaseNewCents)}.
+                        {deadlinePreview && (
+                          <>
+                            {" "}
+                            If served today, the notice period expires{" "}
+                            <span className="font-medium text-foreground" data-testid="text-rent-increase-expiration">
+                              {deadlinePreview.expirationDate}
+                            </span>
+                            .
+                          </>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        No scheduled rent is on file for this tenant, so the 10% threshold cannot be
+                        checked — the standard 30-day period is assumed. Verify before serving.
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

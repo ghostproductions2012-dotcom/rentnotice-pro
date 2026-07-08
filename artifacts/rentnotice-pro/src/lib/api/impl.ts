@@ -995,8 +995,16 @@ function createServices(): AppServices {
       if (!n) throw new Error("Notice not found");
       let next = noticesRepo.update(db, id, { service });
       if (service.dateServed) {
+        const tenant = n.noticeType === "rent_increase" ? tenantsRepo.get(db, n.tenantId) : null;
         const deadline = computeDeadlineEngine(service.dateServed, n.noticeType, n.jurisdiction, {
           holidays: customHolidays(db),
+          rentIncrease:
+            n.noticeType === "rent_increase"
+              ? {
+                  newRentCents: n.rentIncreaseNewAmountCents,
+                  currentRentCents: tenant?.monthlyRentCents ?? null,
+                }
+              : undefined,
         });
         next = noticesRepo.update(db, id, { deadlineDate: deadline.expirationDate });
         next = statusChange(
@@ -1200,10 +1208,11 @@ function createServices(): AppServices {
       holidaysRepo.remove(db, id);
       logAudit(db, "holiday_changed", "holiday", id, `Removed holiday ${holiday?.name ?? id}`);
     },
-    async computeDeadline(serviceDate, noticeType, jurisdiction): Promise<DeadlineResult> {
+    async computeDeadline(serviceDate, noticeType, jurisdiction, context): Promise<DeadlineResult> {
       const db = await getDb();
       return computeDeadlineEngine(serviceDate, noticeType, jurisdiction, {
         holidays: customHolidays(db),
+        rentIncrease: context?.rentIncrease,
       });
     },
 

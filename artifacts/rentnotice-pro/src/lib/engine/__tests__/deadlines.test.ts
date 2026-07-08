@@ -68,6 +68,65 @@ describe("deadline calculator", () => {
     expect(r.expirationDate).toBe("2026-07-31");
   });
 
+  it("uses 30 calendar days for a rent increase of 10% or less", () => {
+    // $2,000 → $2,150 = +7.5%. Served Mon 2026-06-01: +30 days = Wed 2026-07-01.
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 215000, currentRentCents: 200000 },
+    });
+    expect(r.countedDays).toBe(30);
+    expect(r.expirationDate).toBe("2026-07-01");
+  });
+
+  it("uses 90 calendar days for a rent increase over 10% (§827(b)(2))", () => {
+    // $2,000 → $2,300 = +15%. Served Mon 2026-06-01: +90 days = Sun 2026-08-30,
+    // rolls forward off the weekend to Mon 2026-08-31.
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 230000, currentRentCents: 200000 },
+    });
+    expect(r.countedDays).toBe(90);
+    expect(r.expirationDate).toBe("2026-08-31");
+    expect(r.explanation.join(" ")).toMatch(/827\(b\)\(2\)/);
+  });
+
+  it("uses exactly-10% boundary as the 30-day path", () => {
+    // $2,000 → $2,200 = exactly +10% — not "over 10%", so 30 days.
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 220000, currentRentCents: 200000 },
+    });
+    expect(r.countedDays).toBe(30);
+    expect(r.expirationDate).toBe("2026-07-01");
+  });
+
+  it("handles non-round cent boundaries without float error (just over 10%)", () => {
+    // Current $19.99 (1999¢): 10% threshold is 2198.9¢. 2199¢ is over 10% → 90 days.
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 2199, currentRentCents: 1999 },
+    });
+    expect(r.countedDays).toBe(90);
+  });
+
+  it("handles non-round cent boundaries without float error (under 10%)", () => {
+    // 2198¢ over 1999¢ is below the 10% threshold (2198.9¢) → 30 days.
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 2198, currentRentCents: 1999 },
+    });
+    expect(r.countedDays).toBe(30);
+  });
+
+  it("falls back to 30 days when rent-increase context is missing", () => {
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA");
+    expect(r.countedDays).toBe(30);
+    expect(r.expirationDate).toBe("2026-07-01");
+  });
+
+  it("falls back to 30 days when the current rent is unknown", () => {
+    const r = computeDeadline("2026-06-01", "rent_increase", "CA", {
+      rentIncrease: { newRentCents: 230000, currentRentCents: null },
+    });
+    expect(r.countedDays).toBe(30);
+    expect(r.expirationDate).toBe("2026-07-01");
+  });
+
   it("treats a 24-hour entry notice as one calendar day", () => {
     const r = computeDeadline("2026-06-01", "entry_24hr", "CA");
     expect(r.expirationDate).toBe("2026-06-02");

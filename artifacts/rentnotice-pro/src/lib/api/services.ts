@@ -48,6 +48,14 @@ import type {
   ValidationResult,
 } from "../types";
 
+export interface DeadlineContext {
+  /** Rent-increase amount context — enables the 90-day rule under §827(b)(2). */
+  rentIncrease?: {
+    newRentCents: number | null;
+    currentRentCents: number | null;
+  };
+}
+
 export interface CreatePropertyInput {
   nickname: string;
   addressLine1: string;
@@ -225,6 +233,7 @@ export interface AppServices {
     serviceDate: string,
     noticeType: NoticeType,
     jurisdiction: string,
+    context?: DeadlineContext,
   ): Promise<DeadlineResult>;
 
   // --- audit ---

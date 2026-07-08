@@ -128,6 +128,32 @@ export function getNoticeTypeRule(noticeType: NoticeType): NoticeTypeRule {
 }
 
 /**
+ * Cal. Civ. Code §827(b)(2): a rent increase greater than 10% (cumulative
+ * within 12 months) requires at least 90 days' notice instead of 30.
+ */
+export const RENT_INCREASE_LARGE_PERIOD_DAYS = 90;
+
+/**
+ * True when a proposed new rent exceeds a 10% increase over the tenant's
+ * scheduled rent, triggering the 90-day notice period under §827(b)(2).
+ * Returns false when either amount is missing or the current rent is not
+ * positive (the standard 30-day rule then applies).
+ */
+export function isLargeRentIncrease(
+  newRentCents: number | null | undefined,
+  currentRentCents: number | null | undefined,
+): boolean {
+  // Integer-safe "new > current * 1.1" — avoids float/rounding errors on
+  // non-round cent values (e.g. 1999 → 2199 is over 10% and must qualify).
+  return (
+    newRentCents != null &&
+    currentRentCents != null &&
+    currentRentCents > 0 &&
+    newRentCents * 10 > currentRentCents * 11
+  );
+}
+
+/**
  * CA notices referenced by the spec that are outside the NoticeType contract.
  * Provided as informational metadata only.
  */

@@ -24,7 +24,7 @@ import type {
 } from "../types";
 import { formatCents } from "../types";
 import { monthBounds } from "./dateUtils";
-import { getNoticeTypeRule } from "./noticeRules";
+import { getNoticeTypeRule, isLargeRentIncrease } from "./noticeRules";
 
 export interface ValidationContext {
   notice: Notice;
@@ -219,19 +219,19 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
     );
 
   // Civ. Code §827(b)(2): a cumulative rent increase greater than 10% within
-  // 12 months requires at least 90 days' notice (this tool's rent-increase
-  // rule computes 30 days). Compared against the tenant's scheduled rent.
+  // 12 months requires at least 90 days' notice (the deadline calculator
+  // applies the 90-day period automatically when this context is present).
+  // Compared against the tenant's scheduled rent.
   if (
     notice.noticeType === "rent_increase" &&
     notice.rentIncreaseNewAmountCents != null &&
     ctx.tenant?.monthlyRentCents != null &&
-    ctx.tenant.monthlyRentCents > 0 &&
-    notice.rentIncreaseNewAmountCents > Math.round(ctx.tenant.monthlyRentCents * 1.1)
+    isLargeRentIncrease(notice.rentIncreaseNewAmountCents, ctx.tenant.monthlyRentCents)
   )
     add(
       "rent_increase_over_10_percent",
       "warning",
-      `The new rent (${formatCents(notice.rentIncreaseNewAmountCents)}) exceeds a 10% increase over the tenant's scheduled rent (${formatCents(ctx.tenant.monthlyRentCents)}). California Civil Code §827(b)(2) requires at least 90 days' notice for increases over 10% — attorney review is required before serving this notice.`,
+      `The new rent (${formatCents(notice.rentIncreaseNewAmountCents)}) exceeds a 10% increase over the tenant's scheduled rent (${formatCents(ctx.tenant.monthlyRentCents)}). California Civil Code §827(b)(2) requires at least 90 days' notice for increases over 10% — the deadline calculator applies the 90-day period, and attorney review is required before serving this notice.`,
       "rentIncreaseNewAmountCents",
     );
 
