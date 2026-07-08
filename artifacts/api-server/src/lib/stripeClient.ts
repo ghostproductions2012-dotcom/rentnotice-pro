@@ -2,13 +2,24 @@ import Stripe from "stripe";
 import { StripeSync } from "stripe-replit-sync";
 
 /**
- * Fetches Stripe credentials from the Replit connection API.
+ * Resolves Stripe credentials. Prefers the STRIPE_SECRET_KEY secret (the
+ * user's own Stripe account); falls back to the Replit Stripe connector.
  * Not cached -- tokens can rotate, so fetch fresh each time.
+ *
+ * When the secret key comes from STRIPE_SECRET_KEY there is no connector
+ * webhook secret; webhook signature verification then uses the managed
+ * webhook's signing secret that stripe-replit-sync stores in the database
+ * when it creates the webhook endpoint.
  */
 async function getStripeCredentials(): Promise<{
   secretKey: string;
   webhookSecret?: string;
 }> {
+  const envKey = process.env.STRIPE_SECRET_KEY;
+  if (envKey) {
+    return { secretKey: envKey };
+  }
+
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
     ? "repl " + process.env.REPL_IDENTITY

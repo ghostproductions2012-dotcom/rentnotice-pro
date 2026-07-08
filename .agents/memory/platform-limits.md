@@ -10,6 +10,13 @@ description: Environment-specific restrictions hit while building in this projec
 
 **How to apply:** If mobile artifact creation fails with this message, don't treat it as permanent: defer to a follow-up and retry in a replit.com session. Always attempt creation first rather than assuming it's blocked.
 
+## viewEnvVars can omit secrets that actually exist
+`viewEnvVars()` in a task env listed only some secrets (July 2026: RESEND_API_KEY missing from the list) while `[ -n "$VAR" ]` in the shell confirmed it was present.
+
+**Why:** the secrets listing appears to snapshot/filter differently from the live process environment in task environments.
+
+**How to apply:** before concluding a secret is missing (and asking the user for it), confirm absence via the shell (`[ -n "$KEY" ]`), not just the listing.
+
 ## Shared-proxy path collisions with SPA routes
 Artifacts on the shared proxy own their preview path prefix (e.g. the Expo app owns `/field`). A desktop SPA route with the same path renders fine on client-side navigation but full page loads/reloads get proxied to the other artifact (blank page + asset 404s).
 
