@@ -108,6 +108,8 @@ function rowToUser(r: Row): User {
     id: asStr(r.id),
     name: asStr(r.name),
     initials: asStr(r.initials),
+    username: asStr(r.username),
+    email: strOrNull(r.email),
     role: asStr(r.role) as UserRole,
     // The schema stores the SHA-256 hex digest in pin_hash; null = no PIN.
     pin: strOrNull(r.pin_hash),
@@ -121,6 +123,8 @@ function userRow(u: User): Row {
     id: u.id,
     name: u.name,
     initials: u.initials,
+    username: u.username,
+    email: u.email,
     role: u.role,
     pin_hash: u.pin,
     active: fromBool(u.active),
@@ -137,6 +141,16 @@ export const usersRepo = {
   },
   get(db: AppDatabase, id: Id): User | null {
     const r = db.get("SELECT * FROM users WHERE id = ?", [id]);
+    return r ? rowToUser(r) : null;
+  },
+  /** Case-insensitive lookup by username or email. */
+  findByIdentifier(db: AppDatabase, identifier: string): User | null {
+    const needle = identifier.trim().toLowerCase();
+    if (!needle) return null;
+    const r = db.get("SELECT * FROM users WHERE lower(username) = ? OR lower(email) = ?", [
+      needle,
+      needle,
+    ]);
     return r ? rowToUser(r) : null;
   },
   create(db: AppDatabase, user: User): User {

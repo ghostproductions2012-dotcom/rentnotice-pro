@@ -85,6 +85,8 @@ export interface ClassificationOverrideInput {
 
 export interface CreateUserInput {
   name: string;
+  username: string;
+  email?: string | null;
   role: UserRole;
   pin?: string | null;
 }
@@ -138,7 +140,8 @@ export interface AppServices {
   // --- session & users ---
   getSession(): Promise<SessionInfo>;
   listUsers(): Promise<User[]>;
-  selectUser(userId: Id, pin?: string): Promise<SessionInfo>;
+  /** Sign in with a username or email plus the account's PIN/password. */
+  login(identifier: string, secret: string): Promise<SessionInfo>;
   lockApp(): Promise<SessionInfo>;
   createUser(input: CreateUserInput): Promise<User>;
   updateUser(id: Id, patch: Partial<Omit<User, "id" | "createdAt">>): Promise<User>;

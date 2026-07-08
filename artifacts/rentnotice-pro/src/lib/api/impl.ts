@@ -201,8 +201,30 @@ function initialsOf(name: string): string {
     .join("");
 }
 
-function looksLikeRawPin(pin: string | null | undefined): pin is string {
-  return typeof pin === "string" && /^\d{4,6}$/.test(pin);
+/**
+ * A raw (not-yet-hashed) sign-in secret: a 4-6 digit PIN or a password of at
+ * least 8 characters. Stored values are SHA-256 hex digests, which we never
+ * re-hash.
+ */
+function isStoredSecretHash(value: string): boolean {
+  return /^[0-9a-f]{64}$/i.test(value);
+}
+
+function looksLikeRawSecret(secret: string | null | undefined): secret is string {
+  if (typeof secret !== "string") return false;
+  if (isStoredSecretHash(secret)) return false; // already a stored hash
+  return /^\d{4,6}$/.test(secret) || secret.length >= 8;
+}
+
+const INVALID_SECRET_MESSAGE = "Secret must be a 4-6 digit PIN or a password of at least 8 characters";
+
+function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase();
+}
+
+function normalizeEmail(email: string | null | undefined): string | null {
+  const e = (email ?? "").trim().toLowerCase();
+  return e.length > 0 ? e : null;
 }
 
 function singleLineAddress(property: Property): string {
@@ -333,14 +355,17 @@ function createServices(): AppServices {
       const db = await getDb();
       return usersRepo.list(db);
     },
-    async selectUser(userId: Id, pin?: string): Promise<SessionInfo> {
+    async login(identifier: string, secret: string): Promise<SessionInfo> {
       const db = await getDb();
-      const user = usersRepo.get(db, userId);
-      if (!user || !user.active) throw new Error("User not found or inactive");
+      // One generic error for every failure mode so the login form never
+      // reveals which accounts exist.
+      const invalidCredentials = () => new Error("Invalid username/email or PIN/password");
+      const user = usersRepo.findByIdentifier(db, identifier);
+      if (!user || !user.active) throw invalidCredentials();
       if (user.pin) {
-        if (!pin) throw new Error("PIN required");
-        const hash = await sha256Hex(pin);
-        if (hash !== user.pin) throw new Error("Incorrect PIN");
+        if (!secret) throw invalidCredentials();
+        const hash = await sha256Hex(secret);
+        if (hash !== user.pin) throw invalidCredentials();
       }
       session.user = user;
       session.locked = false;
@@ -355,12 +380,27 @@ function createServices(): AppServices {
     async createUser(input): Promise<User> {
       requirePermission("user.manage");
       const db = await getDb();
+      const username = normalizeUsername(input.username);
+      if (!username) throw new Error("Username is required");
+      if (username.includes("@")) throw new Error("Username cannot contain '@'");
+      const email = normalizeEmail(input.email);
+      if (usersRepo.findByIdentifier(db, username))
+        throw new Error("Username is already in use");
+      if (email && usersRepo.findByIdentifier(db, email))
+        throw new Error("Email is already in use");
+      let pinHash: string | null = null;
+      if (input.pin !== undefined && input.pin !== null && input.pin !== "") {
+        if (!looksLikeRawSecret(input.pin)) throw new Error(INVALID_SECRET_MESSAGE);
+        pinHash = await sha256Hex(input.pin);
+      }
       const user: User = {
         id: uid("user"),
         name: input.name,
         initials: initialsOf(input.name),
+        username,
+        email,
         role: input.role,
-        pin: looksLikeRawPin(input.pin) ? await sha256Hex(input.pin) : null,
+        pin: pinHash,
         active: true,
         createdAt: nowIso(),
       };
@@ -372,8 +412,31 @@ function createServices(): AppServices {
       requirePermission("user.manage");
       const db = await getDb();
       const next = { ...patch };
-      if (looksLikeRawPin(next.pin)) next.pin = await sha256Hex(next.pin);
+      // next.pin may be: undefined (no change), null/"" (clear), an existing
+      // stored hash (pass through), or a raw PIN/password (hash it). Anything
+      // else is an invalid raw secret and must be rejected — never stored.
+      if (typeof next.pin === "string" && !isStoredSecretHash(next.pin)) {
+        if (next.pin === "") next.pin = null;
+        else if (looksLikeRawSecret(next.pin)) next.pin = await sha256Hex(next.pin);
+        else throw new Error(INVALID_SECRET_MESSAGE);
+      }
       if (next.name) next.initials = patch.initials ?? initialsOf(next.name);
+      if (next.username !== undefined) {
+        const username = normalizeUsername(next.username ?? "");
+        if (!username) throw new Error("Username is required");
+        if (username.includes("@")) throw new Error("Username cannot contain '@'");
+        const clash = usersRepo.findByIdentifier(db, username);
+        if (clash && clash.id !== id) throw new Error("Username is already in use");
+        next.username = username;
+      }
+      if (next.email !== undefined) {
+        const email = normalizeEmail(next.email);
+        if (email) {
+          const clash = usersRepo.findByIdentifier(db, email);
+          if (clash && clash.id !== id) throw new Error("Email is already in use");
+        }
+        next.email = email;
+      }
       const user = usersRepo.update(db, id, next);
       if (session.user?.id === id) session.user = user;
       logAudit(db, "user_updated", "user", id, `Updated user ${user.name}`);

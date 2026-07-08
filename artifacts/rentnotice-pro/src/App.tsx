@@ -2,7 +2,7 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useSession, useSelectUser, useLockApp, useUsers, usePermissions } from "@/lib/api/hooks";
+import { useSession, useLogin, useLockApp, usePermissions } from "@/lib/api/hooks";
 import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,18 +42,23 @@ function NotFound() {
 }
 
 function LockScreen() {
-  const { data: users, isLoading } = useUsers();
-  const selectUser = useSelectUser();
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [pin, setPin] = useState("");
-
-  if (isLoading) return <div className="flex min-h-screen items-center justify-center bg-background"><div className="animate-pulse w-8 h-8 rounded-full bg-primary/20" /></div>;
+  const { data: session } = useSession();
+  const login = useLogin();
+  const lockedUser = session?.locked ? session.user : null;
+  const [identifier, setIdentifier] = useState(lockedUser?.username ?? "");
+  const [secret, setSecret] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedUserId) {
-      selectUser.mutate({ userId: selectedUserId, pin });
-    }
+    setError(null);
+    login.mutate(
+      { identifier: identifier.trim(), secret },
+      {
+        onError: (err) =>
+          setError(err instanceof Error ? err.message : "Sign-in failed. Please try again."),
+      },
+    );
   };
 
   return (
@@ -65,50 +70,53 @@ function LockScreen() {
             <Scale className="w-8 h-8" />
           </div>
           <CardTitle className="text-3xl font-serif font-semibold tracking-tight">RentNotice Pro</CardTitle>
-          <CardDescription className="text-base">Secure Legal Operations</CardDescription>
+          <CardDescription className="text-base">
+            {lockedUser ? `Workspace locked — sign in to continue` : "Secure Legal Operations"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                {users?.filter(u => u.active).map(u => (
-                  <Button
-                    key={u.id}
-                    type="button"
-                    variant={selectedUserId === u.id ? "default" : "outline"}
-                    className="h-auto py-4 flex flex-col items-center gap-2 justify-center"
-                    onClick={() => { setSelectedUserId(u.id); setPin(""); }}
-                  >
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-foreground">
-                      {u.initials}
-                    </div>
-                    <span className="text-sm">{u.name}</span>
-                  </Button>
-                ))}
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="login-identifier">Username or email</label>
+                <Input
+                  id="login-identifier"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="e.g. jchen or jchen@company.com"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  autoFocus={!lockedUser}
+                  data-testid="input-login-identifier"
+                />
               </div>
-              
-              {selectedUserId && users?.find(u => u.id === selectedUserId)?.pin !== null && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                  <label className="text-sm font-medium">PIN Required</label>
-                  <Input 
-                    type="password" 
-                    placeholder="Enter PIN" 
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value)}
-                    className="text-center text-lg tracking-widest"
-                    maxLength={6}
-                    autoFocus
-                  />
-                </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium" htmlFor="login-secret">PIN or password</label>
+                <Input
+                  id="login-secret"
+                  type="password"
+                  autoComplete="current-password"
+                  placeholder="Enter your PIN or password"
+                  value={secret}
+                  onChange={(e) => setSecret(e.target.value)}
+                  autoFocus={!!lockedUser}
+                  data-testid="input-login-secret"
+                />
+              </div>
+              {error && (
+                <p className="text-sm text-destructive" role="alert" data-testid="text-login-error">
+                  {error}
+                </p>
               )}
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={!selectedUserId || (users?.find(u => u.id === selectedUserId)?.pin !== null && pin.length < 4) || selectUser.isPending}
+
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!identifier.trim() || login.isPending}
+              data-testid="button-login"
             >
-              {selectUser.isPending ? "Authenticating..." : "Access Workspace"}
+              {login.isPending ? "Authenticating..." : "Access Workspace"}
             </Button>
           </form>
         </CardContent>

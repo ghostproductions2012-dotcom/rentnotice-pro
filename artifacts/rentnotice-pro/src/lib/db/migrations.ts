@@ -31,6 +31,38 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    name: "user_login_identifiers",
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE users ADD COLUMN username TEXT;
+        ALTER TABLE users ADD COLUMN email TEXT;
+      `);
+      // Backfill a deterministic username for existing users: first initial +
+      // last name, lowercased ("Alex Rivera" -> "arivera"), de-duplicated with
+      // a numeric suffix.
+      const rows = db.all<{ id: string; name: string }>(
+        "SELECT id, name FROM users ORDER BY created_at, id",
+      );
+      const taken = new Set<string>();
+      for (const row of rows) {
+        const parts = String(row.name ?? "")
+          .trim()
+          .toLowerCase()
+          .split(/\s+/)
+          .filter(Boolean);
+        const raw =
+          parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1]}` : (parts[0] ?? "user");
+        const base = raw.replace(/[^a-z0-9]/g, "") || "user";
+        let candidate = base;
+        let i = 2;
+        while (taken.has(candidate)) candidate = `${base}${i++}`;
+        taken.add(candidate);
+        db.run("UPDATE users SET username = ? WHERE id = ?", [candidate, row.id]);
+      }
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

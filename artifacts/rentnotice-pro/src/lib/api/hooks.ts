@@ -130,11 +130,11 @@ export function useUsers() {
   return useQuery({ queryKey: qk.users, queryFn: () => getServices().listUsers() });
 }
 
-export function useSelectUser() {
+export function useLogin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ userId, pin }: { userId: Id; pin?: string }) =>
-      getServices().selectUser(userId, pin),
+    mutationFn: ({ identifier, secret }: { identifier: string; secret: string }) =>
+      getServices().login(identifier, secret),
     onSuccess: () => invalidate(qc, ["session", "audit", "dashboard"]),
   });
 }

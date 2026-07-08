@@ -14,8 +14,10 @@ export interface User {
   id: Id;
   name: string;
   initials: string;
+  username: string; // unique sign-in handle (lowercase)
+  email: string | null; // optional; also usable to sign in
   role: UserRole;
-  pin: string | null; // 4-6 digit PIN, null = no PIN required
+  pin: string | null; // SHA-256 hash of the PIN/password, null = no secret required
   active: boolean;
   createdAt: string; // ISO datetime
 }
