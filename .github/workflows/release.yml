@@ -19,6 +19,12 @@ on:
 permissions:
   contents: write
 
+env:
+  # The production licensing/API server the installed desktop apps talk to.
+  # Change this ONE value if the server ever moves (e.g. to a custom domain
+  # like https://www.rentnoticepro.com), then cut a new release.
+  VITE_LICENSE_API_URL: "https://cross-platform-ghost-music.replit.app"
+
 jobs:
   release:
     name: Build ${{ matrix.label }}
@@ -48,9 +54,6 @@ jobs:
     # Job-level env so signing secrets are available to tauri-action AND to the
     # `if:` guards below. Unset secrets resolve to empty strings (graceful no-op).
     env:
-      # --- Updater artifact signing (tauri signer) ---
-      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       # --- Apple code signing + notarization ---
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -115,18 +118,6 @@ jobs:
           Remove-Item $pfxPath -Force
           Write-Host "Imported Windows signing certificate ($($cert.Thumbprint))."
 
-      - name: Determine updater artifact flags
-        id: updater
-        shell: bash
-        run: |
-          if [ -n "${TAURI_SIGNING_PRIVATE_KEY}" ]; then
-            echo "Updater signing key present — building signed updater artifacts."
-            echo "args=" >> "$GITHUB_OUTPUT"
-          else
-            echo "No TAURI_SIGNING_PRIVATE_KEY — disabling updater artifacts for this build."
-            echo 'args=--config {"bundle":{"createUpdaterArtifacts":false}}' >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Build desktop installers
         uses: tauri-apps/tauri-action@v0
         env:
@@ -138,4 +129,4 @@ jobs:
           releaseBody: "Download the installer for your operating system below. This build is a draft — review, then publish the release."
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }} ${{ steps.updater.outputs.args }}
+          args: ${{ matrix.args }}

@@ -10,64 +10,38 @@ source live in [`src-tauri/`](./src-tauri).
 
 ---
 
-## 0. One-time repo setup a maintainer must do
+## 0. One-time repo setup — DONE
 
-Because this is a shared pnpm monorepo, a few Tauri-specific pieces are **not**
-committed automatically. Add them once before your first desktop build.
+The maintainer setup this section used to describe is complete and committed:
 
-### 0.1 Add the Tauri scripts + dev deps to `package.json`
-
-Add the following to `artifacts/rentnotice-pro/package.json`. These scripts are
-referenced by `src-tauri/tauri.conf.json` (`beforeDevCommand` /
-`beforeBuildCommand`) and by the maintainer commands below.
-
-```jsonc
-{
-  "scripts": {
-    // ...existing scripts (dev, build, serve, typecheck) stay as-is...
-
-    "tauri": "tauri",
-
-    // Regenerate the icon set from a source PNG (see src-tauri/icons/README.md)
-    "desktop:icon": "tauri icon ./src-tauri/icons/source-icon.png",
-
-    // Frontend commands Tauri calls internally. They pin PORT + BASE_PATH so the
-    // shared vite.config.ts works without edits. BASE_PATH must be relative (./)
-    // for the packaged app to load assets from the local filesystem.
-    "desktop:dev:web": "cross-env PORT=5000 BASE_PATH=/ vite --config vite.config.ts --host 0.0.0.0 --port 5000",
-    "desktop:build:web": "cross-env PORT=5000 BASE_PATH=./ vite build --config vite.config.ts",
-
-    // Maintainer entry points
-    "desktop:dev": "cross-env PORT=5000 BASE_PATH=/ tauri dev",
-    "desktop:build": "cross-env PORT=5000 BASE_PATH=./ tauri build"
-  },
-  "devDependencies": {
-    // ...existing devDependencies stay as-is...
-    "@tauri-apps/cli": "^2",
-    "cross-env": "^7"
-  }
-}
-```
+- The `tauri`, `desktop:icon`, `desktop:dev(:web)`, and `desktop:build(:web)`
+  scripts plus the `@tauri-apps/cli` and `cross-env` dev dependencies live in
+  `artifacts/rentnotice-pro/package.json`.
+- The full application icon set is generated and committed under
+  [`src-tauri/icons/`](./src-tauri/icons) (see its README to regenerate after a
+  branding change).
 
 > **Why `cross-env`?** `vite.config.ts` requires `PORT` and `BASE_PATH` to be set
 > (it throws otherwise), and Windows `cmd` cannot use inline `VAR=value` syntax.
-> `cross-env` sets them portably across macOS/Windows/Linux.
+> `cross-env` sets them portably across macOS/Windows/Linux. `BASE_PATH` must be
+> relative (`./`) for the packaged app to load assets from the local filesystem.
 
 > **Note on the frontend output path.** `vite.config.ts` builds to `dist/public`
 > (not `dist`), so `frontendDist` in `tauri.conf.json` is `"../dist/public"`.
 > Do not change `vite.config.ts`; the Tauri config already points at the correct
 > folder.
 
-After editing `package.json`, run `pnpm install` from the repo root.
+### 0.1 The production API URL
 
-### 0.2 Generate the application icons
+Installed desktop apps must talk to the hosted licensing server, not
+"same origin" (there is no same origin inside a packaged app). The URL is baked
+in at build time from the `VITE_LICENSE_API_URL` environment variable (read in
+`src/lib/licensing/http.ts`).
 
-Tauri needs a real icon set (the binaries are not committed — see
-[`src-tauri/icons/README.md`](./src-tauri/icons/README.md)):
-
-```bash
-pnpm --filter @workspace/rentnotice-pro run desktop:icon
-```
+- **CI releases:** `release.yml` sets it at the top of the workflow (`env:` →
+  `VITE_LICENSE_API_URL`). Change that ONE value if the server moves.
+- **Local desktop builds:** export it yourself before `desktop:build`, e.g.
+  `VITE_LICENSE_API_URL=https://cross-platform-ghost-music.replit.app`.
 
 ---
 
@@ -199,8 +173,6 @@ installers (nothing hard-fails). Add secrets under
 | Secret                                | Platform | Purpose                                                        | Required? |
 | ------------------------------------- | -------- | -------------------------------------------------------------- | --------- |
 | `GITHUB_TOKEN`                        | all      | Create the draft Release / upload assets (provided automatically) | Automatic |
-| `TAURI_SIGNING_PRIVATE_KEY`           | all      | Sign auto-updater artifacts (`.sig`) — see §4                   | Optional* |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`  | all      | Password for the updater private key                           | Optional  |
 | `APPLE_CERTIFICATE`                   | macOS    | Base64 of the `.p12` Developer ID Application certificate      | Optional  |
 | `APPLE_CERTIFICATE_PASSWORD`          | macOS    | Password for the `.p12`                                        | Optional  |
 | `APPLE_SIGNING_IDENTITY`             | macOS    | e.g. `Developer ID Application: Company (TEAMID)`              | Optional  |
@@ -209,11 +181,6 @@ installers (nothing hard-fails). Add secrets under
 | `APPLE_TEAM_ID`                       | macOS    | Apple Developer Team ID                                       | Optional  |
 | `WINDOWS_CERTIFICATE`                 | Windows  | Base64 of the code-signing `.pfx`                             | Optional  |
 | `WINDOWS_CERTIFICATE_PASSWORD`        | Windows  | Password for the `.pfx`                                       | Optional  |
-
-\* If `TAURI_SIGNING_PRIVATE_KEY` is **not** set, `release.yml` automatically
-disables updater artifact generation for that run
-(`--config {"bundle":{"createUpdaterArtifacts":false}}`) so the build succeeds
-without it.
 
 **Windows signing note:** `release.yml` imports `WINDOWS_CERTIFICATE` into the
 runner's certificate store (only when set) and exports its thumbprint as
@@ -232,23 +199,28 @@ Leave it unset for unsigned CI builds.
 
 ---
 
-## 4. Auto-updater signing keys
+## 4. Auto-updater (disabled in v1)
 
-The updater plugin is pre-wired in `src-tauri/tauri.conf.json` with a
-**placeholder** endpoint and public key:
+The auto-updater is **fully disabled** for v1 so installed apps never contact a
+placeholder endpoint: the `tauri-plugin-updater` dependency is removed from
+`src-tauri/Cargo.toml`, the plugin is not registered in `src-tauri/src/lib.rs`,
+`updater:default` is removed from `src-tauri/capabilities/default.json`, and
+`bundle.createUpdaterArtifacts` is `false` in `tauri.conf.json`. Customers get
+new versions by downloading them from the website's Download page.
 
-```jsonc
-"plugins": {
-  "updater": {
-    "endpoints": ["https://releases.rentnotice.pro/updater/{{target}}/{{arch}}/{{current_version}}"],
-    "pubkey": "REPLACE_WITH_YOUR_TAURI_UPDATER_PUBLIC_KEY_BASE64"
-  }
-}
-```
+To enable real auto-updates later:
 
-To enable real auto-updates:
+1. **Re-add the plugin:**
+   - `src-tauri/Cargo.toml` → add
+     `[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]`
+     with `tauri-plugin-updater = "2"`.
+   - `src-tauri/src/lib.rs` → register
+     `tauri_plugin_updater::Builder::new().build()` behind `#[cfg(desktop)]`.
+   - `src-tauri/capabilities/default.json` → add `"updater:default"`.
+   - `tauri.conf.json` → set `bundle.createUpdaterArtifacts` to `true` and add a
+     `plugins.updater` section with your real endpoint + public key.
 
-1. **Generate a keypair** with the Tauri signer:
+2. **Generate a keypair** with the Tauri signer:
 
    ```bash
    pnpm --filter @workspace/rentnotice-pro exec tauri signer generate -w ~/.tauri/rentnotice-pro.key
@@ -256,19 +228,17 @@ To enable real auto-updates:
 
    This prints a **public key** and writes a **private key** file.
 
-2. **Set the public key** — paste the printed public key into
+3. **Set the public key** — paste the printed public key into
    `tauri.conf.json` → `plugins.updater.pubkey`.
 
-3. **Set the private key as CI secrets:**
+4. **Set the private key as CI secrets** (and re-wire them into `release.yml`'s
+   job `env`):
    - `TAURI_SIGNING_PRIVATE_KEY` = the contents of the private key file
      (or its base64), and
    - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` = the password you chose.
 
-4. **Point `endpoints`** at wherever you host `latest.json` and the signed
+5. **Point `endpoints`** at wherever you host `latest.json` and the signed
    artifacts.
 
 > Keep the private key secret and backed up. Losing it means you cannot ship
 > updates that existing installs will accept.
-
-With the key present, CI produces signed updater artifacts and a `latest.json`
-manifest alongside the installers.

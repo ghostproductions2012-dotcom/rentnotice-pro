@@ -1,0 +1,23 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FF4D14"/>
+      <stop offset="1" stop-color="#E63200"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="204" fill="url(#bg)"/>
+  <!-- Notice document -->
+  <g>
+    <rect x="292" y="212" width="440" height="600" rx="40" fill="#FFFFFF"/>
+    <!-- folded corner -->
+    <path d="M732 340 L604 340 A40 40 0 0 1 564 300 L564 212 L692 212 A40 40 0 0 1 732 252 Z" fill="#FFD9CC"/>
+    <path d="M564 212 L732 340 L604 340 A40 40 0 0 1 564 300 Z" fill="#FFB49C"/>
+    <!-- text lines -->
+    <rect x="352" y="420" width="320" height="36" rx="18" fill="#FF3C00"/>
+    <rect x="352" y="500" width="256" height="28" rx="14" fill="#F0B4A0"/>
+    <rect x="352" y="560" width="288" height="28" rx="14" fill="#F0B4A0"/>
+    <rect x="352" y="620" width="208" height="28" rx="14" fill="#F0B4A0"/>
+    <!-- signature check -->
+    <path d="M366 726 L406 764 L478 686" stroke="#FF3C00" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

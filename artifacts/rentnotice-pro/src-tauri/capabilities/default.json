@@ -1,12 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capability set for the RentNotice Pro main window: core defaults, native dialogs, updater checks, and filesystem access scoped to the app data directories.",
+  "description": "Default capability set for the RentNotice Pro main window: core defaults, native dialogs, and filesystem access scoped to the app data directories.",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "dialog:default",
-    "updater:default",
     "fs:default",
     "fs:allow-appdata-read-recursive",
     "fs:allow-appdata-write-recursive",

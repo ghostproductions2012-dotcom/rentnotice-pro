@@ -1,22 +1,26 @@
 # App Icons
 
 This directory holds the platform icon set that Tauri bundles into the desktop
-installers. **The binary icon files are intentionally _not_ committed here** —
-they are generated from a single source image with the Tauri CLI.
+installers. The icons **are committed** so GitHub Actions release builds work
+without any extra setup. They are generated from the single source image
+`source-icon.svg` / `source-icon.png` (RentNotice Pro brand: orange #FF3C00
+rounded square with a white notice document).
 
-## Generate the icon set
+## Regenerate the icon set (after changing the branding)
 
-1. Create a square source image (PNG, transparent background, **at least
-   1024×1024 px**). Name it something like `source-icon.png` and keep it out of
-   version control, or store it under `src-tauri/icons/source-icon.png`.
+1. Edit `source-icon.svg`, then re-render the 1024×1024 PNG:
+
+   ```bash
+   magick -background none src-tauri/icons/source-icon.svg -resize 1024x1024 src-tauri/icons/source-icon.png
+   ```
+
+   (Any SVG-to-PNG tool works; keep the transparent background and ≥1024×1024 size.)
 
 2. From the app package directory (`artifacts/rentnotice-pro`) run:
 
    ```bash
-   pnpm tauri icon ./src-tauri/icons/source-icon.png
+   pnpm run desktop:icon
    ```
-
-   (or, if you have the CLI installed globally, `tauri icon ./src-tauri/icons/source-icon.png`)
 
 3. This regenerates every file referenced by `bundle.icon` in
    `src-tauri/tauri.conf.json`, including:
@@ -30,9 +34,13 @@ they are generated from a single source image with the Tauri CLI.
    | `icon.ico`           | Windows `.msi` / `.nsis`    |
    | `Square*Logo*.png`   | Windows Store / tiles       |
 
+   The Tauri CLI also emits `android/` and `ios/` icon folders — delete those,
+   they are not used by the desktop app.
+
+4. Commit the regenerated binaries.
+
 ## Notes
 
 - Keep the file list in `bundle.icon` in sync if you add or remove icon sizes.
-- `tauri build` will fail until this icon set exists, so run `tauri icon` once
-  before your first desktop build.
-- Do not hand-edit the generated binaries; re-run `tauri icon` to update them.
+- Do not hand-edit the generated binaries; re-run `pnpm run desktop:icon` to
+  update them.

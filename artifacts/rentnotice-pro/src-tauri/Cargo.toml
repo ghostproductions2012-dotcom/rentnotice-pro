@@ -1,6 +1,6 @@
 [package]
 name = "rentnotice-pro"
-version = "0.1.0"
+version = "1.0.0"
 description = "RentNotice Pro — California 3-Day Pay or Quit notice preparation suite"
 authors = ["RentNotice Pro"]
 edition = "2021"
@@ -24,9 +24,9 @@ tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-# The updater plugin is desktop-only.
-[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2"
+# NOTE: the auto-updater (tauri-plugin-updater) is intentionally NOT included
+# in v1 — installed apps must never phone home to a placeholder endpoint.
+# See BUILDING.md §4 for how to re-enable it with real signing keys.
 
 [features]
 # This feature is used for production builds or when a dev server is not
