@@ -1254,12 +1254,27 @@ function createServices(): AppServices {
       );
       return copy;
     },
-    async recordService(id, service: ServiceRecord): Promise<Notice> {
+    async recordService(
+      id,
+      service: ServiceRecord,
+      options?: { source?: "field_sync" },
+    ): Promise<Notice> {
       requirePermission("notice.status");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
+      const fromFieldSync = options?.source === "field_sync";
       let next = noticesRepo.update(db, id, { service });
+      logAudit(
+        db,
+        "service_recorded",
+        "notice",
+        id,
+        fromFieldSync
+          ? `Service recorded from field sync for ${n.tenantNames.join(", ")} (served by ${service.servedBy || "unknown"})`
+          : `Service recorded for ${n.tenantNames.join(", ")}`,
+        { reason: fromFieldSync ? "field_sync" : null },
+      );
       if (service.dateServed) {
         const tenant = n.noticeType === "rent_increase" ? tenantsRepo.get(db, n.tenantId) : null;
         const deadline = computeDeadlineEngine(service.dateServed, n.noticeType, n.jurisdiction, {
@@ -1277,7 +1292,7 @@ function createServices(): AppServices {
           db,
           next,
           service.method === "post_and_mail" && service.mailedDate ? "mailed" : "served",
-          "Service recorded",
+          fromFieldSync ? "Service recorded from field sync" : "Service recorded",
         );
       }
       return next;

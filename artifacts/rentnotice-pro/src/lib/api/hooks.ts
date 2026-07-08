@@ -535,8 +535,15 @@ export function useReviseNotice() {
 export function useRecordService() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, service }: { id: Id; service: ServiceRecord }) =>
-      getServices().recordService(id, service),
+    mutationFn: ({
+      id,
+      service,
+      source,
+    }: {
+      id: Id;
+      service: ServiceRecord;
+      source?: "field_sync";
+    }) => getServices().recordService(id, service, source ? { source } : undefined),
     onSuccess: () => invalidate(qc, NOTICE_ROOTS),
   });
 }

@@ -623,7 +623,8 @@ export type AuditAction =
   | "login"
   | "warning_acknowledged"
   | "workspace_activated"
-  | "directory_synced";
+  | "directory_synced"
+  | "service_recorded";
 
 export interface AuditEntry {
   id: Id;

@@ -6,6 +6,7 @@ import {
   useNotices,
   useSettings,
   usePermissions,
+  useRecordService,
 } from "@/lib/api/hooks";
 import type { FieldAssignment, FieldEvidence, Notice } from "@/lib/types";
 import { NOTICE_TYPE_LABELS, formatCents } from "@/lib/types";
@@ -96,6 +97,27 @@ const METHOD_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+type ServeCandidate = {
+  noticeId: string;
+  assignmentId: string;
+  tenantNames: string[];
+  propertyAddress: string;
+  unit: string;
+  completedAt: string;
+  serviceMethod: FieldAssignment["serviceMethod"];
+  assigneeName: string;
+};
+
+function localDateParts(iso: string): { date: string; time: string } {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return { date: "", time: "" };
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
+  };
+}
+
 function toPushPayload(a: FieldAssignment, notice: Notice | undefined) {
   return {
     id: a.id,
@@ -143,6 +165,9 @@ export default function FieldAssignmentsPage() {
   const [instructions, setInstructions] = useState("");
   const [syncing, setSyncing] = useState<"push" | "pull" | null>(null);
   const [evidenceView, setEvidenceView] = useState<FieldAssignment | null>(null);
+  const [serveCandidates, setServeCandidates] = useState<ServeCandidate[]>([]);
+  const [recordingService, setRecordingService] = useState(false);
+  const recordService = useRecordService();
 
   const noticeById = useMemo(() => {
     const map = new Map<string, Notice>();
@@ -160,6 +185,7 @@ export default function FieldAssignmentsPage() {
 
   const syncEnabled = settings?.syncEnabled === true;
   const canManage = can ? can("field.manage") : true;
+  const canRecordService = can ? can("notice.status") : true;
 
   const handleCreate = () => {
     if (!noticeId || !assigneeName.trim()) return;
@@ -251,10 +277,79 @@ export default function FieldAssignmentsPage() {
           ? `${updated} assignment${updated === 1 ? "" : "s"} updated with field activity.`
           : "Everything is already up to date.",
       });
+      if (canRecordService) {
+        const candidates: ServeCandidate[] = [];
+        for (const r of remote) {
+          if (r.status !== "completed" || !r.completedAt) continue;
+          const l = local.find((a) => a.id === r.id);
+          if (!l) continue;
+          const notice = noticeById.get(l.noticeId);
+          if (!notice) continue;
+          if (["served", "mailed"].includes(notice.status)) continue;
+          if (notice.service.dateServed) continue;
+          candidates.push({
+            noticeId: notice.id,
+            assignmentId: l.id,
+            tenantNames: notice.tenantNames,
+            propertyAddress: notice.propertyAddress,
+            unit: notice.unit,
+            completedAt: r.completedAt,
+            serviceMethod: r.serviceMethod ?? l.serviceMethod,
+            assigneeName: l.assigneeName,
+          });
+        }
+        if (candidates.length > 0) setServeCandidates(candidates);
+      }
     } catch (e) {
       toast({ title: "Pull failed", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
     } finally {
       setSyncing(null);
+    }
+  };
+
+  const handleRecordServices = async () => {
+    setRecordingService(true);
+    let recorded = 0;
+    let failed = 0;
+    for (const c of serveCandidates) {
+      const { date, time } = localDateParts(c.completedAt);
+      if (!date) {
+        failed += 1;
+        continue;
+      }
+      try {
+        await recordService.mutateAsync({
+          id: c.noticeId,
+          service: {
+            dateServed: date,
+            timeServed: time || null,
+            method: c.serviceMethod,
+            servedBy: c.assigneeName,
+            serverNotes: "Recorded automatically from field sync",
+            mailedDate: null,
+          },
+          source: "field_sync",
+        });
+        recorded += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    setRecordingService(false);
+    setServeCandidates([]);
+    qc.invalidateQueries();
+    if (recorded > 0) {
+      toast({
+        title: "Service recorded",
+        description: `${recorded} notice${recorded === 1 ? "" : "s"} marked as served from field evidence. Deadlines are now counting.`,
+      });
+    }
+    if (failed > 0) {
+      toast({
+        title: "Some notices could not be updated",
+        description: `${failed} notice${failed === 1 ? "" : "s"} failed to record service. Record it manually from the notice page.`,
+        variant: "destructive",
+      });
     }
   };
 
@@ -460,6 +555,62 @@ export default function FieldAssignmentsPage() {
               data-testid="button-create-assignment"
             >
               {createAssignment.isPending ? "Creating…" : "Create Assignment"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={serveCandidates.length > 0}
+        onOpenChange={(open) => {
+          if (!open && !recordingService) setServeCandidates([]);
+        }}
+      >
+        <DialogContent className="max-w-lg" data-testid="dialog-record-service">
+          <DialogHeader>
+            <DialogTitle>Record service from field?</DialogTitle>
+            <DialogDescription>
+              {serveCandidates.length === 1
+                ? "A field agent completed this assignment. Record service on the notice so the compliance deadline starts counting."
+                : `Field agents completed ${serveCandidates.length} assignments. Record service on these notices so compliance deadlines start counting.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 max-h-[50vh] overflow-y-auto py-2">
+            {serveCandidates.map((c) => (
+              <div key={c.assignmentId} className="border rounded-lg p-3 text-sm space-y-1" data-testid={`serve-candidate-${c.assignmentId}`}>
+                <div className="font-medium">{c.tenantNames.join(", ")}</div>
+                <div className="text-muted-foreground">
+                  {c.propertyAddress}
+                  {c.unit ? `, Unit ${c.unit}` : ""}
+                </div>
+                <div className="text-muted-foreground">
+                  Served {new Date(c.completedAt).toLocaleString()} by{" "}
+                  <span className="text-foreground">{c.assigneeName}</span>
+                  {c.serviceMethod && (
+                    <>
+                      {" "}via <span className="text-foreground">{METHOD_LABELS[c.serviceMethod] ?? c.serviceMethod}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setServeCandidates([])}
+              disabled={recordingService}
+              data-testid="button-skip-record-service"
+            >
+              Not now
+            </Button>
+            <Button
+              onClick={handleRecordServices}
+              disabled={recordingService}
+              data-testid="button-confirm-record-service"
+            >
+              {recordingService && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Record service
             </Button>
           </DialogFooter>
         </DialogContent>

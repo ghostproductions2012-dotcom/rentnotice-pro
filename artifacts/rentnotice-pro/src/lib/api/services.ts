@@ -239,7 +239,11 @@ export interface AppServices {
     attestation: FinalizeAttestation,
   ): Promise<Notice>;
   reviseNotice(id: Id, reason: string): Promise<Notice>;
-  recordService(id: Id, service: ServiceRecord): Promise<Notice>;
+  recordService(
+    id: Id,
+    service: ServiceRecord,
+    options?: { source?: "field_sync" },
+  ): Promise<Notice>;
 
   // --- documents ---
   generateDocuments(input: GenerateDocumentsInput): Promise<NoticeDocument[]>;
