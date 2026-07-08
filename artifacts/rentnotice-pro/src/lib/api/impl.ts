@@ -1316,6 +1316,7 @@ function createServices(): AppServices {
           calculateRentOnly(notice.ledgerId, transactions)
         : null;
       const auditEntries = auditRepo.list(db, { entityType: "notice", entityId: notice.id });
+      const fieldAssignments = fieldAssignmentsRepo.list(db, notice.id);
       const ctx: DocumentContext = {
         notice,
         tenant,
@@ -1325,6 +1326,7 @@ function createServices(): AppServices {
         template,
         auditEntries,
         serviceInfo: notice.service,
+        fieldAssignments,
       };
       const isDraft = input.packetKind === "draft";
       const opts = isDraft ? { watermark: true } : undefined;
@@ -1335,8 +1337,11 @@ function createServices(): AppServices {
         });
       }
 
+      const hasFieldEvidence = fieldAssignments.some((a) => a.evidence.length > 0);
       const kinds = packetContents(input.packetKind).filter(
-        (k) => k !== "lahd_letter" || notice.includeLahdLetter,
+        (k) =>
+          (k !== "lahd_letter" || notice.includeLahdLetter) &&
+          (k !== "service_evidence" || hasFieldEvidence),
       );
       const generated: KindedDocument[] = [];
       for (const kind of kinds) {

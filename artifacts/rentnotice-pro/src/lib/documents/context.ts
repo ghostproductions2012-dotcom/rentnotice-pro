@@ -8,6 +8,7 @@ import type {
   AuditEntry,
   CalculationResult,
   CompanyProfile,
+  FieldAssignment,
   Notice,
   NoticeTemplate,
   Property,
@@ -37,6 +38,8 @@ export interface DocumentContext {
   auditEntries: AuditEntry[];
   /** Service record (proof-of-service / date-of-service fields). */
   serviceInfo: ServiceRecord;
+  /** Field assignments linked to the notice (service evidence exhibit). */
+  fieldAssignments: FieldAssignment[];
 }
 
 /** Uniform return shape for every generator (matches DocumentService semantics). */

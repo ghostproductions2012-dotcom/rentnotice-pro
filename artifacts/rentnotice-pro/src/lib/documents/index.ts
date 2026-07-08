@@ -13,6 +13,7 @@ import type { DocumentKind } from "../types";
 import type { DocumentContext, GeneratedDocument, GenerateOptions } from "./context";
 import { generateNotice } from "./generators/notice";
 import { generateProofOfService } from "./generators/proof-of-service";
+import { generateServiceEvidence } from "./generators/service-evidence";
 import { generatePostingChecklist } from "./generators/posting-checklist";
 import { generateCalcReview } from "./generators/calc-review";
 import { generateExcludedSummary } from "./generators/excluded-summary";
@@ -54,6 +55,7 @@ export type { KindedDocument } from "./packet";
 export {
   generateNotice,
   generateProofOfService,
+  generateServiceEvidence,
   generatePostingChecklist,
   generateCalcReview,
   generateExcludedSummary,
@@ -69,6 +71,7 @@ type Generator = (ctx: DocumentContext, options?: GenerateOptions) => Promise<Ge
 const GENERATORS: Record<DocumentKind, Generator> = {
   notice: generateNotice,
   proof_of_service: generateProofOfService,
+  service_evidence: generateServiceEvidence,
   posting_checklist: generatePostingChecklist,
   calc_review: generateCalcReview,
   excluded_summary: generateExcludedSummary,

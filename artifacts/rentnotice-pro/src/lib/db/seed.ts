@@ -9,6 +9,7 @@ import type { AppDatabase } from "./client";
 import {
   companyRepo,
   emptyPayment,
+  fieldAssignmentsRepo,
   holidaysRepo,
   ledgersRepo,
   mappingPresetsRepo,
@@ -23,6 +24,7 @@ import { sha256Hex } from "./util";
 import type {
   AppSettings,
   CompanyProfile,
+  FieldAssignment,
   Holiday,
   Ledger,
   LedgerTransaction,
@@ -718,6 +720,109 @@ function seedNotices(db: AppDatabase): void {
   for (const seed of seeds) noticesRepo.create(db, buildNotice(seed));
 }
 
+// --------------------------- field assignments ------------------------------
+
+// 1x1 gray PNG used when canvas rendering is unavailable (e.g. tests).
+const FALLBACK_PHOTO =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mPcvHnLfwAHtgLxpx0iGAAAAABJRU5ErkJggg==";
+
+/**
+ * Render a simple placeholder "field photo" (posted notice on a door) via
+ * canvas so demo evidence looks realistic in the UI and embeds cleanly in the
+ * Service Evidence Exhibit PDF. Falls back to a tiny PNG outside the browser.
+ */
+function evidencePhotoDataUrl(label: string, subtitle: string): string {
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 480;
+    const g = canvas.getContext("2d");
+    if (!g) return FALLBACK_PHOTO;
+    // wall
+    g.fillStyle = "#b8a894";
+    g.fillRect(0, 0, 640, 480);
+    // door
+    g.fillStyle = "#5b4634";
+    g.fillRect(180, 40, 280, 440);
+    g.strokeStyle = "#3e2f22";
+    g.lineWidth = 6;
+    g.strokeRect(180, 40, 280, 440);
+    // door panels
+    g.strokeStyle = "#4a3829";
+    g.lineWidth = 3;
+    g.strokeRect(210, 70, 220, 150);
+    g.strokeRect(210, 300, 220, 150);
+    // knob
+    g.fillStyle = "#c9b037";
+    g.beginPath();
+    g.arc(430, 260, 9, 0, Math.PI * 2);
+    g.fill();
+    // posted notice sheet
+    g.fillStyle = "#f8f6ef";
+    g.fillRect(240, 110, 160, 210);
+    g.strokeStyle = "#999";
+    g.lineWidth = 2;
+    g.strokeRect(240, 110, 160, 210);
+    g.fillStyle = "#222";
+    g.font = "bold 16px sans-serif";
+    g.textAlign = "center";
+    g.fillText("3-DAY NOTICE", 320, 140);
+    g.font = "11px sans-serif";
+    g.fillText("TO PAY RENT OR QUIT", 320, 158);
+    g.fillStyle = "#555";
+    for (let i = 0; i < 8; i++) g.fillRect(255, 175 + i * 16, 130, 4);
+    // caption bar
+    g.fillStyle = "rgba(0,0,0,0.65)";
+    g.fillRect(0, 420, 640, 60);
+    g.fillStyle = "#fff";
+    g.font = "bold 18px sans-serif";
+    g.textAlign = "left";
+    g.fillText(label, 16, 446);
+    g.font = "13px sans-serif";
+    g.fillText(subtitle, 16, 468);
+    return canvas.toDataURL("image/jpeg", 0.85);
+  } catch {
+    return FALLBACK_PHOTO;
+  }
+}
+
+function seedFieldAssignments(db: AppDatabase): void {
+  // Completed assignment for notice-1 (served post-and-mail on 2026-06-05):
+  // provides on-site photo evidence with GPS + timestamps for the packet.
+  const assignment: FieldAssignment = {
+    id: "fa-1",
+    noticeId: "notice-1",
+    assigneeName: "Jamie Chen",
+    instructions: "Attempt personal service; if unavailable, post on unit door, photograph the posting, and mail the same day.",
+    status: "completed",
+    serviceMethod: "post_and_mail",
+    completedAt: "2026-06-05T17:25:00.000Z",
+    evidence: [
+      {
+        id: "fev-1",
+        photoDataUrl: evidencePhotoDataUrl("Notice posted — unit door", "Captured Jun 5, 2026 · 10:15 AM PT"),
+        latitude: 34.09145,
+        longitude: -118.28325,
+        accuracyMeters: 6,
+        capturedAt: "2026-06-05T17:15:40.000Z",
+        note: "Notice posted on unit entry door.",
+      },
+      {
+        id: "fev-2",
+        photoDataUrl: evidencePhotoDataUrl("Building entrance", "Captured Jun 5, 2026 · 10:17 AM PT"),
+        latitude: 34.09148,
+        longitude: -118.28331,
+        accuracyMeters: 9,
+        capturedAt: "2026-06-05T17:17:05.000Z",
+        note: "Building entrance at time of posting.",
+      },
+    ],
+    createdAt: "2026-06-04T16:00:00.000Z",
+    updatedAt: "2026-06-05T17:25:00.000Z",
+  };
+  fieldAssignmentsRepo.create(db, assignment);
+}
+
 // ------------------------------- holidays ----------------------------------
 
 const HOLIDAYS_BY_YEAR: Record<string, [string, string][]> = {
@@ -808,5 +913,6 @@ export async function seedDatabase(db: AppDatabase): Promise<void> {
   seedMappingPresets(db);
   seedLedgers(db);
   seedNotices(db);
+  seedFieldAssignments(db);
   seedHolidays(db);
 }

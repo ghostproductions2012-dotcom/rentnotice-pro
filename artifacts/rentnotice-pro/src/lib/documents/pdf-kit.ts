@@ -472,6 +472,37 @@ export class DocBuilder {
     }
   }
 
+  /**
+   * Embed a base64 data-URL photo (PNG or JPEG), scaled to fit within
+   * maxWidth/maxHeight, draw it with a thin border, and advance the cursor.
+   * Throws on unsupported/undecodable image data — callers decide how to
+   * surface the failure.
+   */
+  async image(dataUrl: string, opts?: { maxWidth?: number; maxHeight?: number }): Promise<void> {
+    const match = /^data:image\/(png|jpe?g);base64,([\s\S]+)$/i.exec(dataUrl.trim());
+    if (!match) throw new Error("Unsupported image data URL (expected base64 PNG or JPEG)");
+    const bytes = Uint8Array.from(atob(match[2].replace(/\s/g, "")), (c) => c.charCodeAt(0));
+    const img = /^png$/i.test(match[1])
+      ? await this.doc.embedPng(bytes)
+      : await this.doc.embedJpg(bytes);
+    const maxW = Math.min(opts?.maxWidth ?? CONTENT_W, CONTENT_W);
+    const maxH = opts?.maxHeight ?? 320;
+    const scale = Math.min(maxW / img.width, maxH / img.height, 1);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    this.ensureSpace(h + 8);
+    this.page.drawImage(img, { x: MARGIN, y: this.y - h, width: w, height: h });
+    this.page.drawRectangle({
+      x: MARGIN,
+      y: this.y - h,
+      width: w,
+      height: h,
+      borderColor: COLORS.rule,
+      borderWidth: 0.75,
+    });
+    this.y -= h + 8;
+  }
+
   /** Thin horizontal divider across the content width. */
   divider(opts?: { gapBefore?: number; gapAfter?: number }): void {
     this.moveDown(opts?.gapBefore ?? 6);

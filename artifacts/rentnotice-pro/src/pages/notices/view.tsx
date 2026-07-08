@@ -4,6 +4,7 @@ import {
   useApproveNotice,
   useChangeNoticeStatus,
   useFinalizeNotice,
+  useFieldAssignments,
   useGenerateDocuments,
   useNotice,
   useNoticeDocuments,
@@ -17,6 +18,7 @@ import {
   NOTICE_STATUS_LABELS,
   NOTICE_TYPE_LABELS,
   formatCents,
+  type FieldAssignmentStatus,
   type ServiceMethod,
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -53,12 +55,14 @@ import {
   AlertTriangle,
   ArrowLeft,
   BadgeCheck,
+  Camera,
   CheckCircle,
   Download,
   Eye,
   FileText,
   Loader2,
   Lock,
+  MapPin,
   Send,
   Stamp,
   Truck,
@@ -69,6 +73,13 @@ const SERVICE_METHOD_LABELS: Record<ServiceMethod, string> = {
   substitute: "Substituted service",
   post_and_mail: "Post & mail",
   other: "Other",
+};
+
+const FIELD_STATUS_LABELS: Record<FieldAssignmentStatus, string> = {
+  assigned: "Assigned",
+  in_progress: "In progress",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };
 
 function monthLabel(ym: string): string {
@@ -87,6 +98,7 @@ export default function NoticeView() {
   const { data: notice, isLoading } = useNotice(id);
   const { data: validation } = useValidation(id);
   const { data: documents } = useNoticeDocuments(id);
+  const { data: fieldAssignments } = useFieldAssignments(id);
 
   const changeStatus = useChangeNoticeStatus();
   const approve = useApproveNotice();
@@ -437,6 +449,81 @@ export default function NoticeView() {
                     </div>
                   )}
                 </dl>
+              </CardContent>
+            </Card>
+          )}
+
+          {(fieldAssignments?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader className="border-b pb-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Camera className="w-5 h-5 text-primary" />
+                  Field Service Evidence
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                {fieldAssignments?.map((a) => (
+                  <div key={a.id} className="space-y-3" data-testid={`field-assignment-${a.id}`}>
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium">{a.assigneeName || "Unnamed server"}</span>
+                      <span className="px-2 py-0.5 bg-muted text-xs font-medium rounded-md">
+                        {FIELD_STATUS_LABELS[a.status]}
+                      </span>
+                      {a.serviceMethod && (
+                        <span className="text-muted-foreground">
+                          {SERVICE_METHOD_LABELS[a.serviceMethod]}
+                        </span>
+                      )}
+                      {a.completedAt && (
+                        <span className="text-muted-foreground">
+                          Completed {new Date(a.completedAt).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    {a.evidence.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No evidence captured yet for this assignment.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {a.evidence.map((e) => (
+                          <div
+                            key={e.id}
+                            className="border rounded-lg overflow-hidden bg-muted/30"
+                            data-testid={`field-evidence-${e.id}`}
+                          >
+                            <img
+                              src={e.photoDataUrl}
+                              alt="Service evidence"
+                              className="w-full h-44 object-cover"
+                            />
+                            <div className="p-3 text-xs space-y-1">
+                              <div className="font-medium">
+                                {new Date(e.capturedAt).toLocaleString()}
+                              </div>
+                              {e.latitude != null && e.longitude != null ? (
+                                <div className="text-muted-foreground flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" />
+                                  {e.latitude.toFixed(5)}, {e.longitude.toFixed(5)}
+                                  {e.accuracyMeters != null
+                                    ? ` (±${Math.round(e.accuracyMeters)} m)`
+                                    : ""}
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground">GPS not available</div>
+                              )}
+                              {e.note && <div className="text-muted-foreground">{e.note}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">
+                  Evidence photos are added to generated packets as a Service Evidence Exhibit with
+                  capture time, GPS coordinates, server name, and method.
+                </p>
               </CardContent>
             </Card>
           )}

@@ -483,6 +483,7 @@ export interface ValidationResult {
 export type DocumentKind =
   | "notice" // the notice itself
   | "proof_of_service"
+  | "service_evidence"
   | "posting_checklist"
   | "calc_review"
   | "excluded_summary"
@@ -861,6 +862,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
 export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   notice: "Notice",
   proof_of_service: "Proof of Service",
+  service_evidence: "Service Evidence Exhibit",
   posting_checklist: "Posting / Mailing Checklist",
   calc_review: "Calculation Review",
   excluded_summary: "Excluded Charge Summary",
