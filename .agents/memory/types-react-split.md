@@ -13,3 +13,4 @@ The Expo mobile artifact pins an older `@types/react` (19.1.x) while the web cat
 - For case 1: add a `packageExtensions` entry in `pnpm-workspace.yaml` giving the offending package an `'@types/react': '*'` peer (existing entries for react-day-picker and lucide-react show the pattern), then `pnpm install`.
 - For case 2: add `import * as React from "react"` to the file.
 - Symptom signature: TS2322 errors saying `React.CSSProperties`/`Ref` from one `@types+react@x` path is not assignable to another version's path ("two different types with this name exist").
+- To find which package pulls in the old copy: run `tsc -p <artifact>/tsconfig.json --noEmit --explainFiles` and grep for the older `@types+react` version — the "Imported via 'react' from ..." lines name the offending untyped-peer packages.

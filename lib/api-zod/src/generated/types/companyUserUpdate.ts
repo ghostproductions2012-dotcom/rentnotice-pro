@@ -10,4 +10,10 @@ import type { CompanyUserUpdateRole } from './companyUserUpdateRole';
 export interface CompanyUserUpdate {
   role?: CompanyUserUpdateRole;
   active?: boolean;
+  /**
+     * Desktop sign-in username (lowercase letters, digits, ".", "_", "-"); null clears it so the desktop app derives one from the email
+     * @maxLength 32
+     * @nullable
+     */
+  username?: string | null;
 }

@@ -68,17 +68,27 @@ catalog:
 
 autoInstallPeers: false
 
-# react-day-picker declares no @types/react peer, so it type-resolves via pnpm's
+# These packages declare no @types/react peer, so they type-resolve via pnpm's
 # hidden hoisted fallback — which can be the mobile app's older @types/react and
-# poison web artifacts' global React namespace. Flavor it per consumer instead.
+# poison web artifacts' global React namespace. Flavor them per consumer instead.
 packageExtensions:
   react-day-picker:
     peerDependencies:
       '@types/react': '*'
-  # lucide-react has the same issue: no @types/react peer, so its icon types
-  # can resolve against the mobile app's older @types/react instead of the
-  # consumer's. Flavor it per consumer as well.
+  # lucide-react, wouter, @tanstack/react-query, and recharts have the same
+  # issue: no @types/react peer, so their react types can resolve against the
+  # mobile app's older @types/react instead of the consumer's. Flavor them per
+  # consumer as well.
   lucide-react:
+    peerDependencies:
+      '@types/react': '*'
+  wouter:
+    peerDependencies:
+      '@types/react': '*'
+  '@tanstack/react-query':
+    peerDependencies:
+      '@types/react': '*'
+  recharts:
     peerDependencies:
       '@types/react': '*'
 

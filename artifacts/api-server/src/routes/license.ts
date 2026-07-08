@@ -23,6 +23,7 @@ function directoryUser(user: CloudUser) {
     id: user.id,
     email: user.email,
     name: user.name,
+    username: user.username,
     role: user.role,
     active: user.active,
     isMasterAdmin: user.isMasterAdmin,

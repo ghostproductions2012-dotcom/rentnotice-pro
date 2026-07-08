@@ -168,6 +168,11 @@ export interface CompanyUser {
   role: CompanyUserRole;
   active: boolean;
   isMasterAdmin: boolean;
+  /**
+     * Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
+     * @nullable
+     */
+  username?: string | null;
   status: CompanyUserStatus;
   /** @nullable */
   createdAt?: string | null;
@@ -209,6 +214,12 @@ export const CompanyUserUpdateRole = {
 export interface CompanyUserUpdate {
   role?: CompanyUserUpdateRole;
   active?: boolean;
+  /**
+     * Desktop sign-in username (lowercase letters, digits, ".", "_", "-"); null clears it so the desktop app derives one from the email
+     * @maxLength 32
+     * @nullable
+     */
+  username?: string | null;
 }
 
 export interface InviteDetails {
@@ -239,6 +250,11 @@ export interface DirectoryUser {
   id: string;
   email: string;
   name: string;
+  /**
+     * Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
+     * @nullable
+     */
+  username?: string | null;
   role: DirectoryUserRole;
   active: boolean;
   isMasterAdmin: boolean;

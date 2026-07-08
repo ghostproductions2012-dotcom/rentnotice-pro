@@ -15,6 +15,11 @@ export interface CompanyUser {
   role: CompanyUserRole;
   active: boolean;
   isMasterAdmin: boolean;
+  /**
+     * Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
+     * @nullable
+     */
+  username?: string | null;
   status: CompanyUserStatus;
   /** @nullable */
   createdAt?: Date | null;

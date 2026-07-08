@@ -788,6 +788,11 @@ components:
           type: boolean
         isMasterAdmin:
           type: boolean
+        username:
+          type:
+            - string
+            - 'null'
+          description: Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
         status:
           type: string
           enum:
@@ -842,6 +847,12 @@ components:
             - readonly
         active:
           type: boolean
+        username:
+          type:
+            - string
+            - 'null'
+          maxLength: 32
+          description: Desktop sign-in username (lowercase letters, digits, ".", "_", "-"); null clears it so the desktop app derives one from the email
     InviteDetails:
       type: object
       required:
@@ -886,6 +897,11 @@ components:
           type: string
         name:
           type: string
+        username:
+          type:
+            - string
+            - 'null'
+          description: Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
         role:
           type: string
           enum:

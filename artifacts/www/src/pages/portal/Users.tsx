@@ -16,6 +16,7 @@ import * as z from "zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Copy, MoreHorizontal, Shield, UserPlus, Users as UsersIcon } from "lucide-react";
+import type { CompanyUser } from "@workspace/api-client-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { format } from "date-fns";
 
@@ -35,6 +36,9 @@ export default function Users() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [inviteResult, setInviteResult] = useState<{url: string, email: string, emailSent: boolean} | null>(null);
   const [copied, setCopied] = useState(false);
+  const [usernameTarget, setUsernameTarget] = useState<CompanyUser | null>(null);
+  const [usernameValue, setUsernameValue] = useState("");
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   
   const isAdmin = me?.role === 'admin';
   const seatsAvailable = overview ? overview.subscription.seats - overview.seatsUsed : 0;
@@ -71,6 +75,32 @@ export default function Users() {
       queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const openUsernameDialog = (user: CompanyUser) => {
+    setUsernameTarget(user);
+    setUsernameValue(user.username ?? "");
+    setUsernameError(null);
+  };
+
+  const handleSaveUsername = async () => {
+    if (!usernameTarget) return;
+    const trimmed = usernameValue.trim().toLowerCase();
+    if (trimmed && !/^[a-z0-9._-]{1,32}$/.test(trimmed)) {
+      setUsernameError("Use only lowercase letters, numbers, dots, underscores and hyphens (max 32 characters).");
+      return;
+    }
+    try {
+      await updateMutation.mutateAsync({
+        userId: usernameTarget.id,
+        data: { username: trimmed === "" ? null : trimmed },
+      });
+      queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
+      setUsernameTarget(null);
+    } catch (e: unknown) {
+      const data = (e as { data?: { error?: string } })?.data;
+      setUsernameError(data?.error ?? "Could not save the username. Please try again.");
     }
   };
 
@@ -237,6 +267,11 @@ export default function Users() {
                     <TableCell>
                       <div className="font-medium text-foreground">{user.name || "Pending..."}</div>
                       <div className="text-xs text-muted-foreground">{user.email}</div>
+                      {user.username && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          Desktop username: <span className="font-mono">{user.username}</span>
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5">
@@ -251,7 +286,7 @@ export default function Users() {
                       {user.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {isAdmin && !user.isMasterAdmin && user.id !== me?.id ? (
+                      {isAdmin ? (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -259,16 +294,22 @@ export default function Users() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Change Role</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "admin")}>Admin</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "manager")}>Manager</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "staff")}>Staff</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "readonly")}>Read-only</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {user.status === 'deactivated' ? (
-                              <DropdownMenuItem onClick={() => handleToggleActive(user.id, true)}>Reactivate User</DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleToggleActive(user.id, false)}>Deactivate User</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openUsernameDialog(user)}>Set desktop username…</DropdownMenuItem>
+                            {!user.isMasterAdmin && user.id !== me?.id && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuLabel>Change Role</DropdownMenuLabel>
+                                <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "admin")}>Admin</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "manager")}>Manager</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "staff")}>Staff</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "readonly")}>Read-only</DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                {user.status === 'deactivated' ? (
+                                  <DropdownMenuItem onClick={() => handleToggleActive(user.id, true)}>Reactivate User</DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleToggleActive(user.id, false)}>Deactivate User</DropdownMenuItem>
+                                )}
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -292,6 +333,42 @@ export default function Users() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={usernameTarget !== null} onOpenChange={(open) => { if (!open) setUsernameTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Desktop Username</DialogTitle>
+            <DialogDescription>
+              {usernameTarget && (
+                <>Choose the username {usernameTarget.name || usernameTarget.email} types to sign in to the RentNotice Pro desktop app. Leave blank to use an automatic one based on their email.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-2">
+            <Input
+              value={usernameValue}
+              onChange={(e) => { setUsernameValue(e.target.value); setUsernameError(null); }}
+              placeholder={usernameTarget ? (usernameTarget.email.split("@")[0] ?? "").toLowerCase() : "username"}
+              className="font-mono"
+              maxLength={32}
+              autoFocus
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSaveUsername(); } }}
+            />
+            {usernameError && (
+              <p className="text-sm text-destructive">{usernameError}</p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Lowercase letters, numbers, dots, underscores and hyphens only. They can always sign in with their email address too.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setUsernameTarget(null)}>Cancel</Button>
+            <Button type="button" onClick={handleSaveUsername} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PortalLayout>
   );
 }

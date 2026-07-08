@@ -91,15 +91,29 @@ function toSummary(info: LicenseInfo): LicenseSummary {
 
 /**
  * The cloud directory identifies people by email; the desktop app also lets
- * them sign in with a short username. Derive one deterministically from the
- * email local part (collisions get a numeric suffix, ordered by cloud id so
- * the result is stable across syncs).
+ * them sign in with a short username. An admin can pick one explicitly on the
+ * customer website — that always wins. Anyone without one gets a username
+ * derived deterministically from the email local part (collisions get a
+ * numeric suffix, ordered by cloud id so the result is stable across syncs).
  */
 export function deriveUsernames(users: ApiDirectoryUser[]): Map<string, string> {
   const result = new Map<string, string>();
   const taken = new Set<string>();
   const ordered = [...users].sort((a, b) => a.id.localeCompare(b.id));
+
+  // Pass 1: admin-chosen usernames are reserved first so derived names can
+  // never collide with them.
   for (const user of ordered) {
+    const explicit = (user.username ?? "").trim().toLowerCase();
+    if (explicit && !taken.has(explicit)) {
+      taken.add(explicit);
+      result.set(user.id, explicit);
+    }
+  }
+
+  // Pass 2: derive from the email local part for everyone else.
+  for (const user of ordered) {
+    if (result.has(user.id)) continue;
     const local = (user.email.split("@")[0] ?? "").toLowerCase();
     const base = local.replace(/[^a-z0-9._-]/g, "") || "user";
     let candidate = base;

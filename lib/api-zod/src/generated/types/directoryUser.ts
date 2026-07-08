@@ -11,6 +11,11 @@ export interface DirectoryUser {
   id: string;
   email: string;
   name: string;
+  /**
+     * Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part
+     * @nullable
+     */
+  username?: string | null;
   role: DirectoryUserRole;
   active: boolean;
   isMasterAdmin: boolean;

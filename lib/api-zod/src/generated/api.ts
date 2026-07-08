@@ -158,6 +158,7 @@ export const ListCompanyUsersResponseItem = zod.object({
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
   "active": zod.boolean(),
   "isMasterAdmin": zod.boolean(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "status": zod.enum(['active', 'invited', 'deactivated']),
   "createdAt": zod.coerce.date().nullish()
 })
@@ -180,6 +181,7 @@ export const InviteCompanyUserResponse = zod.object({
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
   "active": zod.boolean(),
   "isMasterAdmin": zod.boolean(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "status": zod.enum(['active', 'invited', 'deactivated']),
   "createdAt": zod.coerce.date().nullish()
 }),
@@ -195,9 +197,14 @@ export const UpdateCompanyUserParams = zod.object({
   "userId": zod.coerce.string()
 })
 
+export const updateCompanyUserBodyUsernameMax = 32;
+
+
+
 export const UpdateCompanyUserBody = zod.object({
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']).optional(),
-  "active": zod.boolean().optional()
+  "active": zod.boolean().optional(),
+  "username": zod.string().max(updateCompanyUserBodyUsernameMax).nullish().describe('Desktop sign-in username (lowercase letters, digits, \".\", \"_\", \"-\"); null clears it so the desktop app derives one from the email')
 })
 
 export const UpdateCompanyUserResponse = zod.object({
@@ -207,6 +214,7 @@ export const UpdateCompanyUserResponse = zod.object({
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
   "active": zod.boolean(),
   "isMasterAdmin": zod.boolean(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "status": zod.enum(['active', 'invited', 'deactivated']),
   "createdAt": zod.coerce.date().nullish()
 })
@@ -274,6 +282,7 @@ export const ActivateLicenseResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
   "active": zod.boolean(),
   "isMasterAdmin": zod.boolean()
@@ -305,6 +314,7 @@ export const VerifyLicenseResponse = zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
   "active": zod.boolean(),
   "isMasterAdmin": zod.boolean()

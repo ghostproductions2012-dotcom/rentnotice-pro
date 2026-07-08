@@ -36,6 +36,7 @@ function companyUserPayload(user: CloudUser) {
     id: user.id,
     email: user.email,
     name: user.name,
+    username: user.username,
     role: user.role,
     active: user.active,
     isMasterAdmin: user.isMasterAdmin,
@@ -278,7 +279,7 @@ router.patch(
         return;
       }
 
-      const { role, active } = parsed.data;
+      const { role, active, username } = parsed.data;
       if (target.isMasterAdmin) {
         if (role !== undefined && role !== "admin") {
           res.status(400).json({
@@ -303,10 +304,43 @@ router.patch(
       const updates: Partial<{
         role: string;
         active: boolean;
+        username: string | null;
         updatedAt: Date;
       }> = { updatedAt: new Date() };
       if (role !== undefined) updates.role = role;
       if (active !== undefined) updates.active = active;
+      if (username !== undefined) {
+        const normalized = username === null ? null : username.trim().toLowerCase();
+        if (normalized === null || normalized === "") {
+          updates.username = null;
+        } else {
+          if (!/^[a-z0-9._-]{1,32}$/.test(normalized)) {
+            res.status(400).json({
+              error:
+                "Usernames may only contain lowercase letters, numbers, dots, underscores and hyphens (max 32 characters)",
+              code: "invalid_username",
+            });
+            return;
+          }
+          const [taken] = await db
+            .select({ id: cloudUsersTable.id })
+            .from(cloudUsersTable)
+            .where(
+              and(
+                eq(cloudUsersTable.companyId, admin.companyId),
+                eq(cloudUsersTable.username, normalized),
+              ),
+            );
+          if (taken && taken.id !== target.id) {
+            res.status(400).json({
+              error: "Another team member already uses this username",
+              code: "username_taken",
+            });
+            return;
+          }
+          updates.username = normalized;
+        }
+      }
 
       const [updated] = await db
         .update(cloudUsersTable)

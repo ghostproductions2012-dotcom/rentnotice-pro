@@ -39,6 +39,9 @@ export const cloudUsersTable = pgTable(
       .references(() => companiesTable.id),
     email: text("email").notNull().unique(),
     name: text("name").notNull(),
+    // Optional desktop sign-in username chosen by an admin; when absent the
+    // desktop app derives one from the email local part.
+    username: text("username"),
     passwordHash: text("password_hash"),
     role: text("role").notNull().default("staff"),
     isMasterAdmin: boolean("is_master_admin").notNull().default(false),

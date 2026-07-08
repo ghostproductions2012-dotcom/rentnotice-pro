@@ -82,6 +82,40 @@ describe("deriveUsernames", () => {
     expect(names.get("u-2")).toBe("jane.doe2");
     expect(names.get("u-3")).toBe("bob");
   });
+
+  it("prefers an admin-chosen username over derivation", () => {
+    const users = INFO.users.map((u) =>
+      u.id === "u-2" ? { ...u, username: "janed" } : u,
+    );
+    const names = deriveUsernames(users);
+    expect(names.get("u-1")).toBe("jane.doe");
+    expect(names.get("u-2")).toBe("janed");
+    expect(names.get("u-3")).toBe("bob");
+  });
+
+  it("never derives a username that collides with an admin-chosen one", () => {
+    // u-2 explicitly claims "jane.doe"; u-1 would derive the same name and
+    // must be suffixed instead, regardless of id ordering.
+    const users = INFO.users.map((u) =>
+      u.id === "u-2" ? { ...u, username: "jane.doe" } : u,
+    );
+    const names = deriveUsernames(users);
+    expect(names.get("u-2")).toBe("jane.doe");
+    expect(names.get("u-1")).toBe("jane.doe2");
+  });
+
+  it("normalizes explicit usernames and falls back to derivation on duplicates", () => {
+    const users = INFO.users.map((u) => {
+      if (u.id === "u-1") return { ...u, username: "  SHARED " };
+      if (u.id === "u-2") return { ...u, username: "shared" };
+      return u;
+    });
+    const names = deriveUsernames(users);
+    // u-1 sorts first, wins the explicit name (trimmed + lowercased).
+    expect(names.get("u-1")).toBe("shared");
+    // u-2's duplicate explicit name is ignored; it derives from its email.
+    expect(names.get("u-2")).toBe("jane.doe");
+  });
 });
 
 describe("validateKey", () => {
@@ -195,6 +229,31 @@ describe("verifyCredentials", () => {
     );
     expect(user.cloudUserId).toBe("u-1");
     expect(user.username).toBe("jane.doe");
+  });
+
+  it("signs in with an admin-chosen username from the directory", async () => {
+    verifyLicense.mockResolvedValue({
+      ...INFO,
+      users: INFO.users.map((u) =>
+        u.id === "u-1" ? { ...u, username: "janed" } : u,
+      ),
+    });
+    login.mockResolvedValue({
+      id: "u-1",
+      email: "jane.doe@acme.test",
+      name: "Jane Doe",
+      role: "admin",
+      isMasterAdmin: true,
+      companyId: "co-1",
+      companyName: "Acme Property Mgmt",
+    });
+    const user = await httpLicensingClient.verifyCredentials(freshKey(), "janed", "pw12345678");
+    expect(login).toHaveBeenCalledWith(
+      { email: "Jane.Doe@acme.test", password: "pw12345678" },
+      { credentials: "omit" },
+    );
+    expect(user.cloudUserId).toBe("u-1");
+    expect(user.username).toBe("janed");
   });
 
   it("accepts an email identifier case-insensitively", async () => {
