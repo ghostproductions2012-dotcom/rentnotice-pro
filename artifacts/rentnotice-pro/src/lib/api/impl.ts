@@ -503,7 +503,7 @@ function createServices(): AppServices {
       const db = await getDb();
       // One generic error for every failure mode so the login form never
       // reveals which accounts exist.
-      const invalidCredentials = () => new Error("Invalid username/email or PIN/password");
+      const invalidCredentials = () => new Error("Invalid email or password");
       let user = usersRepo.findByIdentifier(db, identifier);
       if (!user || !user.active) throw invalidCredentials();
       if (user.pin) {

@@ -88,12 +88,12 @@ function LockScreen() {
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="login-identifier">Username or email</label>
+                <label className="text-sm font-medium" htmlFor="login-identifier">Email</label>
                 <Input
                   id="login-identifier"
                   type="text"
                   autoComplete="username"
-                  placeholder="e.g. jchen or jchen@company.com"
+                  placeholder="jchen@company.com"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   autoFocus={!lockedUser}
@@ -101,12 +101,12 @@ function LockScreen() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium" htmlFor="login-secret">PIN or password</label>
+                <label className="text-sm font-medium" htmlFor="login-secret">Password</label>
                 <Input
                   id="login-secret"
                   type="password"
                   autoComplete="current-password"
-                  placeholder="Enter your PIN or password"
+                  placeholder="Enter your password"
                   value={secret}
                   onChange={(e) => setSecret(e.target.value)}
                   autoFocus={!!lockedUser}

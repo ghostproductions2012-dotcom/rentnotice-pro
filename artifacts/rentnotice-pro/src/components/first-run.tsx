@@ -287,7 +287,7 @@ export function ActivationWizard({
         </p>
         <div className="space-y-2">
           <label className="text-sm font-medium" htmlFor="activation-identifier">
-            Username or email
+            Email
           </label>
           <Input
             id="activation-identifier"
@@ -301,7 +301,7 @@ export function ActivationWizard({
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium" htmlFor="activation-secret">
-            PIN or password
+            Password
           </label>
           <Input
             id="activation-secret"
@@ -366,7 +366,7 @@ export function FirstRunScreen() {
     >
       <div className="space-y-3">
         <Button
-          className="w-full justify-start h-auto py-4"
+          className="w-full justify-start h-auto py-4 whitespace-normal"
           onClick={() => setActivating(true)}
           data-testid="button-choose-activate"
         >
@@ -380,7 +380,7 @@ export function FirstRunScreen() {
         </Button>
         <Button
           variant="outline"
-          className="w-full justify-start h-auto py-4"
+          className="w-full justify-start h-auto py-4 whitespace-normal"
           onClick={() =>
             enterDemo.mutate(undefined, {
               onError: (err) =>

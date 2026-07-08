@@ -50,7 +50,7 @@ export class InviteCodeInvalidError extends Error {
 
 /** Credentials rejected by the cloud directory. Message is intentionally generic. */
 export class CloudCredentialsError extends Error {
-  constructor(message = "Invalid username/email or PIN/password") {
+  constructor(message = "Invalid email or password") {
     super(message);
     this.name = "CloudCredentialsError";
   }

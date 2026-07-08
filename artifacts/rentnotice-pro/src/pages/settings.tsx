@@ -225,7 +225,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <div className="font-medium">Session Auto-lock</div>
-                <div className="text-sm text-muted-foreground">Idle time before PIN required</div>
+                <div className="text-sm text-muted-foreground">Idle time before password required</div>
               </div>
               <div className="font-semibold">{settings?.autoLockMinutes} minutes</div>
             </div>
