@@ -1,26 +1,33 @@
 // ---------------------------------------------------------------------------
 // Licensing client selector.
 //
-// Development (and e2e) use the deterministic mock. The real HTTP client will
-// be registered here once the cloud licensing API and its documented contract
-// are available; until then, production builds report the service as not yet
-// configured instead of silently pretending to activate.
+// The real HTTP adapter (http.ts) talks to the cloud licensing API and is the
+// default everywhere. The deterministic mock remains available for automated
+// tests, but only in development builds and only when explicitly requested —
+// shipping a way to force it in production would be a built-in license bypass.
+//
+//   localStorage["rentnotice-pro:licensing"] = "mock"   (dev builds only)
 // ---------------------------------------------------------------------------
 
 import { mockLicensingClient } from "./mock";
-import { LicensingUnavailableError, type LicensingClient } from "./types";
+import { httpLicensingClient } from "./http";
+import type { LicensingClient } from "./types";
 
-// NOTE for the future HTTP adapter: it MUST map every transport-level failure
-// (fetch TypeError, timeout, 5xx, DNS) to LicensingUnavailableError. Callers
-// treat that error as "offline — keep cached state / grace period applies";
-// any other error is surfaced as a real failure (e.g. invalid credentials).
+// The HTTP adapter maps every transport-level failure (fetch TypeError,
+// timeout, 5xx, DNS) to LicensingUnavailableError. Callers treat that error
+// as "offline — keep cached state / grace period applies"; any other error
+// is surfaced as a real failure (e.g. invalid credentials).
 export function getLicensingClient(): LicensingClient {
-  // The mock is strictly dev-only: shipping a way to force it in production
-  // builds would be a built-in license bypass.
-  if (import.meta.env.DEV) return mockLicensingClient;
-  throw new LicensingUnavailableError(
-    "The licensing service is not available in this build yet. Please update the app.",
-  );
+  if (import.meta.env.DEV) {
+    try {
+      if (localStorage.getItem("rentnotice-pro:licensing") === "mock") {
+        return mockLicensingClient;
+      }
+    } catch {
+      // localStorage unavailable — fall through to the real client.
+    }
+  }
+  return httpLicensingClient;
 }
 
 export * from "./types";

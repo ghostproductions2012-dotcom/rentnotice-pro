@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
+import { ActivationWizard } from "@/components/first-run";
+import { KeyRound } from "lucide-react";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -33,9 +35,19 @@ export default function SettingsPage() {
   const updateSettings = useUpdateSettings();
   const { can } = usePermissions();
   const { toast } = useToast();
+  const [activating, setActivating] = useState(false);
 
   const activation = workspace?.mode === "activated" ? workspace.activation : null;
   const canManageSettings = can("settings.manage");
+
+  if (activating) {
+    return (
+      <ActivationWizard
+        onCancel={() => setActivating(false)}
+        replacesExistingData={workspace?.mode === "demo"}
+      />
+    );
+  }
 
   const handleSync = () => {
     setSyncMessage(null);
@@ -81,6 +93,29 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {!activation && (
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Company License</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                This workspace is not activated with a company license. Enter the license key
+                your company received when subscribing (RNP-XXXX-XXXX-XXXX-XXXX) to unlock and
+                sync your team on this device.
+              </p>
+              {workspace?.mode === "demo" && (
+                <p className="text-xs text-amber-600 dark:text-amber-500">
+                  Activating replaces all demo data on this device with your company workspace.
+                </p>
+              )}
+              <Button onClick={() => setActivating(true)} data-testid="button-activate-license">
+                <KeyRound className="w-4 h-4 mr-2" />
+                Activate with a license key
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         {activation && (
           <Card className="md:col-span-2">
             <CardHeader>
@@ -108,6 +143,14 @@ export default function SettingsPage() {
                   >
                     {LICENSE_STATUS_LABELS[activation.licenseStatus] ?? activation.licenseStatus}
                   </div>
+                  {activation.statusReason && (
+                    <div
+                      className="text-sm text-muted-foreground mt-0.5"
+                      data-testid="text-license-status-reason"
+                    >
+                      {activation.statusReason}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">License Key</div>

@@ -15,6 +15,8 @@ export interface LicenseSummary {
   companyName: string;
   plan: string | null;
   status: LicenseStatus;
+  /** Human-readable explanation of the current status, straight from the service. */
+  statusReason: string | null;
   /** Days the workspace keeps working offline before re-verification is required. */
   graceDays: number;
 }

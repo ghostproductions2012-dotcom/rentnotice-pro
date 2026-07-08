@@ -10,6 +10,7 @@ function activation(overrides: Partial<ActivationState> = {}): ActivationState {
     companyId: "co-goldenstate",
     companyName: "Golden State Property Management, Inc.",
     licenseStatus: "active",
+    statusReason: "Subscription in good standing",
     plan: "Team plan (10 seats)",
     activatedAt: new Date(NOW - 30 * 86400_000).toISOString(),
     lastVerifiedAt: new Date(NOW - 86400_000).toISOString(), // yesterday

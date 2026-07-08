@@ -260,6 +260,21 @@ function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [workspace?.mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Periodic re-verification while the app stays open: check hourly, sync
+  // whenever the last successful online check is 24h+ old.
+  const lastVerifiedAt = workspace?.activation?.lastVerifiedAt ?? null;
+  useEffect(() => {
+    if (workspace?.mode !== "activated") return;
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const id = setInterval(() => {
+      const last = lastVerifiedAt ? new Date(lastVerifiedAt).getTime() : NaN;
+      if (!Number.isFinite(last) || Date.now() - last >= DAY_MS) {
+        syncLicense.mutate(undefined, { onError: () => {} });
+      }
+    }, 60 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [workspace?.mode, lastVerifiedAt]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (isLoading || workspaceLoading) return null;
   if (workspace?.mode === "unset") return <FirstRunScreen />;
   if (!session?.user || session.locked) return <LockScreen />;
@@ -275,6 +290,14 @@ function Layout({ children }: { children: React.ReactNode }) {
           >
             <span className="text-destructive font-medium">
               {LICENSE_BLOCK_MESSAGES[workspace.licenseBlockReason ?? "grace_expired"]}
+              {(workspace.licenseBlockReason === "paused" ||
+                workspace.licenseBlockReason === "cancelled") &&
+                workspace.activation?.statusReason && (
+                  <span className="font-normal" data-testid="text-license-block-reason">
+                    {" "}
+                    ({workspace.activation.statusReason})
+                  </span>
+                )}
             </span>
             <Button
               size="sm"

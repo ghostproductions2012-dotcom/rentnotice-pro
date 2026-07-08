@@ -91,6 +91,13 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 5,
+    name: "activation_status_reason",
+    up: (db) => {
+      db.exec("ALTER TABLE activation ADD COLUMN status_reason TEXT;");
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

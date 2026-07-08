@@ -68,6 +68,14 @@ catalog:
 
 autoInstallPeers: false
 
+# react-day-picker declares no @types/react peer, so it type-resolves via pnpm's
+# hidden hoisted fallback — which can be the mobile app's older @types/react and
+# poison web artifacts' global React namespace. Flavor it per consumer instead.
+packageExtensions:
+  react-day-picker:
+    peerDependencies:
+      '@types/react': '*'
+
 onlyBuiltDependencies:
   - '@swc/core'
   - esbuild

@@ -595,6 +595,7 @@ function createServices(): AppServices {
           companyId: license.companyId,
           companyName: license.companyName,
           licenseStatus: license.status,
+          statusReason: license.statusReason,
           plan: license.plan,
           activatedAt: now,
           lastVerifiedAt: now,
@@ -676,6 +677,7 @@ function createServices(): AppServices {
           }
           activationRepo.update(db, {
             licenseStatus: status.status,
+            statusReason: status.statusReason,
             plan: status.plan,
             companyName: status.companyName,
             graceDays: status.graceDays,
@@ -699,7 +701,10 @@ function createServices(): AppServices {
       } catch (err) {
         if (err instanceof LicenseInvalidError) {
           // The key was revoked or no longer exists upstream.
-          activationRepo.update(db, { licenseStatus: "cancelled" });
+          activationRepo.update(db, {
+            licenseStatus: "cancelled",
+            statusReason: "This license key is no longer recognized by the licensing service.",
+          });
           await db.flush();
         } else if (!(err instanceof LicensingUnavailableError)) {
           throw err;

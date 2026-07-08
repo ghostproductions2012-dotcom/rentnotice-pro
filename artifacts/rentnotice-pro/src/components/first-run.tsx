@@ -114,7 +114,7 @@ export function ActivationWizard({
               id="license-key"
               value={licenseKey}
               onChange={(e) => setLicenseKey(e.target.value)}
-              placeholder="e.g. RNP-XXXX-XXXX"
+              placeholder="RNP-XXXX-XXXX-XXXX-XXXX"
               autoFocus
               data-testid="input-license-key"
             />

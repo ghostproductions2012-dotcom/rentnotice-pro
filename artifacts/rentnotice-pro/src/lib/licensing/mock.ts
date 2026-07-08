@@ -114,8 +114,14 @@ function requireKnownKey(licenseKey: string): LicenseStatus {
   return status;
 }
 
+const STATUS_REASONS: Record<LicenseStatus, string> = {
+  active: "Subscription in good standing",
+  paused: "Payment failed and the paid period has ended — resolve billing to resume",
+  cancelled: "Subscription cancelled and the paid period has ended",
+};
+
 function summary(status: LicenseStatus): LicenseSummary {
-  return { ...COMPANY, status };
+  return { ...COMPANY, status, statusReason: STATUS_REASONS[status] };
 }
 
 function stripSecret(entry: MockDirectoryEntry): DirectoryUser {

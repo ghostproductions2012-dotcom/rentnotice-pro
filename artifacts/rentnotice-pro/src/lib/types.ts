@@ -41,6 +41,7 @@ export interface ActivationState {
   companyId: string; // cloud company id
   companyName: string;
   licenseStatus: LicenseStatus; // last known status from the licensing service
+  statusReason: string | null; // display-ready explanation from the licensing service
   plan: string | null;
   activatedAt: string; // ISO datetime
   lastVerifiedAt: string; // ISO datetime of the last successful online check
