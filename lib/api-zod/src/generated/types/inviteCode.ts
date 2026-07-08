@@ -9,6 +9,8 @@ import type { InviteCodeRole } from './inviteCodeRole';
 
 export interface InviteCode {
   inviteCode: string;
+  /** When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days) */
+  inviteCodeExpiresAt: Date;
   email: string;
   role: InviteCodeRole;
 }

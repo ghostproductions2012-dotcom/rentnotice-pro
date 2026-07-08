@@ -186,6 +186,7 @@ export const InviteCompanyUserResponse = zod.object({
   "createdAt": zod.coerce.date().nullish()
 }),
   "inviteCode": zod.string().describe('Single-use code the invitee enters in the desktop app to activate it and set up their account'),
+  "inviteCodeExpiresAt": zod.coerce.date().describe('When the invite code stops being redeemable (14 days after generation)'),
   "emailSent": zod.boolean().describe('Whether the invite email was sent to the invited user')
 })
 
@@ -229,6 +230,7 @@ export const GetInviteCodeParams = zod.object({
 
 export const GetInviteCodeResponse = zod.object({
   "inviteCode": zod.string(),
+  "inviteCodeExpiresAt": zod.coerce.date().describe('When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days)'),
   "email": zod.string(),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly'])
 })
@@ -243,6 +245,7 @@ export const RegenerateInviteCodeParams = zod.object({
 
 export const RegenerateInviteCodeResponse = zod.object({
   "inviteCode": zod.string(),
+  "inviteCodeExpiresAt": zod.coerce.date().describe('When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days)'),
   "email": zod.string(),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly'])
 })

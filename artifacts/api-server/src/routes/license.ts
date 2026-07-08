@@ -15,6 +15,7 @@ import {
 import {
   computeLicenseStatus,
   syncStoredLicenseStatus,
+  effectiveInviteExpiry,
   LICENSE_GRACE_DAYS,
   type ComputedLicenseStatus,
 } from "../lib/license";
@@ -152,6 +153,15 @@ router.post("/license/redeem-invite", async (req, res, next) => {
       return;
     }
 
+    if (effectiveInviteExpiry(invitee).getTime() <= Date.now()) {
+      res.status(400).json({
+        error:
+          "This invite code has expired. Ask your administrator to generate a new one.",
+        code: "invalid_invite_code",
+      });
+      return;
+    }
+
     const [company] = await db
       .select()
       .from(companiesTable)
@@ -187,6 +197,7 @@ router.post("/license/redeem-invite", async (req, res, next) => {
         name: parsed.data.name,
         passwordHash: hashPassword(parsed.data.password),
         inviteCode: null,
+        inviteCodeExpiresAt: null,
         updatedAt: new Date(),
       })
       .where(eq(cloudUsersTable.id, invitee.id))

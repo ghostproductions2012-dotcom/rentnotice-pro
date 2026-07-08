@@ -34,7 +34,7 @@ export default function Users() {
   const updateMutation = useUpdateCompanyUser();
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{code: string, email: string, emailSent: boolean} | null>(null);
+  const [inviteResult, setInviteResult] = useState<{code: string, email: string, emailSent: boolean, expiresAt: string} | null>(null);
   const [copied, setCopied] = useState(false);
   const [inviteCodeTarget, setInviteCodeTarget] = useState<CompanyUser | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
@@ -55,7 +55,7 @@ export default function Users() {
     try {
       const res = await inviteMutation.mutateAsync({ data: values });
       queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
-      setInviteResult({ code: res.inviteCode, email: values.email, emailSent: res.emailSent });
+      setInviteResult({ code: res.inviteCode, email: values.email, emailSent: res.emailSent, expiresAt: res.inviteCodeExpiresAt });
       form.reset();
     } catch (e) {
       console.error(e);
@@ -199,7 +199,8 @@ export default function Users() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      They enter this code in the desktop app to set up their account. It can only be used once.
+                      They enter this code in the desktop app to set up their account. It can only be used once
+                      and expires on {format(new Date(inviteResult.expiresAt), 'MMM d, yyyy')}.
                     </p>
                   </div>
                   <Button className="w-full mt-4" onClick={() => {setInviteResult(null); setInviteDialogOpen(false);}}>Done</Button>
@@ -383,12 +384,27 @@ export default function Users() {
             {inviteCodeQuery.isLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : inviteCodeQuery.data ? (
-              <div className="flex gap-2">
-                <Input readOnly value={inviteCodeQuery.data.inviteCode} className="font-mono text-sm tracking-wider" />
-                <Button variant="secondary" onClick={copyPendingCode} className="shrink-0">
-                  {codeCopied ? "Copied" : <Copy className="w-4 h-4" />}
-                </Button>
-              </div>
+              <>
+                <div className="flex gap-2">
+                  <Input readOnly value={inviteCodeQuery.data.inviteCode} className="font-mono text-sm tracking-wider" />
+                  <Button variant="secondary" onClick={copyPendingCode} className="shrink-0">
+                    {codeCopied ? "Copied" : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+                {inviteCodeQuery.data.inviteCodeExpiresAt && (
+                  new Date(inviteCodeQuery.data.inviteCodeExpiresAt).getTime() <= Date.now() ? (
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        This code expired on {format(new Date(inviteCodeQuery.data.inviteCodeExpiresAt), 'MMM d, yyyy')} and can no longer be redeemed. Generate a new code below.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Expires on {format(new Date(inviteCodeQuery.data.inviteCodeExpiresAt), 'MMM d, yyyy')}.
+                    </p>
+                  )
+                )}
+              </>
             ) : (
               <p className="text-sm text-destructive">
                 Could not load the invite code. The invitation may have already been used.

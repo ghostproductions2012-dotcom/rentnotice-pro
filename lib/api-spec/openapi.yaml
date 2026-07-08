@@ -867,6 +867,7 @@ components:
       required:
         - user
         - inviteCode
+        - inviteCodeExpiresAt
         - emailSent
       properties:
         user:
@@ -874,6 +875,10 @@ components:
         inviteCode:
           type: string
           description: Single-use code the invitee enters in the desktop app to activate it and set up their account
+        inviteCodeExpiresAt:
+          type: string
+          format: date-time
+          description: When the invite code stops being redeemable (14 days after generation)
         emailSent:
           type: boolean
           description: Whether the invite email was sent to the invited user
@@ -881,11 +886,16 @@ components:
       type: object
       required:
         - inviteCode
+        - inviteCodeExpiresAt
         - email
         - role
       properties:
         inviteCode:
           type: string
+        inviteCodeExpiresAt:
+          type: string
+          format: date-time
+          description: When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days)
         email:
           type: string
         role:

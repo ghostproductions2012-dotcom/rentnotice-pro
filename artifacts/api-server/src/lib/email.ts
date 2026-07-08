@@ -171,14 +171,15 @@ export async function sendInviteEmail(
     <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;">
       Open the RentNotice Pro desktop app, choose
       <strong>"I have an invite code"</strong>, and enter this code to set up
-      your account. The code can only be used once.
+      your account. The code can only be used once and expires in 14 days.
     </p>`;
   const text =
     `${input.invitedByName} has invited you to join ${input.companyName} ` +
     `on RentNotice Pro as ${input.role}.\n\n` +
     `Your invite code:\n${input.inviteCode}\n\n` +
     `Open the RentNotice Pro desktop app, choose "I have an invite code", ` +
-    `and enter this code to set up your account. The code can only be used once.`;
+    `and enter this code to set up your account. The code can only be used ` +
+    `once and expires in 14 days.`;
 
   try {
     await sendEmail({

@@ -49,6 +49,11 @@ export const cloudUsersTable = pgTable(
     // Single-use invite code the invitee types into the desktop app to
     // activate it and finish account setup. Cleared on redemption.
     inviteCode: text("invite_code").unique(),
+    // When the invite code stops being redeemable. Refreshed whenever the
+    // code is (re)generated; cleared alongside inviteCode on redemption.
+    inviteCodeExpiresAt: timestamp("invite_code_expires_at", {
+      withTimezone: true,
+    }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

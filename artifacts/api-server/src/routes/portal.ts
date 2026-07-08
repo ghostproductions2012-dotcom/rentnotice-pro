@@ -17,6 +17,8 @@ import {
   computeLicenseStatus,
   syncStoredLicenseStatus,
   generateInviteCode,
+  inviteCodeExpiry,
+  effectiveInviteExpiry,
 } from "../lib/license";
 import { getPlanConfig } from "../lib/plans";
 import { getUncachableStripeClient } from "../lib/stripeClient";
@@ -216,6 +218,7 @@ router.post(
       }
 
       const inviteCode = generateInviteCode();
+      const inviteCodeExpiresAt = inviteCodeExpiry();
       const [invited] = await db
         .insert(cloudUsersTable)
         .values({
@@ -227,6 +230,7 @@ router.post(
           isMasterAdmin: false,
           active: true,
           inviteCode,
+          inviteCodeExpiresAt,
         })
         .returning();
       if (!invited) throw new Error("Failed to create invited user");
@@ -242,6 +246,7 @@ router.post(
       res.status(201).json({
         user: companyUserPayload(invited),
         inviteCode,
+        inviteCodeExpiresAt: inviteCodeExpiresAt.toISOString(),
         emailSent,
       });
     } catch (err) {
@@ -288,6 +293,9 @@ router.get(
       }
       res.json({
         inviteCode: target.inviteCode,
+        // Legacy codes without a stored expiry fall back to createdAt + TTL,
+        // matching what the redeem endpoint enforces.
+        inviteCodeExpiresAt: effectiveInviteExpiry(target).toISOString(),
         email: target.email,
         role: target.role,
       });
@@ -316,14 +324,16 @@ router.post(
         return;
       }
       const inviteCode = generateInviteCode();
+      const inviteCodeExpiresAt = inviteCodeExpiry();
       const [updated] = await db
         .update(cloudUsersTable)
-        .set({ inviteCode, updatedAt: new Date() })
+        .set({ inviteCode, inviteCodeExpiresAt, updatedAt: new Date() })
         .where(eq(cloudUsersTable.id, target.id))
         .returning();
       if (!updated) throw new Error("Failed to regenerate invite code");
       res.json({
         inviteCode,
+        inviteCodeExpiresAt: inviteCodeExpiresAt.toISOString(),
         email: updated.email,
         role: updated.role,
       });

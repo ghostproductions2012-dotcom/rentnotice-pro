@@ -22,6 +22,26 @@ export function generateLicenseKey(): string {
   return `RNP-${groups.join("-")}`;
 }
 
+/** Days a team invite code stays redeemable after it is (re)generated. */
+export const INVITE_CODE_TTL_DAYS = 14;
+
+/** Expiry timestamp for an invite code generated right now. */
+export function inviteCodeExpiry(now: Date = new Date()): Date {
+  return new Date(now.getTime() + INVITE_CODE_TTL_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * Effective expiry for a pending invite. Codes created before expiry tracking
+ * existed have a NULL stored expiry; they fall back to creation time + TTL so
+ * no invite code is ever redeemable indefinitely.
+ */
+export function effectiveInviteExpiry(user: {
+  inviteCodeExpiresAt: Date | null;
+  createdAt: Date;
+}): Date {
+  return user.inviteCodeExpiresAt ?? inviteCodeExpiry(user.createdAt);
+}
+
 /**
  * Short, human-typeable single-use invite code for a team member. The INV-
  * prefix keeps it visually distinct from company license keys (RNP-...).

@@ -7,3 +7,4 @@
 - [stripe-replit-sync gotchas](stripe-replit-sync.md) — must be esbuild-external (silent migration skip when bundled); connector settings use `secret` not `secret_key`.
 - [@types/react version split](types-react-split.md) — Expo app pins older @types/react; libs without an @types/react peer and files using global `React` resolve the hoisted old copy and break web typechecks.
 - [Email via Resend](email-sending.md) — user chose RESEND_API_KEY secret over the connector; account is in test mode (only delivers to owner's address until a domain is verified).
+- [Dev DB schema drift](dev-db-schema-drift.md) — drizzle push dies on rename prompts (no TTY); apply renames via SQL, then re-run push to confirm no diff.

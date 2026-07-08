@@ -11,6 +11,8 @@ export interface InviteResult {
   user: CompanyUser;
   /** Single-use code the invitee enters in the desktop app to activate it and set up their account */
   inviteCode: string;
+  /** When the invite code stops being redeemable (14 days after generation) */
+  inviteCodeExpiresAt: Date;
   /** Whether the invite email was sent to the invited user */
   emailSent: boolean;
 }

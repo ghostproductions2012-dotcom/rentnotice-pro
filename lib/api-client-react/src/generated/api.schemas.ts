@@ -197,6 +197,8 @@ export interface InviteResult {
   user: CompanyUser;
   /** Single-use code the invitee enters in the desktop app to activate it and set up their account */
   inviteCode: string;
+  /** When the invite code stops being redeemable (14 days after generation) */
+  inviteCodeExpiresAt: string;
   /** Whether the invite email was sent to the invited user */
   emailSent: boolean;
 }
@@ -213,6 +215,8 @@ export const InviteCodeRole = {
 
 export interface InviteCode {
   inviteCode: string;
+  /** When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days) */
+  inviteCodeExpiresAt: string;
   email: string;
   role: InviteCodeRole;
 }
