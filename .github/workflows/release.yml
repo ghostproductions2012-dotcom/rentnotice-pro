@@ -51,6 +51,12 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
+    # Boolean flags only — real secret values are injected in the guarded steps
+    # below. (The `secrets` context is not allowed in step `if:` conditions.)
+    env:
+      HAS_APPLE_CERT: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -95,7 +101,7 @@ jobs:
       # when the secrets are non-empty — Tauri's bundler treats an EMPTY
       # APPLE_CERTIFICATE as "present" and fails trying to import it.
       - name: Enable Apple code signing (only if certificate secret is set)
-        if: startsWith(matrix.platform, 'macos') && secrets.APPLE_CERTIFICATE != ''
+        if: startsWith(matrix.platform, 'macos') && env.HAS_APPLE_CERT == 'true'
         run: |
           {
             echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
@@ -107,7 +113,7 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Import Windows signing certificate
-        if: matrix.platform == 'windows-latest' && secrets.WINDOWS_CERTIFICATE != ''
+        if: matrix.platform == 'windows-latest' && env.HAS_WINDOWS_CERT == 'true'
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
