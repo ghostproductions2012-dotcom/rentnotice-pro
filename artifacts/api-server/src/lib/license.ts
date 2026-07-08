@@ -57,9 +57,21 @@ async function fetchSyncedSubscription(
   subscriptionId: string,
 ): Promise<SyncedSubscriptionRow | null> {
   try {
+    // Newer Stripe API versions report current_period_end on the
+    // subscription ITEMS, not the subscription itself -- fall back to the
+    // latest item period end when the subscription-level column is null.
     const result = await db.execute(
-      sql`SELECT status, cancel_at_period_end, current_period_end, ended_at
-          FROM stripe.subscriptions WHERE id = ${subscriptionId}`,
+      sql`SELECT s.status,
+                 s.cancel_at_period_end,
+                 COALESCE(
+                   s.current_period_end,
+                   (SELECT MAX(si.current_period_end)
+                    FROM stripe.subscription_items si
+                    WHERE si.subscription = s.id)
+                 ) AS current_period_end,
+                 s.ended_at
+          FROM stripe.subscriptions s
+          WHERE s.id = ${subscriptionId}`,
     );
     return (result.rows[0] as unknown as SyncedSubscriptionRow) ?? null;
   } catch {
