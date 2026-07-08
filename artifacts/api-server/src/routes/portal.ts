@@ -16,6 +16,7 @@ import { requireAuth, requireAdmin, type AuthedRequest } from "../lib/auth";
 import {
   computeLicenseStatus,
   syncStoredLicenseStatus,
+  generateLicenseKey,
   generateInviteCode,
   inviteCodeExpiry,
   effectiveInviteExpiry,
@@ -59,10 +60,27 @@ router.get("/www/portal/overview", requireAuth, async (req, res, next) => {
       return;
     }
 
-    const [license] = await db
+    let [license] = await db
       .select()
       .from(licenseKeysTable)
       .where(eq(licenseKeysTable.companyId, company.id));
+    if (!license) {
+      // Self-heal: a company without a license key row is an inconsistent
+      // state (checkout and the admin seed both create one). Provision a key
+      // lazily so the portal never shows "License key not found", then
+      // re-read so a concurrent request's insert wins deterministically.
+      await db.insert(licenseKeysTable).values({
+        companyId: company.id,
+        key: generateLicenseKey(),
+        status: "active",
+      });
+      [license] = await db
+        .select()
+        .from(licenseKeysTable)
+        .where(eq(licenseKeysTable.companyId, company.id))
+        .orderBy(licenseKeysTable.createdAt)
+        .limit(1);
+    }
     if (!license) {
       res
         .status(404)

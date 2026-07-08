@@ -9,9 +9,16 @@
  * Run with: node scripts/seed-admin.ts   (Node >= 22.18 type stripping)
  * Uses DATABASE_URL from the environment.
  */
-import { db, pool, companiesTable, cloudUsersTable } from "@workspace/db";
+import {
+  db,
+  pool,
+  companiesTable,
+  cloudUsersTable,
+  licenseKeysTable,
+} from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { hashPassword } from "../src/lib/auth.ts";
+import { generateLicenseKey } from "../src/lib/license.ts";
 
 const TEST_COMPANY_NAME = "Test Company";
 const ADMIN_EMAIL = "admin@admin.com";
@@ -87,6 +94,30 @@ async function main(): Promise<void> {
       })
       .returning();
     console.log(`Created test admin user: ${user.id}`);
+  }
+
+  // 3. Ensure the test company has a license key. Never rotate an existing
+  // key or touch its device activation: an already-activated desktop install
+  // must keep working across re-runs.
+  const [existingKey] = await db
+    .select()
+    .from(licenseKeysTable)
+    .where(eq(licenseKeysTable.companyId, company.id));
+
+  if (existingKey) {
+    console.log(
+      `License key exists (kept, not rotated): ${existingKey.key} [status: ${existingKey.status}]`,
+    );
+  } else {
+    const [created] = await db
+      .insert(licenseKeysTable)
+      .values({
+        companyId: company.id,
+        key: generateLicenseKey(),
+        status: "active",
+      })
+      .returning();
+    console.log(`Created license key: ${created.key} [status: active]`);
   }
 
   console.log(
