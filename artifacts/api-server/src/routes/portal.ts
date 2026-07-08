@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
 import {
@@ -17,6 +16,7 @@ import { requireAuth, requireAdmin, type AuthedRequest } from "../lib/auth";
 import {
   computeLicenseStatus,
   syncStoredLicenseStatus,
+  generateInviteCode,
 } from "../lib/license";
 import { getPlanConfig } from "../lib/plans";
 import { getUncachableStripeClient } from "../lib/stripeClient";
@@ -215,7 +215,7 @@ router.post(
         return;
       }
 
-      const inviteToken = randomBytes(24).toString("hex");
+      const inviteCode = generateInviteCode();
       const [invited] = await db
         .insert(cloudUsersTable)
         .values({
@@ -226,24 +226,106 @@ router.post(
           role,
           isMasterAdmin: false,
           active: true,
-          inviteToken,
+          inviteCode,
         })
         .returning();
       if (!invited) throw new Error("Failed to create invited user");
 
-      const inviteUrl = `${getPublicBaseUrl()}/invite/${inviteToken}`;
       const emailSent = await sendInviteEmail({
         to: email,
         companyName: company.name,
         role,
         invitedByName: admin.name || admin.email,
-        inviteUrl,
+        inviteCode,
       });
 
       res.status(201).json({
         user: companyUserPayload(invited),
-        inviteUrl,
+        inviteCode,
         emailSent,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** Loads a still-pending invitee (no password yet) belonging to the admin's company. */
+async function findPendingInvitee(
+  companyId: string,
+  userId: string,
+): Promise<CloudUser | null> {
+  const [target] = await db
+    .select()
+    .from(cloudUsersTable)
+    .where(
+      and(
+        eq(cloudUsersTable.id, userId),
+        eq(cloudUsersTable.companyId, companyId),
+      ),
+    );
+  if (!target || target.passwordHash !== null || !target.active) return null;
+  return target;
+}
+
+router.get(
+  "/www/portal/users/:userId/invite-code",
+  requireAuth,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const admin = (req as AuthedRequest).user;
+      const target = await findPendingInvitee(
+        admin.companyId,
+        String(req.params["userId"]),
+      );
+      if (!target || !target.inviteCode) {
+        res.status(404).json({
+          error: "No pending invite code for this user",
+          code: "not_found",
+        });
+        return;
+      }
+      res.json({
+        inviteCode: target.inviteCode,
+        email: target.email,
+        role: target.role,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post(
+  "/www/portal/users/:userId/invite-code",
+  requireAuth,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const admin = (req as AuthedRequest).user;
+      const target = await findPendingInvitee(
+        admin.companyId,
+        String(req.params["userId"]),
+      );
+      if (!target) {
+        res.status(404).json({
+          error: "This user is not a pending invitee",
+          code: "not_found",
+        });
+        return;
+      }
+      const inviteCode = generateInviteCode();
+      const [updated] = await db
+        .update(cloudUsersTable)
+        .set({ inviteCode, updatedAt: new Date() })
+        .where(eq(cloudUsersTable.id, target.id))
+        .returning();
+      if (!updated) throw new Error("Failed to regenerate invite code");
+      res.json({
+        inviteCode,
+        email: updated.email,
+        role: updated.role,
       });
     } catch (err) {
       next(err);

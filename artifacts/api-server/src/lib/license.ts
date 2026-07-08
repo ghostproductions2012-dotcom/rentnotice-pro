@@ -22,6 +22,23 @@ export function generateLicenseKey(): string {
   return `RNP-${groups.join("-")}`;
 }
 
+/**
+ * Short, human-typeable single-use invite code for a team member. The INV-
+ * prefix keeps it visually distinct from company license keys (RNP-...).
+ */
+export function generateInviteCode(): string {
+  const groups: string[] = [];
+  for (let g = 0; g < 2; g++) {
+    const bytes = randomBytes(4);
+    let group = "";
+    for (let i = 0; i < 4; i++) {
+      group += KEY_ALPHABET[bytes[i]! % KEY_ALPHABET.length];
+    }
+    groups.push(group);
+  }
+  return `INV-${groups.join("-")}`;
+}
+
 export type LicenseStatus = "active" | "paused" | "cancelled";
 
 export interface ComputedLicenseStatus {

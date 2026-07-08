@@ -40,6 +40,14 @@ export class LicenseInvalidError extends Error {
   }
 }
 
+/** The invite code was not recognized or has already been used. */
+export class InviteCodeInvalidError extends Error {
+  constructor(message = "This invite code is invalid or has already been used.") {
+    super(message);
+    this.name = "InviteCodeInvalidError";
+  }
+}
+
 /** Credentials rejected by the cloud directory. Message is intentionally generic. */
 export class CloudCredentialsError extends Error {
   constructor(message = "Invalid username/email or PIN/password") {
@@ -54,6 +62,26 @@ export class LicensingUnavailableError extends Error {
     super(message);
     this.name = "LicensingUnavailableError";
   }
+}
+
+/** Input for redeeming a single-use team invite code from the desktop app. */
+export interface RedeemInviteInput {
+  inviteCode: string;
+  /** Full name the invitee chooses for their account. */
+  name: string;
+  /** Password the invitee sets (also their customer-website password). */
+  password: string;
+}
+
+/** Everything the app needs to provision a workspace after redeeming an invite. */
+export interface InviteRedemption {
+  /** The company license key this device is now bound to (for later verify/sync). */
+  licenseKey: string;
+  license: LicenseSummary;
+  /** The freshly set-up account of the invitee. */
+  me: DirectoryUser;
+  /** The full company directory, including the invitee. */
+  directory: DirectoryUser[];
 }
 
 /**
@@ -74,4 +102,10 @@ export interface LicensingClient {
   fetchDirectory(licenseKey: string): Promise<DirectoryUser[]>;
   /** Re-check the license status (launch-time re-verification). */
   checkStatus(licenseKey: string): Promise<LicenseSummary>;
+  /**
+   * Redeem a single-use invite code: sets the invitee's name/password in the
+   * cloud directory and returns everything needed to provision this device.
+   * Throws InviteCodeInvalidError for unknown/used codes.
+   */
+  redeemInvite(input: RedeemInviteInput): Promise<InviteRedemption>;
 }

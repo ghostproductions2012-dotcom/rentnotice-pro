@@ -15,6 +15,7 @@ import { getServices } from "./services";
 import { type Permission, can } from "./permissions";
 import type {
   ActivateWorkspaceInput,
+  RedeemInviteCodeInput,
   AddAttachmentInput,
   ClassificationOverrideInput,
   CreateFieldAssignmentInput,
@@ -175,6 +176,15 @@ export function useActivateWorkspace() {
   return useMutation({
     mutationFn: (input: ActivateWorkspaceInput) => getServices().activateWorkspace(input),
     // Activation may wipe and re-provision the entire database.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useRedeemInviteCode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RedeemInviteCodeInput) => getServices().redeemInviteCode(input),
+    // Redemption wipes and re-provisions the entire database, like activation.
     onSuccess: () => qc.invalidateQueries(),
   });
 }

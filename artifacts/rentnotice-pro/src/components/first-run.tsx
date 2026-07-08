@@ -19,9 +19,15 @@ import { Scale, KeyRound, FlaskConical } from "lucide-react";
 import {
   useActivateWorkspace,
   useEnterDemoMode,
+  useRedeemInviteCode,
   useValidateLicenseKey,
 } from "@/lib/api/hooks";
 import type { LicenseSummary } from "@/lib/licensing/types";
+
+/** Team invite codes look like INV-XXXX-XXXX; license keys start with RNP-. */
+function isInviteCode(value: string): boolean {
+  return value.trim().toUpperCase().startsWith("INV-");
+}
 
 function Shell({
   title,
@@ -61,15 +67,26 @@ export function ActivationWizard({
 }) {
   const validate = useValidateLicenseKey();
   const activate = useActivateWorkspace();
+  const redeem = useRedeemInviteCode();
   const [licenseKey, setLicenseKey] = useState("");
   const [license, setLicense] = useState<LicenseSummary | null>(null);
+  const [inviteStep, setInviteStep] = useState(false);
   const [identifier, setIdentifier] = useState("");
   const [secret, setSecret] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [invitePassword, setInvitePassword] = useState("");
+  const [invitePasswordConfirm, setInvitePasswordConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleValidate = (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    // Invite codes skip key validation: the code is checked when redeemed,
+    // after the invitee picks their name and password.
+    if (isInviteCode(licenseKey)) {
+      setInviteStep(true);
+      return;
+    }
     validate.mutate(licenseKey, {
       onSuccess: (summary) => {
         if (summary.status === "paused") {
@@ -99,22 +116,135 @@ export function ActivationWizard({
     );
   };
 
+  const handleRedeem = (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (invitePassword.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+    if (invitePassword !== invitePasswordConfirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    redeem.mutate(
+      { inviteCode: licenseKey, name: inviteName.trim(), password: invitePassword },
+      {
+        onError: (err) =>
+          setError(
+            err instanceof Error ? err.message : "Could not redeem the invite code. Please try again.",
+          ),
+      },
+    );
+  };
+
+  if (inviteStep) {
+    return (
+      <Shell
+        title="Join your team"
+        description="Set up your account to finish activating this device."
+      >
+        <form onSubmit={handleRedeem} className="space-y-4">
+          <p className="text-sm text-muted-foreground" data-testid="text-invite-code-display">
+            Invite code: <span className="font-mono font-medium">{licenseKey.trim().toUpperCase()}</span>
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="invite-name">
+              Your full name
+            </label>
+            <Input
+              id="invite-name"
+              type="text"
+              autoComplete="name"
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
+              autoFocus
+              data-testid="input-invite-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="invite-password">
+              Create a password
+            </label>
+            <Input
+              id="invite-password"
+              type="password"
+              autoComplete="new-password"
+              value={invitePassword}
+              onChange={(e) => setInvitePassword(e.target.value)}
+              placeholder="At least 8 characters"
+              data-testid="input-invite-password"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium" htmlFor="invite-password-confirm">
+              Confirm password
+            </label>
+            <Input
+              id="invite-password-confirm"
+              type="password"
+              autoComplete="new-password"
+              value={invitePasswordConfirm}
+              onChange={(e) => setInvitePasswordConfirm(e.target.value)}
+              data-testid="input-invite-password-confirm"
+            />
+          </div>
+          {replacesExistingData && (
+            <p
+              className="text-xs text-amber-600 dark:text-amber-500"
+              data-testid="text-invite-warning"
+            >
+              Joining replaces all demo data on this device with your company workspace.
+            </p>
+          )}
+          {error && (
+            <p className="text-sm text-destructive" role="alert" data-testid="text-invite-error">
+              {error}
+            </p>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={
+              !inviteName.trim() || !invitePassword || !invitePasswordConfirm || redeem.isPending
+            }
+            data-testid="button-redeem-invite"
+          >
+            {redeem.isPending ? "Joining…" : "Join and activate this device"}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setInviteStep(false);
+              setError(null);
+            }}
+            data-testid="button-invite-back"
+          >
+            Use a different code
+          </Button>
+        </form>
+      </Shell>
+    );
+  }
+
   if (!license) {
     return (
       <Shell
         title="Activate RentNotice Pro"
-        description="Enter the license key your company received when subscribing."
+        description="Enter your company license key, or the invite code your admin sent you."
       >
         <form onSubmit={handleValidate} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium" htmlFor="license-key">
-              License key
+              License key or invite code
             </label>
             <Input
               id="license-key"
               value={licenseKey}
               onChange={(e) => setLicenseKey(e.target.value)}
-              placeholder="RNP-XXXX-XXXX-XXXX-XXXX"
+              placeholder="RNP-XXXX-XXXX-XXXX-XXXX or INV-XXXX-XXXX"
               autoFocus
               data-testid="input-license-key"
             />

@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './acceptInviteInput';
 export * from './addFieldEvidenceRequest';
 export * from './checkoutCompleteInput';
 export * from './checkoutSession';
@@ -24,9 +23,11 @@ export * from './fieldAssignmentSyncServiceMethod';
 export * from './fieldAssignmentSyncStatus';
 export * from './fieldEvidenceSync';
 export * from './healthStatus';
-export * from './inviteDetails';
+export * from './inviteCode';
+export * from './inviteCodeRole';
 export * from './inviteInput';
 export * from './inviteInputRole';
+export * from './inviteRedemptionResult';
 export * from './inviteResult';
 export * from './licenseActivateInput';
 export * from './licenseInfo';
@@ -44,6 +45,7 @@ export * from './portalOverviewCompany';
 export * from './provisionResult';
 export * from './pushFieldAssignmentsRequest';
 export * from './pushFieldAssignmentsResult';
+export * from './redeemInviteInput';
 export * from './sessionUser';
 export * from './sessionUserRole';
 export * from './signupInput';

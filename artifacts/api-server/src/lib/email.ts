@@ -144,13 +144,13 @@ export interface InviteEmailInput {
   companyName: string;
   role: string;
   invitedByName: string;
-  inviteUrl: string;
+  inviteCode: string;
 }
 
 /**
- * Sends a team invite email. Best-effort: returns true when the email was
- * sent, false when sending failed (the copyable invite link remains the
- * fallback). Never throws.
+ * Sends a team invite email carrying the single-use invite code.
+ * Best-effort: returns true when the email was sent, false when sending
+ * failed (the copyable invite code remains the fallback). Never throws.
  */
 export async function sendInviteEmail(
   input: InviteEmailInput,
@@ -162,25 +162,23 @@ export async function sendInviteEmail(
       <strong>${escapeHtml(input.companyName)}</strong> on RentNotice Pro
       as <strong>${escapeHtml(input.role)}</strong>.
     </p>
-    <p style="margin:0 0 24px;line-height:1.6;">
-      Click the button below to accept the invitation and set your password.
-      You'll use this account to log into the RentNotice Pro desktop app.
-    </p>
-    <p style="text-align:center;margin:0 0 24px;">
-      <a href="${escapeHtml(input.inviteUrl)}"
-         style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;">
-        Accept Invitation
-      </a>
+    <p style="margin:0 0 8px;line-height:1.6;">Your invite code:</p>
+    <p style="margin:0 0 24px;">
+      <code style="display:block;background:#f4f4f5;border:1px solid #e4e4e7;border-radius:6px;padding:12px 16px;font-size:15px;letter-spacing:1px;text-align:center;">
+        ${escapeHtml(input.inviteCode)}
+      </code>
     </p>
     <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;">
-      Or copy this link into your browser:<br />
-      <a href="${escapeHtml(input.inviteUrl)}" style="color:#2563eb;word-break:break-all;">${escapeHtml(input.inviteUrl)}</a>
+      Open the RentNotice Pro desktop app, choose
+      <strong>"I have an invite code"</strong>, and enter this code to set up
+      your account. The code can only be used once.
     </p>`;
   const text =
     `${input.invitedByName} has invited you to join ${input.companyName} ` +
     `on RentNotice Pro as ${input.role}.\n\n` +
-    `Accept the invitation and set your password here:\n${input.inviteUrl}\n\n` +
-    `You'll use this account to log into the RentNotice Pro desktop app.`;
+    `Your invite code:\n${input.inviteCode}\n\n` +
+    `Open the RentNotice Pro desktop app, choose "I have an invite code", ` +
+    `and enter this code to set up your account. The code can only be used once.`;
 
   try {
     await sendEmail({

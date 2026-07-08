@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, cloudUsersTable, companiesTable } from "@workspace/db";
-import { LoginBody, AcceptInviteBody } from "@workspace/api-zod";
+import { LoginBody } from "@workspace/api-zod";
 import {
   verifyPassword,
-  hashPassword,
   createSession,
   setSessionCookie,
   clearSessionCookie,
@@ -92,88 +91,6 @@ router.get("/www/auth/me", async (req, res, next) => {
       return;
     }
     res.json(await sessionUserPayload(user));
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.get("/www/invites/:token", async (req, res, next) => {
-  try {
-    const token = req.params["token"];
-    const [user] = await db
-      .select()
-      .from(cloudUsersTable)
-      .where(
-        and(
-          eq(cloudUsersTable.inviteToken, token),
-          isNull(cloudUsersTable.passwordHash),
-        ),
-      );
-    if (!user || !user.active) {
-      res.status(404).json({
-        error: "This invitation is invalid or has already been used",
-        code: "invalid_invite",
-      });
-      return;
-    }
-    const [company] = await db
-      .select()
-      .from(companiesTable)
-      .where(eq(companiesTable.id, user.companyId));
-    res.json({
-      email: user.email,
-      role: user.role,
-      companyName: company?.name ?? "",
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post("/www/invites/accept", async (req, res, next) => {
-  try {
-    const parsed = AcceptInviteBody.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json({
-        error: "Invalid input (password must be at least 8 characters)",
-        code: "invalid_input",
-      });
-      return;
-    }
-    const { token, name, password } = parsed.data;
-
-    const [user] = await db
-      .select()
-      .from(cloudUsersTable)
-      .where(
-        and(
-          eq(cloudUsersTable.inviteToken, token),
-          isNull(cloudUsersTable.passwordHash),
-        ),
-      );
-    if (!user || !user.active) {
-      res.status(400).json({
-        error: "This invitation is invalid or has already been used",
-        code: "invalid_invite",
-      });
-      return;
-    }
-
-    const [updated] = await db
-      .update(cloudUsersTable)
-      .set({
-        name,
-        passwordHash: hashPassword(password),
-        inviteToken: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(cloudUsersTable.id, user.id))
-      .returning();
-    if (!updated) throw new Error("Failed to activate invited user");
-
-    const session = await createSession(updated.id);
-    setSessionCookie(res, session.token, session.expiresAt);
-    res.json(await sessionUserPayload(updated));
   } catch (err) {
     next(err);
   }

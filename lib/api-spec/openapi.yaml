@@ -298,52 +298,94 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  '/www/invites/{token}':
+  '/www/portal/users/{userId}/invite-code':
     get:
-      operationId: getInvite
+      operationId: getInviteCode
       tags:
-        - auth
-      summary: Look up a pending invitation by token
+        - portal
+      summary: View the pending invite code for an invited user
       parameters:
-        - name: token
+        - name: userId
           in: path
           required: true
           schema:
             type: string
       responses:
         '200':
-          description: Invitation details
+          description: Pending invite code
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InviteDetails'
-        '404':
-          description: Invalid or already-used invite
+                $ref: '#/components/schemas/InviteCode'
+        '403':
+          description: Requires admin role
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /www/invites/accept:
+        '404':
+          description: User not found or no longer pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
     post:
-      operationId: acceptInvite
+      operationId: regenerateInviteCode
       tags:
-        - auth
-      summary: Accept an invitation by setting name and password (logs the user in)
+        - portal
+      summary: Regenerate the invite code for a still-pending invitee (invalidates the old code)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: New invite code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteCode'
+        '403':
+          description: Requires admin role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found or no longer pending
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /license/redeem-invite:
+    post:
+      operationId: redeemInvite
+      tags:
+        - license
+      summary: Redeem a single-use invite code from the desktop app (sets up the account and activates the device)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AcceptInviteInput'
+              $ref: '#/components/schemas/RedeemInviteInput'
       responses:
         '200':
-          description: Account activated and logged in
+          description: 'Invite redeemed - account created, device activated; returns the company license context'
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SessionUser'
+                $ref: '#/components/schemas/InviteRedemptionResult'
         '400':
-          description: Invalid token or password
+          description: Invalid, already-used invite code, or seat limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Company license is paused or cancelled
           content:
             application/json:
               schema:
@@ -824,17 +866,35 @@ components:
       type: object
       required:
         - user
-        - inviteUrl
+        - inviteCode
         - emailSent
       properties:
         user:
           $ref: '#/components/schemas/CompanyUser'
-        inviteUrl:
+        inviteCode:
           type: string
-          description: Shareable link the invited user opens to set their password
+          description: Single-use code the invitee enters in the desktop app to activate it and set up their account
         emailSent:
           type: boolean
           description: Whether the invite email was sent to the invited user
+    InviteCode:
+      type: object
+      required:
+        - inviteCode
+        - email
+        - role
+      properties:
+        inviteCode:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
     CompanyUserUpdate:
       type: object
       properties:
@@ -853,34 +913,44 @@ components:
             - 'null'
           maxLength: 32
           description: Desktop sign-in username (lowercase letters, digits, ".", "_", "-"); null clears it so the desktop app derives one from the email
-    InviteDetails:
+    RedeemInviteInput:
       type: object
       required:
-        - email
-        - role
-        - companyName
-      properties:
-        email:
-          type: string
-        role:
-          type: string
-        companyName:
-          type: string
-    AcceptInviteInput:
-      type: object
-      required:
-        - token
+        - inviteCode
         - name
         - password
+        - deviceId
       properties:
-        token:
+        inviteCode:
           type: string
+          description: Single-use invite code (INV-XXXX-XXXX)
         name:
           type: string
           minLength: 1
+          description: Full name the invitee chooses for their account
         password:
           type: string
           minLength: 8
+          description: Password the invitee sets for their account
+        deviceId:
+          type: string
+          description: Stable identifier for the installation
+        deviceName:
+          type: string
+    InviteRedemptionResult:
+      type: object
+      required:
+        - licenseKey
+        - user
+        - license
+      properties:
+        licenseKey:
+          type: string
+          description: The company license key this device is now bound to (used for later verify calls)
+        user:
+          $ref: '#/components/schemas/DirectoryUser'
+        license:
+          $ref: '#/components/schemas/LicenseInfo'
     DirectoryUser:
       type: object
       required:

@@ -185,7 +185,7 @@ export const InviteCompanyUserResponse = zod.object({
   "status": zod.enum(['active', 'invited', 'deactivated']),
   "createdAt": zod.coerce.date().nullish()
 }),
-  "inviteUrl": zod.string().describe('Shareable link the invited user opens to set their password'),
+  "inviteCode": zod.string().describe('Single-use code the invitee enters in the desktop app to activate it and set up their account'),
   "emailSent": zod.boolean().describe('Whether the invite email was sent to the invited user')
 })
 
@@ -221,41 +221,82 @@ export const UpdateCompanyUserResponse = zod.object({
 
 
 /**
- * @summary Look up a pending invitation by token
+ * @summary View the pending invite code for an invited user
  */
-export const GetInviteParams = zod.object({
-  "token": zod.coerce.string()
+export const GetInviteCodeParams = zod.object({
+  "userId": zod.coerce.string()
 })
 
-export const GetInviteResponse = zod.object({
+export const GetInviteCodeResponse = zod.object({
+  "inviteCode": zod.string(),
   "email": zod.string(),
-  "role": zod.string(),
-  "companyName": zod.string()
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly'])
 })
 
 
 /**
- * @summary Accept an invitation by setting name and password (logs the user in)
+ * @summary Regenerate the invite code for a still-pending invitee (invalidates the old code)
  */
-
-export const acceptInviteBodyPasswordMin = 8;
-
-
-
-export const AcceptInviteBody = zod.object({
-  "token": zod.string(),
-  "name": zod.string().min(1),
-  "password": zod.string().min(acceptInviteBodyPasswordMin)
+export const RegenerateInviteCodeParams = zod.object({
+  "userId": zod.coerce.string()
 })
 
-export const AcceptInviteResponse = zod.object({
+export const RegenerateInviteCodeResponse = zod.object({
+  "inviteCode": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly'])
+})
+
+
+/**
+ * @summary Redeem a single-use invite code from the desktop app (sets up the account and activates the device)
+ */
+
+export const redeemInviteBodyPasswordMin = 8;
+
+
+
+export const RedeemInviteBody = zod.object({
+  "inviteCode": zod.string().describe('Single-use invite code (INV-XXXX-XXXX)'),
+  "name": zod.string().min(1).describe('Full name the invitee chooses for their account'),
+  "password": zod.string().min(redeemInviteBodyPasswordMin).describe('Password the invitee sets for their account'),
+  "deviceId": zod.string().describe('Stable identifier for the installation'),
+  "deviceName": zod.string().optional()
+})
+
+export const RedeemInviteResponse = zod.object({
+  "licenseKey": zod.string().describe('The company license key this device is now bound to (used for later verify calls)'),
+  "user": zod.object({
   "id": zod.string(),
   "email": zod.string(),
   "name": zod.string(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
-  "isMasterAdmin": zod.boolean(),
-  "companyId": zod.string(),
-  "companyName": zod.string()
+  "active": zod.boolean(),
+  "isMasterAdmin": zod.boolean()
+}),
+  "license": zod.object({
+  "status": zod.enum(['active', 'paused', 'cancelled']),
+  "statusReason": zod.string(),
+  "company": zod.object({
+  "id": zod.string(),
+  "name": zod.string()
+}),
+  "tier": zod.string(),
+  "seats": zod.number(),
+  "paidThrough": zod.coerce.date().nullish(),
+  "users": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "username": zod.string().nullish().describe('Admin-chosen desktop sign-in username; when null the desktop app derives one from the email local part'),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
+  "active": zod.boolean(),
+  "isMasterAdmin": zod.boolean()
+})),
+  "graceDays": zod.number().describe('Days the desktop app may keep working offline before requiring re-verification'),
+  "verifiedAt": zod.coerce.date()
+})
 })
 
 

@@ -195,10 +195,26 @@ export interface InviteInput {
 
 export interface InviteResult {
   user: CompanyUser;
-  /** Shareable link the invited user opens to set their password */
-  inviteUrl: string;
+  /** Single-use code the invitee enters in the desktop app to activate it and set up their account */
+  inviteCode: string;
   /** Whether the invite email was sent to the invited user */
   emailSent: boolean;
+}
+
+export type InviteCodeRole = typeof InviteCodeRole[keyof typeof InviteCodeRole];
+
+
+export const InviteCodeRole = {
+  admin: 'admin',
+  manager: 'manager',
+  staff: 'staff',
+  readonly: 'readonly',
+} as const;
+
+export interface InviteCode {
+  inviteCode: string;
+  email: string;
+  role: InviteCodeRole;
 }
 
 export type CompanyUserUpdateRole = typeof CompanyUserUpdateRole[keyof typeof CompanyUserUpdateRole];
@@ -222,18 +238,22 @@ export interface CompanyUserUpdate {
   username?: string | null;
 }
 
-export interface InviteDetails {
-  email: string;
-  role: string;
-  companyName: string;
-}
-
-export interface AcceptInviteInput {
-  token: string;
-  /** @minLength 1 */
+export interface RedeemInviteInput {
+  /** Single-use invite code (INV-XXXX-XXXX) */
+  inviteCode: string;
+  /**
+     * Full name the invitee chooses for their account
+     * @minLength 1
+     */
   name: string;
-  /** @minLength 8 */
+  /**
+     * Password the invitee sets for their account
+     * @minLength 8
+     */
   password: string;
+  /** Stable identifier for the installation */
+  deviceId: string;
+  deviceName?: string;
 }
 
 export type DirectoryUserRole = typeof DirectoryUserRole[keyof typeof DirectoryUserRole];
@@ -258,18 +278,6 @@ export interface DirectoryUser {
   role: DirectoryUserRole;
   active: boolean;
   isMasterAdmin: boolean;
-}
-
-export interface LicenseActivateInput {
-  licenseKey: string;
-  /** Stable identifier for the installation */
-  deviceId: string;
-  deviceName?: string;
-}
-
-export interface LicenseVerifyInput {
-  licenseKey: string;
-  deviceId?: string;
 }
 
 export type LicenseInfoStatus = typeof LicenseInfoStatus[keyof typeof LicenseInfoStatus];
@@ -298,6 +306,25 @@ export interface LicenseInfo {
   /** Days the desktop app may keep working offline before requiring re-verification */
   graceDays: number;
   verifiedAt: string;
+}
+
+export interface InviteRedemptionResult {
+  /** The company license key this device is now bound to (used for later verify calls) */
+  licenseKey: string;
+  user: DirectoryUser;
+  license: LicenseInfo;
+}
+
+export interface LicenseActivateInput {
+  licenseKey: string;
+  /** Stable identifier for the installation */
+  deviceId: string;
+  deviceName?: string;
+}
+
+export interface LicenseVerifyInput {
+  licenseKey: string;
+  deviceId?: string;
 }
 
 export interface ErrorMessage {

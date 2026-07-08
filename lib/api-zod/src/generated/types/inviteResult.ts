@@ -9,8 +9,8 @@ import type { CompanyUser } from './companyUser';
 
 export interface InviteResult {
   user: CompanyUser;
-  /** Shareable link the invited user opens to set their password */
-  inviteUrl: string;
+  /** Single-use code the invitee enters in the desktop app to activate it and set up their account */
+  inviteCode: string;
   /** Whether the invite email was sent to the invited user */
   emailSent: boolean;
 }

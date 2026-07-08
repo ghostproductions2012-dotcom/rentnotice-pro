@@ -109,6 +109,15 @@ export interface ActivateWorkspaceInput {
   secret: string;
 }
 
+export interface RedeemInviteCodeInput {
+  /** Single-use invite code from a company admin (INV-XXXX-XXXX). */
+  inviteCode: string;
+  /** Full name the invitee chooses for their account. */
+  name: string;
+  /** Password the invitee sets — verified/set online, never stored raw. */
+  password: string;
+}
+
 export interface CreateTemplateInput {
   name: string;
   noticeType: NoticeType;
@@ -176,6 +185,12 @@ export interface AppServices {
    * directory (replacing any demo data), and signs them in.
    */
   activateWorkspace(input: ActivateWorkspaceInput): Promise<SessionInfo>;
+  /**
+   * Redeem a single-use invite code from a company admin: sets the invitee's
+   * name/password in the cloud, provisions a clean local workspace from the
+   * company directory (replacing any demo data), and signs them in.
+   */
+  redeemInviteCode(input: RedeemInviteCodeInput): Promise<SessionInfo>;
   /**
    * Re-verify the license and sync the user directory from the cloud
    * (launch-time and manual "Sync now"). Offline is not an error: the cached

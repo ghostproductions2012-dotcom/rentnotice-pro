@@ -21,6 +21,7 @@
 import type { LicenseStatus } from "../types";
 import {
   CloudCredentialsError,
+  InviteCodeInvalidError,
   LicenseInvalidError,
   LicensingUnavailableError,
   type DirectoryUser,
@@ -163,5 +164,35 @@ export const mockLicensingClient: LicensingClient = {
         ? override
         : base;
     return summary(status);
+  },
+
+  // Mock invite codes:
+  //   INV-TEST-STAFF   → redeems as a new staff member on the active license
+  //   INV-TEST-USED    → always rejected as already used
+  //   INV-TEST-OFFLINE → simulates an unreachable licensing service
+  async redeemInvite(input) {
+    await delay(MOCK_LATENCY_MS);
+    if (readOverride("rentnotice-pro:mock-network") === "offline") {
+      throw new LicensingUnavailableError();
+    }
+    const code = input.inviteCode.trim().toUpperCase();
+    if (code === "INV-TEST-OFFLINE") throw new LicensingUnavailableError();
+    if (code !== "INV-TEST-STAFF") throw new InviteCodeInvalidError();
+
+    const me: DirectoryUser = {
+      cloudUserId: "cu-invited",
+      name: input.name,
+      username: (input.name.split(/\s+/)[0] ?? "invited").toLowerCase() || "invited",
+      email: "invited@goldenstatepm.com",
+      role: "staff",
+      active: true,
+      isMasterAdmin: false,
+    };
+    return {
+      licenseKey: "RNP-TEST-ACTIVE",
+      license: summary("active"),
+      me,
+      directory: [...DIRECTORY.map(stripSecret), me],
+    };
   },
 };

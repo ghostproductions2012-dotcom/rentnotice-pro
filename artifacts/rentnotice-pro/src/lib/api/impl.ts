@@ -96,6 +96,7 @@ import {
   LicenseInvalidError,
   LicensingUnavailableError,
 } from "../licensing";
+import type { DirectoryUser, LicenseSummary } from "../licensing/types";
 import { evaluateLicenseGate, type LicenseGate } from "../licensing/gate";
 import { parseDateToIso, parseFile, parseMoneyToCents, toParsedLedgerFile } from "../import";
 import {
@@ -383,6 +384,110 @@ function hydrateDocument(db: AppDatabase, doc: NoticeDocument): NoticeDocument {
 
 // ------------------------------- services -----------------------------------
 
+/**
+ * Provisions a clean activated workspace from the cloud company directory and
+ * signs the given member in. Shared by license-key activation and invite-code
+ * redemption; any demo/leftover local data is wiped first.
+ */
+async function provisionActivatedWorkspace(opts: {
+  licenseKey: string;
+  license: LicenseSummary;
+  directory: DirectoryUser[];
+  me: DirectoryUser;
+  /** sha256 hash of the secret the signing-in member just used online. */
+  myHash: string;
+}): Promise<SessionInfo> {
+  const { licenseKey, license, directory, me, myHash } = opts;
+
+  // Activation always provisions a clean workspace: wipe demo/leftover data.
+  let db = await getDb();
+  if (getWorkspaceMode(db) !== "unset" || usersRepo.count(db) > 0) {
+    db.close();
+    dbPromise = null;
+    await clearPersistedDatabase();
+    db = await getDb();
+  }
+
+  const now = nowIso();
+  db.transaction(() => {
+    companyRepo.create(db, {
+      id: "company-1",
+      name: license.companyName,
+      address: "",
+      phone: "",
+      email: "",
+      logoDataUrl: null,
+      notes: "",
+      createdAt: now,
+      updatedAt: now,
+    });
+    settingsRepo.create(db, {
+      id: "app",
+      companyProfileId: "company-1",
+      defaultJurisdiction: "CA",
+      requireAttorneyReviewedTemplate: true,
+      allowAdminTemplateOverride: false,
+      pinLockEnabled: true,
+      autoLockMinutes: 15,
+      aiAssistEnabled: false,
+      aiConsentAcknowledged: false,
+      syncEnabled: false,
+      syncEndpoint: "",
+      disclaimerAcknowledgedAt: null,
+      onboardingCompleted: false,
+      updatedAt: now,
+    });
+    seedReferenceData(db);
+    for (const member of directory) {
+      const localUser: User = {
+        id: uid("user"),
+        name: member.name,
+        initials: initialsOf(member.name),
+        username: member.username,
+        email: member.email,
+        role: member.role,
+        // Only the member who just verified online gets a cached secret;
+        // everyone else verifies online on their own first sign-in.
+        pin: member.cloudUserId === me.cloudUserId ? myHash : null,
+        active: member.active,
+        createdAt: now,
+        cloudUserId: member.cloudUserId,
+      };
+      usersRepo.create(db, localUser);
+    }
+    activationRepo.set(db, {
+      licenseKey,
+      companyId: license.companyId,
+      companyName: license.companyName,
+      licenseStatus: license.status,
+      statusReason: license.statusReason,
+      plan: license.plan,
+      activatedAt: now,
+      lastVerifiedAt: now,
+      graceDays: license.graceDays,
+      directorySyncedAt: now,
+    });
+    setWorkspaceMode(db, "activated");
+  });
+  const currentUser = usersRepo.list(db).find((u) => u.cloudUserId === me.cloudUserId);
+  if (!currentUser) {
+    throw new Error("Activation failed: your account was not found in the company directory.");
+  }
+  session.user = currentUser;
+  session.locked = false;
+  refreshLicenseGate(db);
+  logAudit(
+    db,
+    "workspace_activated",
+    "settings",
+    "activation",
+    `Workspace activated for ${license.companyName}`,
+  );
+  logAudit(db, "login", "user", currentUser.id, `${currentUser.name} signed in`);
+  await db.flush();
+  return { user: { ...currentUser }, locked: false };
+}
+
 function createServices(): AppServices {
   const services = {
     // --- session & users ---
@@ -532,95 +637,32 @@ function createServices(): AppServices {
       const me = await client.verifyCredentials(key, input.identifier, input.secret);
       const directory = await client.fetchDirectory(key);
       if (!me.active) throw new Error("Your account has been deactivated by your company admin.");
-
-      // Activation always provisions a clean workspace: wipe demo/leftover data.
-      let db = await getDb();
-      if (getWorkspaceMode(db) !== "unset" || usersRepo.count(db) > 0) {
-        db.close();
-        dbPromise = null;
-        await clearPersistedDatabase();
-        db = await getDb();
-      }
-
-      const now = nowIso();
-      const myHash = await sha256Hex(input.secret);
-      db.transaction(() => {
-        companyRepo.create(db, {
-          id: "company-1",
-          name: license.companyName,
-          address: "",
-          phone: "",
-          email: "",
-          logoDataUrl: null,
-          notes: "",
-          createdAt: now,
-          updatedAt: now,
-        });
-        settingsRepo.create(db, {
-          id: "app",
-          companyProfileId: "company-1",
-          defaultJurisdiction: "CA",
-          requireAttorneyReviewedTemplate: true,
-          allowAdminTemplateOverride: false,
-          pinLockEnabled: true,
-          autoLockMinutes: 15,
-          aiAssistEnabled: false,
-          aiConsentAcknowledged: false,
-          syncEnabled: false,
-          syncEndpoint: "",
-          disclaimerAcknowledgedAt: null,
-          onboardingCompleted: false,
-          updatedAt: now,
-        });
-        seedReferenceData(db);
-        for (const member of directory) {
-          const localUser: User = {
-            id: uid("user"),
-            name: member.name,
-            initials: initialsOf(member.name),
-            username: member.username,
-            email: member.email,
-            role: member.role,
-            // Only the member who just verified online gets a cached secret;
-            // everyone else verifies online on their own first sign-in.
-            pin: member.cloudUserId === me.cloudUserId ? myHash : null,
-            active: member.active,
-            createdAt: now,
-            cloudUserId: member.cloudUserId,
-          };
-          usersRepo.create(db, localUser);
-        }
-        activationRepo.set(db, {
-          licenseKey: key,
-          companyId: license.companyId,
-          companyName: license.companyName,
-          licenseStatus: license.status,
-          statusReason: license.statusReason,
-          plan: license.plan,
-          activatedAt: now,
-          lastVerifiedAt: now,
-          graceDays: license.graceDays,
-          directorySyncedAt: now,
-        });
-        setWorkspaceMode(db, "activated");
+      return provisionActivatedWorkspace({
+        licenseKey: key,
+        license,
+        directory,
+        me,
+        myHash: await sha256Hex(input.secret),
       });
-      const currentUser = usersRepo.list(db).find((u) => u.cloudUserId === me.cloudUserId);
-      if (!currentUser) {
-        throw new Error("Activation failed: your account was not found in the company directory.");
-      }
-      session.user = currentUser;
-      session.locked = false;
-      refreshLicenseGate(db);
-      logAudit(
-        db,
-        "workspace_activated",
-        "settings",
-        "activation",
-        `Workspace activated for ${license.companyName}`,
-      );
-      logAudit(db, "login", "user", currentUser.id, `${currentUser.name} signed in`);
-      await db.flush();
-      return { user: { ...currentUser }, locked: false };
+    },
+    async redeemInviteCode(input): Promise<SessionInfo> {
+      const code = input.inviteCode.trim();
+      if (!code) throw new Error("Enter your invite code");
+      const name = input.name.trim();
+      if (!name) throw new Error("Enter your name");
+      if (input.password.length < 8) throw new Error("Password must be at least 8 characters");
+      const redemption = await getLicensingClient().redeemInvite({
+        inviteCode: code,
+        name,
+        password: input.password,
+      });
+      return provisionActivatedWorkspace({
+        licenseKey: redemption.licenseKey,
+        license: redemption.license,
+        directory: redemption.directory,
+        me: redemption.me,
+        myHash: await sha256Hex(input.password),
+      });
     },
     async syncLicense(): Promise<WorkspaceState> {
       const db = await getDb();

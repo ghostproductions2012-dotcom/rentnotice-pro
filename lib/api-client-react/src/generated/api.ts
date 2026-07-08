@@ -20,7 +20,6 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  AcceptInviteInput,
   AddFieldEvidenceRequest,
   CheckoutCompleteInput,
   CheckoutSession,
@@ -30,8 +29,9 @@ import type {
   ErrorResponse,
   FieldAssignmentSync,
   HealthStatus,
-  InviteDetails,
+  InviteCode,
   InviteInput,
+  InviteRedemptionResult,
   InviteResult,
   LicenseActivateInput,
   LicenseInfo,
@@ -43,6 +43,7 @@ import type {
   ProvisionResult,
   PushFieldAssignmentsRequest,
   PushFieldAssignmentsResult,
+  RedeemInviteInput,
   SessionUser,
   SignupInput,
   UpdateFieldAssignmentRequest
@@ -952,20 +953,20 @@ export const useUpdateCompanyUser = <TError = ErrorType<ErrorResponse>,
       return useMutation(getUpdateCompanyUserMutationOptions(options));
     }
 
-export const getGetInviteUrl = (token: string,) => {
+export const getGetInviteCodeUrl = (userId: string,) => {
 
 
 
 
-  return `/api/www/invites/${token}`
+  return `/api/www/portal/users/${userId}/invite-code`
 }
 
 /**
- * @summary Look up a pending invitation by token
+ * @summary View the pending invite code for an invited user
  */
-export const getInvite = async (token: string, options?: RequestInit): Promise<InviteDetails> => {
+export const getInviteCode = async (userId: string, options?: RequestInit): Promise<InviteCode> => {
 
-  return customFetch<InviteDetails>(getGetInviteUrl(token),
+  return customFetch<InviteCode>(getGetInviteCodeUrl(userId),
   {
     ...options,
     method: 'GET'
@@ -978,45 +979,45 @@ export const getInvite = async (token: string, options?: RequestInit): Promise<I
 
 
 
-export const getGetInviteQueryKey = (token: string,) => {
+export const getGetInviteCodeQueryKey = (userId: string,) => {
     return [
-    `/api/www/invites/${token}`
+    `/api/www/portal/users/${userId}/invite-code`
     ] as const;
     }
 
 
-export const getGetInviteQueryOptions = <TData = Awaited<ReturnType<typeof getInvite>>, TError = ErrorType<ErrorResponse>>(token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetInviteCodeQueryOptions = <TData = Awaited<ReturnType<typeof getInviteCode>>, TError = ErrorType<ErrorResponse>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInviteCode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetInviteQueryKey(token);
+  const queryKey =  queryOptions?.queryKey ?? getGetInviteCodeQueryKey(userId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInvite>>> = ({ signal }) => getInvite(token, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getInviteCode>>> = ({ signal }) => getInviteCode(userId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: token !== null && token !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInvite>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getInviteCode>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type GetInviteQueryResult = NonNullable<Awaited<ReturnType<typeof getInvite>>>
-export type GetInviteQueryError = ErrorType<ErrorResponse>
+export type GetInviteCodeQueryResult = NonNullable<Awaited<ReturnType<typeof getInviteCode>>>
+export type GetInviteCodeQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary Look up a pending invitation by token
+ * @summary View the pending invite code for an invited user
  */
 
-export function useGetInvite<TData = Awaited<ReturnType<typeof getInvite>>, TError = ErrorType<ErrorResponse>>(
- token: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInvite>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetInviteCode<TData = Awaited<ReturnType<typeof getInviteCode>>, TError = ErrorType<ErrorResponse>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getInviteCode>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getGetInviteQueryOptions(token,options)
+  const queryOptions = getGetInviteCodeQueryOptions(userId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -1029,36 +1030,36 @@ export function useGetInvite<TData = Awaited<ReturnType<typeof getInvite>>, TErr
 
 
 
-export const getAcceptInviteUrl = () => {
+export const getRegenerateInviteCodeUrl = (userId: string,) => {
 
 
 
 
-  return `/api/www/invites/accept`
+  return `/api/www/portal/users/${userId}/invite-code`
 }
 
 /**
- * @summary Accept an invitation by setting name and password (logs the user in)
+ * @summary Regenerate the invite code for a still-pending invitee (invalidates the old code)
  */
-export const acceptInvite = async (acceptInviteInput: AcceptInviteInput, options?: RequestInit): Promise<SessionUser> => {
+export const regenerateInviteCode = async (userId: string, options?: RequestInit): Promise<InviteCode> => {
 
-  return customFetch<SessionUser>(getAcceptInviteUrl(),
+  return customFetch<InviteCode>(getRegenerateInviteCodeUrl(userId),
   {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(acceptInviteInput)
+    method: 'POST'
+
+
   }
 );}
 
 
 
 
-export const getAcceptInviteMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptInvite>>, TError,{data: BodyType<AcceptInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof acceptInvite>>, TError,{data: BodyType<AcceptInviteInput>}, TContext> => {
+export const getRegenerateInviteCodeMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateInviteCode>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof regenerateInviteCode>>, TError,{userId: string}, TContext> => {
 
-const mutationKey = ['acceptInvite'];
+const mutationKey = ['regenerateInviteCode'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -1068,10 +1069,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof acceptInvite>>, {data: BodyType<AcceptInviteInput>}> = (props) => {
-          const {data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof regenerateInviteCode>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
 
-          return  acceptInvite(data,requestOptions)
+          return  regenerateInviteCode(userId,requestOptions)
         }
 
 
@@ -1081,22 +1082,92 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type AcceptInviteMutationResult = NonNullable<Awaited<ReturnType<typeof acceptInvite>>>
-    export type AcceptInviteMutationBody = BodyType<AcceptInviteInput>
-    export type AcceptInviteMutationError = ErrorType<ErrorResponse>
+    export type RegenerateInviteCodeMutationResult = NonNullable<Awaited<ReturnType<typeof regenerateInviteCode>>>
+
+    export type RegenerateInviteCodeMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Accept an invitation by setting name and password (logs the user in)
+ * @summary Regenerate the invite code for a still-pending invitee (invalidates the old code)
  */
-export const useAcceptInvite = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof acceptInvite>>, TError,{data: BodyType<AcceptInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+export const useRegenerateInviteCode = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof regenerateInviteCode>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
-        Awaited<ReturnType<typeof acceptInvite>>,
+        Awaited<ReturnType<typeof regenerateInviteCode>>,
         TError,
-        {data: BodyType<AcceptInviteInput>},
+        {userId: string},
         TContext
       > => {
-      return useMutation(getAcceptInviteMutationOptions(options));
+      return useMutation(getRegenerateInviteCodeMutationOptions(options));
+    }
+
+export const getRedeemInviteUrl = () => {
+
+
+
+
+  return `/api/license/redeem-invite`
+}
+
+/**
+ * @summary Redeem a single-use invite code from the desktop app (sets up the account and activates the device)
+ */
+export const redeemInvite = async (redeemInviteInput: RedeemInviteInput, options?: RequestInit): Promise<InviteRedemptionResult> => {
+
+  return customFetch<InviteRedemptionResult>(getRedeemInviteUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(redeemInviteInput)
+  }
+);}
+
+
+
+
+export const getRedeemInviteMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redeemInvite>>, TError,{data: BodyType<RedeemInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof redeemInvite>>, TError,{data: BodyType<RedeemInviteInput>}, TContext> => {
+
+const mutationKey = ['redeemInvite'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof redeemInvite>>, {data: BodyType<RedeemInviteInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  redeemInvite(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RedeemInviteMutationResult = NonNullable<Awaited<ReturnType<typeof redeemInvite>>>
+    export type RedeemInviteMutationBody = BodyType<RedeemInviteInput>
+    export type RedeemInviteMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Redeem a single-use invite code from the desktop app (sets up the account and activates the device)
+ */
+export const useRedeemInvite = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof redeemInvite>>, TError,{data: BodyType<RedeemInviteInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof redeemInvite>>,
+        TError,
+        {data: BodyType<RedeemInviteInput>},
+        TContext
+      > => {
+      return useMutation(getRedeemInviteMutationOptions(options));
     }
 
 export const getActivateLicenseUrl = () => {

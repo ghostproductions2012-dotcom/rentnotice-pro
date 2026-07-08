@@ -5,9 +5,10 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { InviteCodeRole } from './inviteCodeRole';
 
-export interface InviteDetails {
+export interface InviteCode {
+  inviteCode: string;
   email: string;
-  role: string;
-  companyName: string;
+  role: InviteCodeRole;
 }

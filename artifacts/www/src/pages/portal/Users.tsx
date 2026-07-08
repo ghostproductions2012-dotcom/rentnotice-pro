@@ -1,4 +1,4 @@
-import { useListCompanyUsers, useInviteCompanyUser, useUpdateCompanyUser, getListCompanyUsersQueryKey, useGetMe, useGetPortalOverview } from "@workspace/api-client-react";
+import { useListCompanyUsers, useInviteCompanyUser, useUpdateCompanyUser, getListCompanyUsersQueryKey, useGetMe, useGetPortalOverview, useGetInviteCode, useRegenerateInviteCode, getGetInviteCodeQueryKey } from "@workspace/api-client-react";
 import PortalLayout from "./PortalLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,8 +34,10 @@ export default function Users() {
   const updateMutation = useUpdateCompanyUser();
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{url: string, email: string, emailSent: boolean} | null>(null);
+  const [inviteResult, setInviteResult] = useState<{code: string, email: string, emailSent: boolean} | null>(null);
   const [copied, setCopied] = useState(false);
+  const [inviteCodeTarget, setInviteCodeTarget] = useState<CompanyUser | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
   const [usernameTarget, setUsernameTarget] = useState<CompanyUser | null>(null);
   const [usernameValue, setUsernameValue] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -53,7 +55,7 @@ export default function Users() {
     try {
       const res = await inviteMutation.mutateAsync({ data: values });
       queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
-      setInviteResult({ url: res.inviteUrl, email: values.email, emailSent: res.emailSent });
+      setInviteResult({ code: res.inviteCode, email: values.email, emailSent: res.emailSent });
       form.reset();
     } catch (e) {
       console.error(e);
@@ -106,9 +108,36 @@ export default function Users() {
 
   const copyInvite = () => {
     if (inviteResult) {
-      navigator.clipboard.writeText(inviteResult.url);
+      navigator.clipboard.writeText(inviteResult.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const inviteCodeQuery = useGetInviteCode(inviteCodeTarget?.id ?? "", {
+    query: {
+      queryKey: getGetInviteCodeQueryKey(inviteCodeTarget?.id ?? ""),
+      enabled: inviteCodeTarget !== null,
+    },
+  });
+  const regenerateMutation = useRegenerateInviteCode();
+
+  const handleRegenerateCode = async () => {
+    if (!inviteCodeTarget) return;
+    try {
+      await regenerateMutation.mutateAsync({ userId: inviteCodeTarget.id });
+      queryClient.invalidateQueries({ queryKey: getGetInviteCodeQueryKey(inviteCodeTarget.id) });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const copyPendingCode = () => {
+    const code = inviteCodeQuery.data?.inviteCode;
+    if (code) {
+      navigator.clipboard.writeText(code);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
     }
   };
 
@@ -144,8 +173,8 @@ export default function Users() {
               <DialogHeader>
                 <DialogTitle>Invite Team Member</DialogTitle>
                 <DialogDescription>
-                  Send an invitation to join your company account. 
-                  They will use this email to log into the desktop app.
+                  Invite a colleague by email and role. You'll get a single-use
+                  invite code they enter in the RentNotice Pro desktop app.
                 </DialogDescription>
               </DialogHeader>
 
@@ -155,20 +184,23 @@ export default function Users() {
                     <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                     <AlertDescription className="text-green-800 dark:text-green-300">
                       {inviteResult.emailSent
-                        ? `Invitation email sent to ${inviteResult.email}.`
-                        : `Invitation created for ${inviteResult.email}, but the email could not be sent. Share the link below instead.`}
+                        ? `Invite code emailed to ${inviteResult.email}.`
+                        : `Invitation created for ${inviteResult.email}, but the email could not be sent. Share the code below instead.`}
                     </AlertDescription>
                   </Alert>
                   <div>
                     <label className="text-sm font-medium mb-1.5 block">
-                      {inviteResult.emailSent ? "Or share this link directly:" : "Share this link directly:"}
+                      {inviteResult.emailSent ? "Or share this invite code directly:" : "Share this invite code directly:"}
                     </label>
                     <div className="flex gap-2">
-                      <Input readOnly value={inviteResult.url} className="font-mono text-xs" />
+                      <Input readOnly value={inviteResult.code} className="font-mono text-sm tracking-wider" />
                       <Button variant="secondary" onClick={copyInvite} className="shrink-0">
                         {copied ? "Copied" : <Copy className="w-4 h-4" />}
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      They enter this code in the desktop app to set up their account. It can only be used once.
+                    </p>
                   </div>
                   <Button className="w-full mt-4" onClick={() => {setInviteResult(null); setInviteDialogOpen(false);}}>Done</Button>
                 </div>
@@ -294,6 +326,9 @@ export default function Users() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            {user.status === 'invited' && (
+                              <DropdownMenuItem onClick={() => setInviteCodeTarget(user)}>View invite code…</DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => openUsernameDialog(user)}>Set desktop username…</DropdownMenuItem>
                             {!user.isMasterAdmin && user.id !== me?.id && (
                               <>
@@ -333,6 +368,44 @@ export default function Users() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={inviteCodeTarget !== null} onOpenChange={(open) => { if (!open) { setInviteCodeTarget(null); setCodeCopied(false); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Invite Code</DialogTitle>
+            <DialogDescription>
+              {inviteCodeTarget && (
+                <>Share this single-use code with {inviteCodeTarget.email}. They enter it in the RentNotice Pro desktop app to set up their account.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            {inviteCodeQuery.isLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : inviteCodeQuery.data ? (
+              <div className="flex gap-2">
+                <Input readOnly value={inviteCodeQuery.data.inviteCode} className="font-mono text-sm tracking-wider" />
+                <Button variant="secondary" onClick={copyPendingCode} className="shrink-0">
+                  {codeCopied ? "Copied" : <Copy className="w-4 h-4" />}
+                </Button>
+              </div>
+            ) : (
+              <p className="text-sm text-destructive">
+                Could not load the invite code. The invitation may have already been used.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Need a fresh code? Generating a new one immediately invalidates the old code.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleRegenerateCode} disabled={regenerateMutation.isPending}>
+              {regenerateMutation.isPending ? "Generating..." : "Generate New Code"}
+            </Button>
+            <Button type="button" onClick={() => { setInviteCodeTarget(null); setCodeCopied(false); }}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={usernameTarget !== null} onOpenChange={(open) => { if (!open) setUsernameTarget(null); }}>
         <DialogContent>

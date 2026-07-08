@@ -7,7 +7,11 @@ import {
   licenseKeysTable,
 } from "@workspace/db";
 import type { CloudUser, Company, LicenseKey } from "@workspace/db";
-import { ActivateLicenseBody, VerifyLicenseBody } from "@workspace/api-zod";
+import {
+  ActivateLicenseBody,
+  VerifyLicenseBody,
+  RedeemInviteBody,
+} from "@workspace/api-zod";
 import {
   computeLicenseStatus,
   syncStoredLicenseStatus,
@@ -15,6 +19,7 @@ import {
   type ComputedLicenseStatus,
 } from "../lib/license";
 import { getPlanConfig } from "../lib/plans";
+import { hashPassword } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -114,6 +119,100 @@ router.post("/license/activate", async (req, res, next) => {
       .where(eq(licenseKeysTable.id, license.id));
 
     res.json(await buildLicenseInfo(license, company, computed));
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/license/redeem-invite", async (req, res, next) => {
+  try {
+    const parsed = RedeemInviteBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Invalid input (password must be at least 8 characters)",
+        code: "invalid_input",
+      });
+      return;
+    }
+    const code = parsed.data.inviteCode.trim().toUpperCase();
+
+    const [invitee] = await db
+      .select()
+      .from(cloudUsersTable)
+      .where(eq(cloudUsersTable.inviteCode, code));
+    if (
+      !invitee ||
+      invitee.passwordHash !== null ||
+      !invitee.active
+    ) {
+      res.status(400).json({
+        error: "This invite code is invalid or has already been used",
+        code: "invalid_invite_code",
+      });
+      return;
+    }
+
+    const [company] = await db
+      .select()
+      .from(companiesTable)
+      .where(eq(companiesTable.id, invitee.companyId));
+    const [license] = company
+      ? await db
+          .select()
+          .from(licenseKeysTable)
+          .where(eq(licenseKeysTable.companyId, company.id))
+      : [];
+    if (!company || !license) {
+      res.status(400).json({
+        error: "This invite code is invalid or has already been used",
+        code: "invalid_invite_code",
+      });
+      return;
+    }
+
+    const computed = await computeLicenseStatus(company);
+    await syncStoredLicenseStatus(license, computed);
+
+    if (computed.status !== "active") {
+      res.status(403).json({
+        error: `License is ${computed.status}: ${computed.statusReason}`,
+        code: `license_${computed.status}`,
+      });
+      return;
+    }
+
+    const [updated] = await db
+      .update(cloudUsersTable)
+      .set({
+        name: parsed.data.name,
+        passwordHash: hashPassword(parsed.data.password),
+        inviteCode: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(cloudUsersTable.id, invitee.id))
+      .returning();
+    if (!updated) throw new Error("Failed to redeem invite code");
+
+    // Mark the license as seen from this device without stealing the primary
+    // device binding established by /license/activate.
+    const now = new Date();
+    await db
+      .update(licenseKeysTable)
+      .set({
+        activatedAt: license.activatedAt ?? now,
+        lastVerifiedAt: now,
+        deviceId: license.deviceId ?? parsed.data.deviceId,
+        deviceName:
+          license.deviceName ?? parsed.data.deviceName ?? null,
+        updatedAt: now,
+      })
+      .where(eq(licenseKeysTable.id, license.id));
+
+    res.json({
+      licenseKey: license.key,
+      user: directoryUser(updated),
+      license: await buildLicenseInfo(license, company, computed),
+    });
   } catch (err) {
     next(err);
   }

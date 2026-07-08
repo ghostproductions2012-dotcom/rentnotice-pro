@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { activateLicense, verifyLicense, login } = vi.hoisted(() => ({
+const { activateLicense, verifyLicense, login, redeemInvite } = vi.hoisted(() => ({
   activateLicense: vi.fn(),
   verifyLicense: vi.fn(),
   login: vi.fn(),
+  redeemInvite: vi.fn(),
 }));
 
 vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@workspace/api-client-react")>();
-  return { ...actual, activateLicense, verifyLicense, login };
+  return { ...actual, activateLicense, verifyLicense, login, redeemInvite };
 });
 
 import { ApiError, type LicenseInfo } from "@workspace/api-client-react";
 import { deriveUsernames, httpLicensingClient } from "../http";
 import {
   CloudCredentialsError,
+  InviteCodeInvalidError,
   LicenseInvalidError,
   LicensingUnavailableError,
 } from "../types";
@@ -320,6 +322,94 @@ describe("verifyCredentials", () => {
     login.mockRejectedValue(new TypeError("fetch failed"));
     await expect(
       httpLicensingClient.verifyCredentials(freshKey(), "jane.doe", "pw12345678"),
+    ).rejects.toBeInstanceOf(LicensingUnavailableError);
+  });
+});
+
+describe("redeemInvite", () => {
+  const INVITED_INFO: LicenseInfo = {
+    ...INFO,
+    users: [
+      ...INFO.users,
+      {
+        id: "u-4",
+        email: "newbie@acme.test",
+        name: "New Bee",
+        role: "staff",
+        active: true,
+        isMasterAdmin: false,
+      },
+    ],
+  };
+
+  it("normalizes the code, returns the redemption context, and warms the verify cache", async () => {
+    redeemInvite.mockResolvedValue({
+      licenseKey: freshKey(),
+      license: INVITED_INFO,
+      user: { id: "u-4", email: "newbie@acme.test", name: "New Bee", role: "staff" },
+    });
+    const result = await httpLicensingClient.redeemInvite({
+      inviteCode: "  inv-abcd-1234 ",
+      name: "New Bee",
+      password: "pw12345678",
+    });
+    expect(redeemInvite).toHaveBeenCalledWith(
+      expect.objectContaining({ inviteCode: "INV-ABCD-1234", name: "New Bee" }),
+    );
+    expect(result.me.cloudUserId).toBe("u-4");
+    expect(result.me.username).toBe("newbie");
+    expect(result.directory).toHaveLength(4);
+    expect(result.license.status).toBe("active");
+    // The verify cache is warmed: checkStatus must not hit the network again.
+    verifyLicense.mockRejectedValue(new TypeError("fetch failed"));
+    const status = await httpLicensingClient.checkStatus(result.licenseKey);
+    expect(status.status).toBe("active");
+    expect(verifyLicense).not.toHaveBeenCalled();
+  });
+
+  it("maps invalid_invite_code to InviteCodeInvalidError", async () => {
+    redeemInvite.mockRejectedValue(
+      apiError(400, { error: "Invalid invite code", code: "invalid_invite_code" }),
+    );
+    await expect(
+      httpLicensingClient.redeemInvite({
+        inviteCode: "INV-NOPE-NOPE",
+        name: "X",
+        password: "pw12345678",
+      }),
+    ).rejects.toBeInstanceOf(InviteCodeInvalidError);
+  });
+
+  it("surfaces license-state refusals as plain errors with the server message", async () => {
+    redeemInvite.mockRejectedValue(
+      apiError(403, { error: "License is paused", code: "license_paused" }),
+    );
+    await expect(
+      httpLicensingClient.redeemInvite({
+        inviteCode: "INV-ABCD-1234",
+        name: "X",
+        password: "pw12345678",
+      }),
+    ).rejects.toThrow("License is paused");
+  });
+
+  it("maps transport failures and 5xx to LicensingUnavailableError", async () => {
+    redeemInvite.mockRejectedValue(new TypeError("fetch failed"));
+    await expect(
+      httpLicensingClient.redeemInvite({
+        inviteCode: "INV-ABCD-1234",
+        name: "X",
+        password: "pw12345678",
+      }),
+    ).rejects.toBeInstanceOf(LicensingUnavailableError);
+
+    redeemInvite.mockRejectedValue(apiError(500, { error: "boom" }));
+    await expect(
+      httpLicensingClient.redeemInvite({
+        inviteCode: "INV-ABCD-1234",
+        name: "X",
+        password: "pw12345678",
+      }),
     ).rejects.toBeInstanceOf(LicensingUnavailableError);
   });
 });

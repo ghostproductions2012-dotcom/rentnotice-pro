@@ -11,7 +11,6 @@ import Login from "@/pages/Login";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import Dashboard from "@/pages/portal/Dashboard";
 import Users from "@/pages/portal/Users";
-import Invite from "@/pages/Invite";
 
 const queryClient = new QueryClient();
 
@@ -25,7 +24,6 @@ function Router() {
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/portal" component={Dashboard} />
       <Route path="/portal/users" component={Users} />
-      <Route path="/invite/:token" component={Invite} />
       <Route component={NotFound} />
     </Switch>
   );

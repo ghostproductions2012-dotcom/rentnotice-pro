@@ -14,6 +14,7 @@
 import {
   activateLicense,
   verifyLicense,
+  redeemInvite,
   login,
   ApiError,
   setBaseUrl,
@@ -23,6 +24,7 @@ import {
 import type { LicenseStatus } from "../types";
 import {
   CloudCredentialsError,
+  InviteCodeInvalidError,
   LicenseInvalidError,
   LicensingUnavailableError,
   type DirectoryUser,
@@ -262,5 +264,43 @@ export const httpLicensingClient: LicensingClient = {
 
   async checkStatus(licenseKey) {
     return toSummary(await verifyCached(licenseKey));
+  },
+
+  /**
+   * Redeem a single-use invite code: the server sets the invitee's
+   * name/password, consumes the code, and returns the company license
+   * context in one round-trip.
+   */
+  async redeemInvite(input) {
+    try {
+      const result = await redeemInvite({
+        inviteCode: input.inviteCode.trim().toUpperCase(),
+        name: input.name,
+        password: input.password,
+        deviceId: getDeviceId(),
+        deviceName: deviceName(),
+      });
+      const key = result.licenseKey.trim().toUpperCase();
+      verifyCache = { key, info: result.license, at: Date.now() };
+      const directory = toDirectoryUsers(result.license.users);
+      const me = directory.find((u) => u.cloudUserId === result.user.id);
+      if (!me) throw new LicensingUnavailableError();
+      return {
+        licenseKey: key,
+        license: toSummary(result.license),
+        me,
+        directory,
+      };
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status >= 500) throw new LicensingUnavailableError();
+        if (err.status === 400 && errorCode(err) === "invalid_invite_code") {
+          throw new InviteCodeInvalidError();
+        }
+        throw new Error(errorMessage(err) ?? "The licensing service rejected the request.");
+      }
+      if (err instanceof LicensingUnavailableError) throw err;
+      throw new LicensingUnavailableError();
+    }
   },
 };
