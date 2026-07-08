@@ -93,6 +93,7 @@ packageExtensions:
       '@types/react': '*'
 
 onlyBuiltDependencies:
+  - tesseract.js
   - '@swc/core'
   - esbuild
   - msw
