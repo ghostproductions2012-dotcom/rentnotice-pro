@@ -2,7 +2,9 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useSession, useLogin, useLockApp, usePermissions } from "@/lib/api/hooks";
+import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, useSyncLicense } from "@/lib/api/hooks";
+import { FirstRunScreen, ActivationWizard } from "@/components/first-run";
+import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +27,7 @@ import TemplateView from "@/pages/templates/view";
 import ReportsPage from "@/pages/reports";
 import AuditPage from "@/pages/audit";
 import SettingsPage from "@/pages/settings";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const queryClient = new QueryClient();
 
@@ -43,11 +45,17 @@ function NotFound() {
 
 function LockScreen() {
   const { data: session } = useSession();
+  const { data: workspace } = useWorkspaceState();
   const login = useLogin();
   const lockedUser = session?.locked ? session.user : null;
   const [identifier, setIdentifier] = useState(lockedUser?.username ?? "");
   const [secret, setSecret] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [showActivate, setShowActivate] = useState(false);
+
+  if (showActivate) {
+    return <ActivationWizard onCancel={() => setShowActivate(false)} replacesExistingData />;
+  }
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +127,19 @@ function LockScreen() {
               {login.isPending ? "Authenticating..." : "Access Workspace"}
             </Button>
           </form>
+          {workspace?.mode === "demo" && (
+            <p className="text-xs text-muted-foreground text-center mt-6">
+              Demo workspace ·{" "}
+              <button
+                type="button"
+                className="underline underline-offset-2 hover:text-foreground"
+                onClick={() => setShowActivate(true)}
+                data-testid="link-activate-license"
+              >
+                Activate with a company license
+              </button>
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -224,14 +245,46 @@ function Sidebar() {
 
 function Layout({ children }: { children: React.ReactNode }) {
   const { data: session, isLoading } = useSession();
+  const { data: workspace, isLoading: workspaceLoading } = useWorkspaceState();
+  const syncLicense = useSyncLicense();
+  const launchSyncDone = useRef(false);
 
-  if (isLoading) return null;
+  // Launch-time re-verification: refresh license status and user directory
+  // once per app boot. Offline is fine — cached state + grace period apply.
+  useEffect(() => {
+    if (workspace?.mode === "activated" && !launchSyncDone.current) {
+      launchSyncDone.current = true;
+      syncLicense.mutate(undefined, { onError: () => {} });
+    }
+  }, [workspace?.mode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (isLoading || workspaceLoading) return null;
+  if (workspace?.mode === "unset") return <FirstRunScreen />;
   if (!session?.user || session.locked) return <LockScreen />;
 
   return (
     <div className="flex min-h-[100dvh] w-full bg-background text-foreground">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
+        {workspace?.licenseBlocked && (
+          <div
+            className="px-8 py-3 bg-destructive/10 border-b border-destructive/20 text-sm flex items-center justify-between gap-4 shrink-0"
+            data-testid="banner-license-blocked"
+          >
+            <span className="text-destructive font-medium">
+              {LICENSE_BLOCK_MESSAGES[workspace.licenseBlockReason ?? "grace_expired"]}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => syncLicense.mutate(undefined, { onError: () => {} })}
+              disabled={syncLicense.isPending}
+              data-testid="button-sync-license-banner"
+            >
+              {syncLicense.isPending ? "Syncing…" : "Sync now"}
+            </Button>
+          </div>
+        )}
         <main className="flex-1 overflow-y-auto p-8 relative">
           <div className="max-w-6xl mx-auto h-full">
             {children}

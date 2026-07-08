@@ -46,7 +46,9 @@ import type {
   User,
   UserRole,
   ValidationResult,
+  WorkspaceState,
 } from "../types";
+import type { LicenseSummary } from "../licensing/types";
 
 export interface DeadlineContext {
   /** Rent-increase amount context — enables the 90-day rule under §827(b)(2). */
@@ -97,6 +99,14 @@ export interface CreateUserInput {
   email?: string | null;
   role: UserRole;
   pin?: string | null;
+}
+
+export interface ActivateWorkspaceInput {
+  licenseKey: string;
+  /** Username or email of a company directory member (typically the master admin). */
+  identifier: string;
+  /** Their cloud password — verified online, never stored raw. */
+  secret: string;
 }
 
 export interface CreateTemplateInput {
@@ -153,6 +163,25 @@ export interface AppServices {
   lockApp(): Promise<SessionInfo>;
   createUser(input: CreateUserInput): Promise<User>;
   updateUser(id: Id, patch: Partial<Omit<User, "id" | "createdAt">>): Promise<User>;
+
+  // --- workspace activation ---
+  getWorkspaceState(): Promise<WorkspaceState>;
+  /** Explicit first-run choice: seed the local demo workspace. */
+  enterDemoMode(): Promise<void>;
+  /** Check a license key online and return the company it belongs to. */
+  validateLicenseKey(licenseKey: string): Promise<LicenseSummary>;
+  /**
+   * Activate this device with a company license: verifies the member's
+   * credentials online, provisions a clean local workspace from the company
+   * directory (replacing any demo data), and signs them in.
+   */
+  activateWorkspace(input: ActivateWorkspaceInput): Promise<SessionInfo>;
+  /**
+   * Re-verify the license and sync the user directory from the cloud
+   * (launch-time and manual "Sync now"). Offline is not an error: the cached
+   * state is kept and the offline grace period governs lockout.
+   */
+  syncLicense(): Promise<WorkspaceState>;
 
   // --- company & settings ---
   getCompanyProfile(): Promise<CompanyProfile>;

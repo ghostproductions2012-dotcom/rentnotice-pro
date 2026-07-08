@@ -91,6 +91,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       pin: adminPin,
       active: true,
       createdAt: SEED_TS,
+      cloudUserId: null,
     },
     {
       id: "user-manager",
@@ -102,6 +103,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       pin: managerPin,
       active: true,
       createdAt: SEED_TS,
+      cloudUserId: null,
     },
     {
       id: "user-staff",
@@ -113,6 +115,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       pin: staffPin,
       active: true,
       createdAt: SEED_TS,
+      cloudUserId: null,
     },
   ];
   for (const u of users) usersRepo.create(db, u);
@@ -782,6 +785,17 @@ function seedHolidays(db: AppDatabase): void {
 }
 
 // ------------------------------- entry point -------------------------------
+
+/**
+ * Reference content every workspace needs regardless of how it was provisioned
+ * (demo or license activation): notice templates, ledger mapping presets, and
+ * CA court holidays. Contains no demo tenants, properties, or users.
+ */
+export function seedReferenceData(db: AppDatabase): void {
+  seedTemplates(db);
+  seedMappingPresets(db);
+  seedHolidays(db);
+}
 
 /** Seeds demo data only when the users table is empty. Safe to call every boot. */
 export async function seedDatabase(db: AppDatabase): Promise<void> {

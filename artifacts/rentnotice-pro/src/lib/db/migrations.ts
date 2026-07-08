@@ -63,6 +63,34 @@ export const MIGRATIONS: Migration[] = [
       }
     },
   },
+  {
+    version: 4,
+    name: "workspace_activation",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS activation (
+          id TEXT PRIMARY KEY CHECK (id = 'activation'),
+          license_key TEXT NOT NULL,
+          company_id TEXT NOT NULL,
+          company_name TEXT NOT NULL,
+          license_status TEXT NOT NULL,
+          plan TEXT,
+          activated_at TEXT NOT NULL,
+          last_verified_at TEXT NOT NULL,
+          grace_days INTEGER NOT NULL DEFAULT 14,
+          directory_synced_at TEXT
+        );
+        ALTER TABLE users ADD COLUMN cloud_user_id TEXT;
+      `);
+      // Existing databases were auto-seeded with demo content before the
+      // first-run screen existed; classify them as demo workspaces so they
+      // keep working unchanged. Fresh databases stay "unset".
+      const row = db.get<{ c: number }>("SELECT COUNT(*) AS c FROM users");
+      if ((row?.c ?? 0) > 0) {
+        db.run("INSERT OR IGNORE INTO app_meta (key, value) VALUES ('workspace_mode', 'demo')");
+      }
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

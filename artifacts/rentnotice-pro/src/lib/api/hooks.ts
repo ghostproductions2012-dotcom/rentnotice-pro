@@ -14,6 +14,7 @@ import "./impl"; // registers the AppServices implementation
 import { getServices } from "./services";
 import { type Permission, can } from "./permissions";
 import type {
+  ActivateWorkspaceInput,
   AddAttachmentInput,
   ClassificationOverrideInput,
   CreateFieldAssignmentInput,
@@ -54,6 +55,7 @@ import type {
 
 export const qk = {
   session: ["session"] as const,
+  workspace: ["workspace"] as const,
   users: ["users"] as const,
   company: ["company"] as const,
   settings: ["settings"] as const,
@@ -141,6 +143,47 @@ export function useLogin() {
     mutationFn: ({ identifier, secret }: { identifier: string; secret: string }) =>
       getServices().login(identifier, secret),
     onSuccess: () => invalidate(qc, ["session", "audit", "dashboard"]),
+  });
+}
+
+// --- workspace activation ---
+
+export function useWorkspaceState() {
+  return useQuery({
+    queryKey: qk.workspace,
+    queryFn: () => getServices().getWorkspaceState(),
+  });
+}
+
+export function useEnterDemoMode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => getServices().enterDemoMode(),
+    // Seeding touches every table — refresh everything.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useValidateLicenseKey() {
+  return useMutation({
+    mutationFn: (licenseKey: string) => getServices().validateLicenseKey(licenseKey),
+  });
+}
+
+export function useActivateWorkspace() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ActivateWorkspaceInput) => getServices().activateWorkspace(input),
+    // Activation may wipe and re-provision the entire database.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useSyncLicense() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => getServices().syncLicense(),
+    onSuccess: () => invalidate(qc, ["workspace", "users", "session", "audit", "dashboard"]),
   });
 }
 

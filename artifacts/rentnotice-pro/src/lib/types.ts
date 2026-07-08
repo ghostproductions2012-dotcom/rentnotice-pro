@@ -20,6 +20,51 @@ export interface User {
   pin: string | null; // SHA-256 hash of the PIN/password, null = no secret required
   active: boolean;
   createdAt: string; // ISO datetime
+  cloudUserId: string | null; // id in the company's cloud directory (activated workspaces)
+}
+
+// --------------------------- Workspace activation ---------------------------
+
+/**
+ * How this device's workspace was set up:
+ *  - "unset":     fresh install, first-run screen decides
+ *  - "demo":      explicitly seeded demo workspace (local only)
+ *  - "activated": provisioned from a company license via the licensing service
+ */
+export type WorkspaceMode = "unset" | "demo" | "activated";
+
+export type LicenseStatus = "active" | "paused" | "cancelled";
+
+/** Single-row local record describing the company license this device was activated with. */
+export interface ActivationState {
+  licenseKey: string;
+  companyId: string; // cloud company id
+  companyName: string;
+  licenseStatus: LicenseStatus; // last known status from the licensing service
+  plan: string | null;
+  activatedAt: string; // ISO datetime
+  lastVerifiedAt: string; // ISO datetime of the last successful online check
+  graceDays: number; // offline grace period before the workspace locks
+  directorySyncedAt: string | null; // last successful user-directory sync
+}
+
+/** Why editing is currently blocked by the company license (view stays available). */
+export type LicenseBlockReason = "paused" | "cancelled" | "grace_expired";
+
+export const LICENSE_BLOCK_MESSAGES: Record<LicenseBlockReason, string> = {
+  paused:
+    "Your company's subscription is paused, so this workspace is view-only. Restore billing, then sync to continue editing.",
+  cancelled: "Your company's subscription has been cancelled, so this workspace is view-only.",
+  grace_expired:
+    "This device hasn't been able to verify your company license within the offline grace period. Connect to the internet and sync to continue editing.",
+};
+
+export interface WorkspaceState {
+  mode: WorkspaceMode;
+  activation: ActivationState | null;
+  /** True when the license blocks editing (paused/cancelled/grace expired). */
+  licenseBlocked: boolean;
+  licenseBlockReason: LicenseBlockReason | null;
 }
 
 export interface SessionInfo {
@@ -576,7 +621,9 @@ export type AuditAction =
   | "backup_exported"
   | "backup_restored"
   | "login"
-  | "warning_acknowledged";
+  | "warning_acknowledged"
+  | "workspace_activated"
+  | "directory_synced";
 
 export interface AuditEntry {
   id: Id;

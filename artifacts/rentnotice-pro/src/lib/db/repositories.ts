@@ -13,11 +13,14 @@
 import type { AppDatabase } from "./client";
 import type { ClassificationOverrideInput, LedgerDetail } from "../api/services";
 import type {
+  ActivationState,
   AppSettings,
   Attachment,
   AuditEntry,
   AuditAction,
   AuditFilters,
+  LicenseStatus,
+  WorkspaceMode,
   CalculationResult,
   ColumnMapping,
   CompanyProfile,
@@ -115,6 +118,7 @@ function rowToUser(r: Row): User {
     pin: strOrNull(r.pin_hash),
     active: toBool(r.active),
     createdAt: asStr(r.created_at),
+    cloudUserId: strOrNull(r.cloud_user_id),
   };
 }
 
@@ -129,6 +133,7 @@ function userRow(u: User): Row {
     pin_hash: u.pin,
     active: fromBool(u.active),
     created_at: u.createdAt,
+    cloud_user_id: u.cloudUserId,
   };
 }
 
@@ -166,6 +171,78 @@ export const usersRepo = {
   },
   remove(db: AppDatabase, id: Id): void {
     db.run("DELETE FROM users WHERE id = ?", [id]);
+  },
+};
+
+// =====================================================================
+// App meta (key/value) & workspace activation
+// =====================================================================
+
+export const appMetaRepo = {
+  get(db: AppDatabase, key: string): string | null {
+    const r = db.get<{ value: string }>("SELECT value FROM app_meta WHERE key = ?", [key]);
+    return r ? asStr(r.value) : null;
+  },
+  set(db: AppDatabase, key: string, value: string): void {
+    db.run(
+      "INSERT INTO app_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      [key, value],
+    );
+  },
+};
+
+const WORKSPACE_MODE_KEY = "workspace_mode";
+
+/** How this device's workspace was provisioned. Unset = first-run screen. */
+export function getWorkspaceMode(db: AppDatabase): WorkspaceMode {
+  const v = appMetaRepo.get(db, WORKSPACE_MODE_KEY);
+  return v === "demo" || v === "activated" ? v : "unset";
+}
+
+export function setWorkspaceMode(db: AppDatabase, mode: Exclude<WorkspaceMode, "unset">): void {
+  appMetaRepo.set(db, WORKSPACE_MODE_KEY, mode);
+}
+
+function rowToActivation(r: Row): ActivationState {
+  return {
+    licenseKey: asStr(r.license_key),
+    companyId: asStr(r.company_id),
+    companyName: asStr(r.company_name),
+    licenseStatus: asStr(r.license_status) as LicenseStatus,
+    plan: strOrNull(r.plan),
+    activatedAt: asStr(r.activated_at),
+    lastVerifiedAt: asStr(r.last_verified_at),
+    graceDays: asNum(r.grace_days),
+    directorySyncedAt: strOrNull(r.directory_synced_at),
+  };
+}
+
+/** Single-row record describing the company license this device was activated with. */
+export const activationRepo = {
+  get(db: AppDatabase): ActivationState | null {
+    const r = db.get("SELECT * FROM activation WHERE id = 'activation'");
+    return r ? rowToActivation(r) : null;
+  },
+  set(db: AppDatabase, state: ActivationState): ActivationState {
+    upsertRow(db, "activation", {
+      id: "activation",
+      license_key: state.licenseKey,
+      company_id: state.companyId,
+      company_name: state.companyName,
+      license_status: state.licenseStatus,
+      plan: state.plan,
+      activated_at: state.activatedAt,
+      last_verified_at: state.lastVerifiedAt,
+      grace_days: state.graceDays,
+      directory_synced_at: state.directorySyncedAt,
+    });
+    return state;
+  },
+  update(db: AppDatabase, patch: Partial<ActivationState>): ActivationState {
+    const current = activationRepo.get(db);
+    if (!current) throw new Error("Workspace is not activated");
+    const next = applyPatch<ActivationState>(current, patch);
+    return activationRepo.set(db, next);
   },
 };
 

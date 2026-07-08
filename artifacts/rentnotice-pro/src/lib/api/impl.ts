@@ -27,6 +27,7 @@ import type {
   ImportLedgerInput,
   Ledger,
   LedgerTransaction,
+  LicenseBlockReason,
   MailTracking,
   MailTrackingEvent,
   Notice,
@@ -45,8 +46,9 @@ import type {
   Tenant,
   User,
   ValidationResult,
+  WorkspaceState,
 } from "../types";
-import { NOTICE_STATUS_LABELS, NOTICE_TYPE_LABELS } from "../types";
+import { LICENSE_BLOCK_MESSAGES, NOTICE_STATUS_LABELS, NOTICE_TYPE_LABELS } from "../types";
 import type {
   AppServices,
   ClassificationOverrideInput,
@@ -57,13 +59,16 @@ import { type Permission, checkPermission } from "./permissions";
 import {
   type AppDatabase,
   attachmentsRepo,
+  activationRepo,
   auditRepo,
   calculationsRepo,
+  clearPersistedDatabase,
   companyRepo,
   dataUrlToBytes,
   documentsRepo,
   exportBackup as exportDbBackup,
   fieldAssignmentsRepo,
+  getWorkspaceMode,
   holidaysRepo,
   importBackup as importDbBackup,
   initDatabase,
@@ -73,6 +78,9 @@ import {
   noticesRepo,
   nowIso,
   propertiesRepo,
+  seedDatabase,
+  seedReferenceData,
+  setWorkspaceMode,
   settingsRepo,
   sha256Hex,
   statusHistoryRepo,
@@ -83,6 +91,12 @@ import {
   usersRepo,
   validationResultsRepo,
 } from "../db";
+import {
+  getLicensingClient,
+  LicenseInvalidError,
+  LicensingUnavailableError,
+} from "../licensing";
+import { evaluateLicenseGate, type LicenseGate } from "../licensing/gate";
 import { parseDateToIso, parseFile, parseMoneyToCents, toParsedLedgerFile } from "../import";
 import {
   STATE_RULES,
@@ -123,10 +137,35 @@ function getDb(): Promise<AppDatabase> {
 
 const session: SessionInfo = { user: null, locked: false };
 
+// --------------------------- license gate -----------------------------------
+
+// Computed from the local activation record; refreshed on boot (via
+// getWorkspaceState), after every sync, and after activation. When blocked,
+// the workspace becomes view-only: reads succeed, writes throw.
+let licenseGate: LicenseGate = { blocked: false, reason: null };
+
+function refreshLicenseGate(db: AppDatabase): LicenseGate {
+  licenseGate = evaluateLicenseGate(getWorkspaceMode(db), activationRepo.get(db));
+  return licenseGate;
+}
+
+function workspaceState(db: AppDatabase): WorkspaceState {
+  const gate = refreshLicenseGate(db);
+  return {
+    mode: getWorkspaceMode(db),
+    activation: activationRepo.get(db),
+    licenseBlocked: gate.blocked,
+    licenseBlockReason: gate.reason,
+  };
+}
+
 // Authoritative RBAC gate. Every state-changing service method calls this
 // before touching the database; the UI mirrors the same rules (see
 // usePermissions) but the enforcement here is the source of truth.
 function requirePermission(permission: Permission): void {
+  if (licenseGate.blocked && licenseGate.reason) {
+    throw new Error(LICENSE_BLOCK_MESSAGES[licenseGate.reason]);
+  }
   checkPermission({ role: session.user?.role, locked: session.locked }, permission);
 }
 
@@ -360,12 +399,28 @@ function createServices(): AppServices {
       // One generic error for every failure mode so the login form never
       // reveals which accounts exist.
       const invalidCredentials = () => new Error("Invalid username/email or PIN/password");
-      const user = usersRepo.findByIdentifier(db, identifier);
+      let user = usersRepo.findByIdentifier(db, identifier);
       if (!user || !user.active) throw invalidCredentials();
       if (user.pin) {
         if (!secret) throw invalidCredentials();
         const hash = await sha256Hex(secret);
         if (hash !== user.pin) throw invalidCredentials();
+      } else if (user.cloudUserId && getWorkspaceMode(db) === "activated") {
+        // Activated workspace, first sign-in on this device: verify against
+        // the cloud directory once, then cache a local hash for offline use.
+        const activation = activationRepo.get(db);
+        if (!activation) throw invalidCredentials();
+        try {
+          await getLicensingClient().verifyCredentials(activation.licenseKey, identifier, secret);
+        } catch (err) {
+          if (err instanceof LicensingUnavailableError) {
+            throw new Error(
+              "Your first sign-in on this device requires an internet connection. Reconnect and try again — afterwards you can sign in offline.",
+            );
+          }
+          throw invalidCredentials();
+        }
+        user = usersRepo.update(db, user.id, { pin: await sha256Hex(secret) });
       }
       session.user = user;
       session.locked = false;
@@ -403,6 +458,7 @@ function createServices(): AppServices {
         pin: pinHash,
         active: true,
         createdAt: nowIso(),
+        cloudUserId: null,
       };
       usersRepo.create(db, user);
       logAudit(db, "user_created", "user", user.id, `Created user ${user.name} (${user.role})`);
@@ -441,6 +497,216 @@ function createServices(): AppServices {
       if (session.user?.id === id) session.user = user;
       logAudit(db, "user_updated", "user", id, `Updated user ${user.name}`);
       return user;
+    },
+
+    // --- workspace activation ---
+    async getWorkspaceState() {
+      const db = await getDb();
+      return workspaceState(db);
+    },
+    async enterDemoMode(): Promise<void> {
+      const db = await getDb();
+      if (getWorkspaceMode(db) === "activated")
+        throw new Error("This workspace is already activated with a company license.");
+      await seedDatabase(db);
+      setWorkspaceMode(db, "demo");
+      await db.flush();
+    },
+    async validateLicenseKey(licenseKey: string) {
+      const key = licenseKey.trim();
+      if (!key) throw new Error("Enter your license key");
+      return getLicensingClient().validateKey(key);
+    },
+    async activateWorkspace(input): Promise<SessionInfo> {
+      const key = input.licenseKey.trim();
+      if (!key) throw new Error("Enter your license key");
+      const client = getLicensingClient();
+      const license = await client.validateKey(key);
+      if (license.status !== "active") {
+        throw new Error(
+          license.status === "paused"
+            ? "This license is currently paused (check the subscription billing). It cannot activate new devices."
+            : "This license has been cancelled and can no longer activate devices.",
+        );
+      }
+      const me = await client.verifyCredentials(key, input.identifier, input.secret);
+      const directory = await client.fetchDirectory(key);
+      if (!me.active) throw new Error("Your account has been deactivated by your company admin.");
+
+      // Activation always provisions a clean workspace: wipe demo/leftover data.
+      let db = await getDb();
+      if (getWorkspaceMode(db) !== "unset" || usersRepo.count(db) > 0) {
+        db.close();
+        dbPromise = null;
+        await clearPersistedDatabase();
+        db = await getDb();
+      }
+
+      const now = nowIso();
+      const myHash = await sha256Hex(input.secret);
+      db.transaction(() => {
+        companyRepo.create(db, {
+          id: "company-1",
+          name: license.companyName,
+          address: "",
+          phone: "",
+          email: "",
+          logoDataUrl: null,
+          notes: "",
+          createdAt: now,
+          updatedAt: now,
+        });
+        settingsRepo.create(db, {
+          id: "app",
+          companyProfileId: "company-1",
+          defaultJurisdiction: "CA",
+          requireAttorneyReviewedTemplate: true,
+          allowAdminTemplateOverride: false,
+          pinLockEnabled: true,
+          autoLockMinutes: 15,
+          aiAssistEnabled: false,
+          aiConsentAcknowledged: false,
+          syncEnabled: false,
+          syncEndpoint: "",
+          disclaimerAcknowledgedAt: null,
+          onboardingCompleted: false,
+          updatedAt: now,
+        });
+        seedReferenceData(db);
+        for (const member of directory) {
+          const localUser: User = {
+            id: uid("user"),
+            name: member.name,
+            initials: initialsOf(member.name),
+            username: member.username,
+            email: member.email,
+            role: member.role,
+            // Only the member who just verified online gets a cached secret;
+            // everyone else verifies online on their own first sign-in.
+            pin: member.cloudUserId === me.cloudUserId ? myHash : null,
+            active: member.active,
+            createdAt: now,
+            cloudUserId: member.cloudUserId,
+          };
+          usersRepo.create(db, localUser);
+        }
+        activationRepo.set(db, {
+          licenseKey: key,
+          companyId: license.companyId,
+          companyName: license.companyName,
+          licenseStatus: license.status,
+          plan: license.plan,
+          activatedAt: now,
+          lastVerifiedAt: now,
+          graceDays: license.graceDays,
+          directorySyncedAt: now,
+        });
+        setWorkspaceMode(db, "activated");
+      });
+      const currentUser = usersRepo.list(db).find((u) => u.cloudUserId === me.cloudUserId);
+      if (!currentUser) {
+        throw new Error("Activation failed: your account was not found in the company directory.");
+      }
+      session.user = currentUser;
+      session.locked = false;
+      refreshLicenseGate(db);
+      logAudit(
+        db,
+        "workspace_activated",
+        "settings",
+        "activation",
+        `Workspace activated for ${license.companyName}`,
+      );
+      logAudit(db, "login", "user", currentUser.id, `${currentUser.name} signed in`);
+      await db.flush();
+      return { user: { ...currentUser }, locked: false };
+    },
+    async syncLicense(): Promise<WorkspaceState> {
+      const db = await getDb();
+      if (getWorkspaceMode(db) !== "activated") return workspaceState(db);
+      const activation = activationRepo.get(db);
+      if (!activation) return workspaceState(db);
+      try {
+        // Acquired inside the try: an unconfigured build throws
+        // LicensingUnavailableError synchronously, which must mean
+        // "keep cached state", not a rejected sync.
+        const client = getLicensingClient();
+        const status = await client.checkStatus(activation.licenseKey);
+        const directory = await client.fetchDirectory(activation.licenseKey);
+        const now = nowIso();
+        db.transaction(() => {
+          const locals = usersRepo.list(db);
+          const byCloudId = new Map(
+            locals.filter((u) => u.cloudUserId).map((u) => [u.cloudUserId as string, u]),
+          );
+          for (const member of directory) {
+            const existing = byCloudId.get(member.cloudUserId);
+            if (existing) {
+              // Cloud is the source of truth for identity and role; the
+              // locally cached secret (pin) is deliberately left untouched.
+              usersRepo.update(db, existing.id, {
+                name: member.name,
+                initials: initialsOf(member.name),
+                username: member.username,
+                email: member.email,
+                role: member.role,
+                active: member.active,
+              });
+            } else {
+              usersRepo.create(db, {
+                id: uid("user"),
+                name: member.name,
+                initials: initialsOf(member.name),
+                username: member.username,
+                email: member.email,
+                role: member.role,
+                pin: null, // verified online on their first sign-in
+                active: member.active,
+                createdAt: now,
+                cloudUserId: member.cloudUserId,
+              });
+            }
+          }
+          // Members removed from the cloud directory lose access here too.
+          const cloudIds = new Set(directory.map((m) => m.cloudUserId));
+          for (const u of locals) {
+            if (u.cloudUserId && !cloudIds.has(u.cloudUserId) && u.active) {
+              usersRepo.update(db, u.id, { active: false });
+            }
+          }
+          activationRepo.update(db, {
+            licenseStatus: status.status,
+            plan: status.plan,
+            companyName: status.companyName,
+            graceDays: status.graceDays,
+            lastVerifiedAt: now,
+            directorySyncedAt: now,
+          });
+        });
+        // Keep the in-memory session consistent with directory changes.
+        if (session.user) {
+          const fresh = usersRepo.list(db).find((u) => u.id === session.user?.id);
+          session.user = fresh && fresh.active ? fresh : null;
+        }
+        logAudit(
+          db,
+          "directory_synced",
+          "settings",
+          "activation",
+          `License verified and directory synced (${directory.length} members)`,
+        );
+        await db.flush();
+      } catch (err) {
+        if (err instanceof LicenseInvalidError) {
+          // The key was revoked or no longer exists upstream.
+          activationRepo.update(db, { licenseStatus: "cancelled" });
+          await db.flush();
+        } else if (!(err instanceof LicensingUnavailableError)) {
+          throw err;
+        }
+        // Service unreachable: keep cached state; the grace period governs lockout.
+      }
+      return workspaceState(db);
     },
 
     // --- company & settings ---

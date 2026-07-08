@@ -10,16 +10,18 @@
 import type { AppDatabase } from "./client";
 import { openDatabase } from "./client";
 import { runMigrations } from "./migrations";
-import { seedDatabase } from "./seed";
 
 /**
- * Open (or create) the local SQLite database, apply pending migrations, seed
- * demo data on first run, and persist the result to IndexedDB.
+ * Open (or create) the local SQLite database, apply pending migrations, and
+ * persist the result to IndexedDB.
+ *
+ * NOTE: demo data is intentionally NOT seeded here. A fresh database boots
+ * "unset" and the first-run screen decides between demo seeding
+ * (services.enterDemoMode) and license activation (services.activateWorkspace).
  */
 export async function initDatabase(): Promise<AppDatabase> {
   const db = await openDatabase();
   runMigrations(db);
-  await seedDatabase(db);
   await db.flush();
   return db;
 }
@@ -27,7 +29,7 @@ export async function initDatabase(): Promise<AppDatabase> {
 export type { AppDatabase } from "./client";
 export { openDatabase, clearPersistedDatabase, loadSqlJs } from "./client";
 export { runMigrations, currentSchemaVersion, MIGRATIONS } from "./migrations";
-export { seedDatabase } from "./seed";
+export { seedDatabase, seedReferenceData } from "./seed";
 export { exportBackup, importBackup, tableCounts } from "./backup";
 export * from "./util";
 export * from "./repositories";
