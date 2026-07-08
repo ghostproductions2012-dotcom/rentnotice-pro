@@ -63,7 +63,8 @@ app.post(
 );
 
 app.use(cors());
-app.use(express.json());
+// Field evidence photos are relayed as data URLs, so allow large JSON bodies.
+app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 

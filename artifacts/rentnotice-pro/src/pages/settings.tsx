@@ -4,9 +4,13 @@ import {
   useCompanyProfile,
   useWorkspaceState,
   useSyncLicense,
+  useUpdateSettings,
+  usePermissions,
 } from "@/lib/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -26,8 +30,12 @@ export default function SettingsPage() {
   const { data: workspace } = useWorkspaceState();
   const syncLicense = useSyncLicense();
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const updateSettings = useUpdateSettings();
+  const { can } = usePermissions();
+  const { toast } = useToast();
 
   const activation = workspace?.mode === "activated" ? workspace.activation : null;
+  const canManageSettings = can("settings.manage");
 
   const handleSync = () => {
     setSyncMessage(null);
@@ -42,6 +50,27 @@ export default function SettingsPage() {
       onError: (err) =>
         setSyncMessage(err instanceof Error ? err.message : "Sync failed. Please try again."),
     });
+  };
+
+  const handleSyncToggle = (checked: boolean) => {
+    updateSettings.mutate(
+      { syncEnabled: checked },
+      {
+        onSuccess: () =>
+          toast({
+            title: checked ? "Mobile field sync enabled" : "Mobile field sync disabled",
+            description: checked
+              ? "You can now push assignments to the RentNotice Field app from the Field Service page."
+              : "Assignments will no longer sync with mobile devices.",
+          }),
+        onError: (e: unknown) =>
+          toast({
+            title: "Could not update sync setting",
+            description: e instanceof Error ? e.message : String(e),
+            variant: "destructive",
+          }),
+      },
+    );
   };
 
   return (
@@ -157,6 +186,36 @@ export default function SettingsPage() {
               </div>
               <div className="font-semibold">{settings?.autoLockMinutes} minutes</div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Mobile Field Sync</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <div className="font-medium">Sync with RentNotice Field</div>
+                <div className="text-sm text-muted-foreground max-w-xl">
+                  Opt in to share field assignments with the mobile companion app for process
+                  servers. Your desktop records stay local — only assignments you explicitly push,
+                  and the evidence agents capture, pass through the sync relay.
+                </div>
+              </div>
+              <Switch
+                checked={settings?.syncEnabled === true}
+                onCheckedChange={handleSyncToggle}
+                disabled={!canManageSettings || updateSettings.isPending}
+                data-testid="switch-field-sync"
+              />
+            </div>
+            {settings?.syncEnabled && (
+              <div className="text-sm text-muted-foreground border-t pt-4">
+                Sync is on. Use the <span className="font-medium text-foreground">Field Service</span> page
+                to push assignments to mobile agents and pull back service evidence.
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

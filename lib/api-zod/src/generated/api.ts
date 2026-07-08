@@ -313,3 +313,172 @@ export const VerifyLicenseResponse = zod.object({
 })
 
 
+/**
+ * Returns all relayed field assignments with their evidence
+ * @summary List field assignments
+ */
+export const ListFieldAssignmentsQueryParams = zod.object({
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']).optional()
+})
+
+export const ListFieldAssignmentsResponseItem = zod.object({
+  "id": zod.string(),
+  "noticeId": zod.string(),
+  "assigneeName": zod.string(),
+  "instructions": zod.string(),
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']),
+  "serviceMethod": zod.union([zod.literal('personal'),zod.literal('substitute'),zod.literal('post_and_mail'),zod.literal('other'),zod.literal(null)]).nullable(),
+  "completedAt": zod.string().nullable(),
+  "serverNotes": zod.string(),
+  "tenantNames": zod.array(zod.string()),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "noticeType": zod.string(),
+  "deadlineDate": zod.string().nullable(),
+  "totalAmountCents": zod.number().nullable(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListFieldAssignmentsResponse = zod.array(ListFieldAssignmentsResponseItem)
+
+
+/**
+ * Bulk-upserts assignments into the relay. Snapshot fields are always refreshed; mutable service fields use last-write-wins by updatedAt. Evidence is append-only by id.
+ * @summary Push field assignments from desktop
+ */
+export const PushFieldAssignmentsBody = zod.object({
+  "assignments": zod.array(zod.object({
+  "id": zod.string(),
+  "noticeId": zod.string(),
+  "assigneeName": zod.string(),
+  "instructions": zod.string(),
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']),
+  "serviceMethod": zod.union([zod.literal('personal'),zod.literal('substitute'),zod.literal('post_and_mail'),zod.literal('other'),zod.literal(null)]).nullable(),
+  "completedAt": zod.string().nullable(),
+  "serverNotes": zod.string(),
+  "tenantNames": zod.array(zod.string()),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "noticeType": zod.string(),
+  "deadlineDate": zod.string().nullable(),
+  "totalAmountCents": zod.number().nullable(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+export const PushFieldAssignmentsResponse = zod.object({
+  "pushed": zod.number()
+})
+
+
+/**
+ * Records service progress from the field agent
+ * @summary Update a field assignment (mobile)
+ */
+export const UpdateFieldAssignmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateFieldAssignmentBody = zod.object({
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']).optional(),
+  "serviceMethod": zod.union([zod.literal('personal'),zod.literal('substitute'),zod.literal('post_and_mail'),zod.literal('other'),zod.literal(null)]).nullish(),
+  "completedAt": zod.string().nullish(),
+  "serverNotes": zod.string().optional(),
+  "updatedAt": zod.string()
+})
+
+export const UpdateFieldAssignmentResponse = zod.object({
+  "id": zod.string(),
+  "noticeId": zod.string(),
+  "assigneeName": zod.string(),
+  "instructions": zod.string(),
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']),
+  "serviceMethod": zod.union([zod.literal('personal'),zod.literal('substitute'),zod.literal('post_and_mail'),zod.literal('other'),zod.literal(null)]).nullable(),
+  "completedAt": zod.string().nullable(),
+  "serverNotes": zod.string(),
+  "tenantNames": zod.array(zod.string()),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "noticeType": zod.string(),
+  "deadlineDate": zod.string().nullable(),
+  "totalAmountCents": zod.number().nullable(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * Adds a photo + GPS evidence record to an assignment. Idempotent by client-generated evidence id so offline queues can safely retry.
+ * @summary Attach service evidence (mobile)
+ */
+export const AddFieldEvidenceParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AddFieldEvidenceBody = zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "accuracyMeters": zod.number().nullish(),
+  "capturedAt": zod.string(),
+  "note": zod.string().optional()
+})
+
+export const AddFieldEvidenceResponse = zod.object({
+  "id": zod.string(),
+  "noticeId": zod.string(),
+  "assigneeName": zod.string(),
+  "instructions": zod.string(),
+  "status": zod.enum(['assigned', 'in_progress', 'completed', 'cancelled']),
+  "serviceMethod": zod.union([zod.literal('personal'),zod.literal('substitute'),zod.literal('post_and_mail'),zod.literal('other'),zod.literal(null)]).nullable(),
+  "completedAt": zod.string().nullable(),
+  "serverNotes": zod.string(),
+  "tenantNames": zod.array(zod.string()),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "noticeType": zod.string(),
+  "deadlineDate": zod.string().nullable(),
+  "totalAmountCents": zod.number().nullable(),
+  "evidence": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+

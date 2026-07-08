@@ -282,3 +282,135 @@ export interface LicenseInfo {
   verifiedAt: string;
 }
 
+export interface ErrorMessage {
+  message: string;
+}
+
+export interface FieldEvidenceSync {
+  id: string;
+  photoDataUrl: string;
+  /** @nullable */
+  latitude: number | null;
+  /** @nullable */
+  longitude: number | null;
+  /** @nullable */
+  accuracyMeters: number | null;
+  capturedAt: string;
+  note: string;
+}
+
+export type FieldAssignmentSyncStatus = typeof FieldAssignmentSyncStatus[keyof typeof FieldAssignmentSyncStatus];
+
+
+export const FieldAssignmentSyncStatus = {
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+/**
+ * @nullable
+ */
+export type FieldAssignmentSyncServiceMethod = typeof FieldAssignmentSyncServiceMethod[keyof typeof FieldAssignmentSyncServiceMethod] | null;
+
+
+export const FieldAssignmentSyncServiceMethod = {
+  personal: 'personal',
+  substitute: 'substitute',
+  post_and_mail: 'post_and_mail',
+  other: 'other',
+} as const;
+
+export interface FieldAssignmentSync {
+  id: string;
+  noticeId: string;
+  assigneeName: string;
+  instructions: string;
+  status: FieldAssignmentSyncStatus;
+  /** @nullable */
+  serviceMethod: FieldAssignmentSyncServiceMethod;
+  /** @nullable */
+  completedAt: string | null;
+  serverNotes: string;
+  tenantNames: string[];
+  propertyAddress: string;
+  unit: string;
+  noticeType: string;
+  /** @nullable */
+  deadlineDate: string | null;
+  /** @nullable */
+  totalAmountCents: number | null;
+  evidence: FieldEvidenceSync[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PushFieldAssignmentsRequest {
+  assignments: FieldAssignmentSync[];
+}
+
+export interface PushFieldAssignmentsResult {
+  pushed: number;
+}
+
+export type UpdateFieldAssignmentRequestStatus = typeof UpdateFieldAssignmentRequestStatus[keyof typeof UpdateFieldAssignmentRequestStatus];
+
+
+export const UpdateFieldAssignmentRequestStatus = {
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+/**
+ * @nullable
+ */
+export type UpdateFieldAssignmentRequestServiceMethod = typeof UpdateFieldAssignmentRequestServiceMethod[keyof typeof UpdateFieldAssignmentRequestServiceMethod] | null;
+
+
+export const UpdateFieldAssignmentRequestServiceMethod = {
+  personal: 'personal',
+  substitute: 'substitute',
+  post_and_mail: 'post_and_mail',
+  other: 'other',
+} as const;
+
+export interface UpdateFieldAssignmentRequest {
+  status?: UpdateFieldAssignmentRequestStatus;
+  /** @nullable */
+  serviceMethod?: UpdateFieldAssignmentRequestServiceMethod;
+  /** @nullable */
+  completedAt?: string | null;
+  serverNotes?: string;
+  updatedAt: string;
+}
+
+export interface AddFieldEvidenceRequest {
+  id: string;
+  photoDataUrl: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  accuracyMeters?: number | null;
+  capturedAt: string;
+  note?: string;
+}
+
+export type ListFieldAssignmentsParams = {
+status?: ListFieldAssignmentsStatus;
+};
+
+export type ListFieldAssignmentsStatus = typeof ListFieldAssignmentsStatus[keyof typeof ListFieldAssignmentsStatus];
+
+
+export const ListFieldAssignmentsStatus = {
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+

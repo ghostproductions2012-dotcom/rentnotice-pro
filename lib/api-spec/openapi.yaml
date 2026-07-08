@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -20,233 +19,247 @@ tags:
     description: Authenticated company admin portal
   - name: license
     description: License verification API used by the desktop app
+  - name: field
+    description: Field assignment sync relay for the mobile companion
 paths:
   /healthz:
     get:
       operationId: healthCheck
-      tags: [health]
+      tags:
+        - health
       summary: Health check
       description: Returns server health status
       responses:
-        "200":
+        '200':
           description: Healthy
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/HealthStatus"
+                $ref: '#/components/schemas/HealthStatus'
   /www/plans:
     get:
       operationId: listPlans
-      tags: [plans]
+      tags:
+        - plans
       summary: List pricing plans (public)
       responses:
-        "200":
+        '200':
           description: Available subscription tiers
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Plan"
+                  $ref: '#/components/schemas/Plan'
   /www/checkout/session:
     post:
       operationId: startCheckout
-      tags: [checkout]
+      tags:
+        - checkout
       summary: Start signup + Stripe checkout for a plan
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SignupInput"
+              $ref: '#/components/schemas/SignupInput'
       responses:
-        "200":
+        '200':
           description: Stripe Checkout session created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CheckoutSession"
-        "400":
+                $ref: '#/components/schemas/CheckoutSession'
+        '400':
           description: Invalid input (e.g. email already registered)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "503":
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
           description: Payments unavailable (Stripe not configured)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/checkout/complete:
     post:
       operationId: completeCheckout
-      tags: [checkout]
-      summary: Finalize a paid checkout session, provisioning company, master admin and license key
+      tags:
+        - checkout
+      summary: 'Finalize a paid checkout session, provisioning company, master admin and license key'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CheckoutCompleteInput"
+              $ref: '#/components/schemas/CheckoutCompleteInput'
       responses:
-        "200":
+        '200':
           description: Company provisioned (idempotent - returns existing result on retry)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ProvisionResult"
-        "400":
+                $ref: '#/components/schemas/ProvisionResult'
+        '400':
           description: Session not paid or unknown
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/auth/login:
     post:
       operationId: login
-      tags: [auth]
+      tags:
+        - auth
       summary: Log in with email and password
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LoginInput"
+              $ref: '#/components/schemas/LoginInput'
       responses:
-        "200":
+        '200':
           description: Logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionUser"
-        "401":
+                $ref: '#/components/schemas/SessionUser'
+        '401':
           description: Invalid credentials
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/auth/logout:
     post:
       operationId: logout
-      tags: [auth]
+      tags:
+        - auth
       summary: Log out the current session
       responses:
-        "204":
+        '204':
           description: Logged out
   /www/auth/me:
     get:
       operationId: getMe
-      tags: [auth]
+      tags:
+        - auth
       summary: Get the currently logged-in user
       responses:
-        "200":
+        '200':
           description: Current session user
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionUser"
-        "401":
+                $ref: '#/components/schemas/SessionUser'
+        '401':
           description: Not logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/portal/overview:
     get:
       operationId: getPortalOverview
-      tags: [portal]
-      summary: Company overview - license key, live status, subscription details
+      tags:
+        - portal
+      summary: 'Company overview - license key, live status, subscription details'
       responses:
-        "200":
+        '200':
           description: Portal overview
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PortalOverview"
-        "401":
+                $ref: '#/components/schemas/PortalOverview'
+        '401':
           description: Not logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/portal/billing:
     post:
       operationId: createBillingSession
-      tags: [portal]
+      tags:
+        - portal
       summary: Create a Stripe billing portal session (manage/upgrade/cancel subscription)
       responses:
-        "200":
+        '200':
           description: Billing portal session
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CheckoutSession"
-        "401":
+                $ref: '#/components/schemas/CheckoutSession'
+        '401':
           description: Not logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Requires admin role
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/portal/users:
     get:
       operationId: listCompanyUsers
-      tags: [portal]
+      tags:
+        - portal
       summary: List company users and their roles
       responses:
-        "200":
+        '200':
           description: Company user directory
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CompanyUser"
-        "401":
+                  $ref: '#/components/schemas/CompanyUser'
+        '401':
           description: Not logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
     post:
       operationId: inviteCompanyUser
-      tags: [portal]
+      tags:
+        - portal
       summary: Invite a user by email with a role (returns a shareable invite link)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/InviteInput"
+              $ref: '#/components/schemas/InviteInput'
       responses:
-        "201":
+        '201':
           description: Invitation created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InviteResult"
-        "400":
+                $ref: '#/components/schemas/InviteResult'
+        '400':
           description: Email already in company or over seat limit
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Requires admin role
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /www/portal/users/{userId}:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/portal/users/{userId}':
     patch:
       operationId: updateCompanyUser
-      tags: [portal]
+      tags:
+        - portal
       summary: Change a user's role or deactivate/reactivate them
       parameters:
         - name: userId
@@ -259,36 +272,37 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CompanyUserUpdate"
+              $ref: '#/components/schemas/CompanyUserUpdate'
       responses:
-        "200":
+        '200':
           description: Updated user
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CompanyUser"
-        "400":
+                $ref: '#/components/schemas/CompanyUser'
+        '400':
           description: Invalid change (e.g. demoting the master admin)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
           description: Requires admin role
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
           description: User not found
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /www/invites/{token}:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/invites/{token}':
     get:
       operationId: getInvite
-      tags: [auth]
+      tags:
+        - auth
       summary: Look up a pending invitation by token
       parameters:
         - name: token
@@ -297,96 +311,213 @@ paths:
           schema:
             type: string
       responses:
-        "200":
+        '200':
           description: Invitation details
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/InviteDetails"
-        "404":
+                $ref: '#/components/schemas/InviteDetails'
+        '404':
           description: Invalid or already-used invite
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /www/invites/accept:
     post:
       operationId: acceptInvite
-      tags: [auth]
+      tags:
+        - auth
       summary: Accept an invitation by setting name and password (logs the user in)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AcceptInviteInput"
+              $ref: '#/components/schemas/AcceptInviteInput'
       responses:
-        "200":
+        '200':
           description: Account activated and logged in
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SessionUser"
-        "400":
+                $ref: '#/components/schemas/SessionUser'
+        '400':
           description: Invalid token or password
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
   /license/activate:
     post:
       operationId: activateLicense
-      tags: [license]
+      tags:
+        - license
       summary: Activate a license key from the desktop app
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LicenseActivateInput"
+              $ref: '#/components/schemas/LicenseActivateInput'
       responses:
-        "200":
-          description: License activated - returns company, status and user directory
+        '200':
+          description: 'License activated - returns company, status and user directory'
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LicenseInfo"
-        "404":
-          description: Unknown license key
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
+                $ref: '#/components/schemas/LicenseInfo'
+        '403':
           description: License is paused or cancelled
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown license key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /license/verify:
     post:
       operationId: verifyLicense
-      tags: [license]
+      tags:
+        - license
       summary: Re-verify a license key and sync the company user directory
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/LicenseVerifyInput"
+              $ref: '#/components/schemas/LicenseVerifyInput'
       responses:
-        "200":
+        '200':
           description: Current license status and user directory (also returned for paused/cancelled keys)
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/LicenseInfo"
-        "404":
+                $ref: '#/components/schemas/LicenseInfo'
+        '404':
           description: Unknown license key
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
+  /field/assignments:
+    get:
+      operationId: listFieldAssignments
+      tags:
+        - field
+      summary: List field assignments
+      description: Returns all relayed field assignments with their evidence
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - assigned
+              - in_progress
+              - completed
+              - cancelled
+      responses:
+        '200':
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FieldAssignmentSync'
+    put:
+      operationId: pushFieldAssignments
+      tags:
+        - field
+      summary: Push field assignments from desktop
+      description: >-
+        Bulk-upserts assignments into the relay. Snapshot fields are always refreshed; mutable
+        service fields use last-write-wins by updatedAt. Evidence is append-only by id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushFieldAssignmentsRequest'
+      responses:
+        '200':
+          description: Push result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushFieldAssignmentsResult'
+  '/field/assignments/{id}':
+    patch:
+      operationId: updateFieldAssignment
+      tags:
+        - field
+      summary: Update a field assignment (mobile)
+      description: Records service progress from the field agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateFieldAssignmentRequest'
+      responses:
+        '200':
+          description: Updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldAssignmentSync'
+        '404':
+          description: Assignment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  '/field/assignments/{id}/evidence':
+    post:
+      operationId: addFieldEvidence
+      tags:
+        - field
+      summary: Attach service evidence (mobile)
+      description: >-
+        Adds a photo + GPS evidence record to an assignment. Idempotent by client-generated evidence
+        id so offline queues can safely retry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddFieldEvidenceRequest'
+      responses:
+        '200':
+          description: Updated assignment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FieldAssignmentSync'
+        '404':
+          description: Assignment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
 components:
   schemas:
     HealthStatus:
@@ -398,7 +529,8 @@ components:
         - status
     ErrorResponse:
       type: object
-      required: [error]
+      required:
+        - error
       properties:
         error:
           type: string
@@ -407,11 +539,18 @@ components:
           description: Machine-readable error code
     Plan:
       type: object
-      required: [tier, name, description, seats, priceMonthlyCents, features, available]
+      required:
+        - tier
+        - name
+        - description
+        - seats
+        - priceMonthlyCents
+        - features
+        - available
       properties:
         tier:
           type: string
-          description: Stable tier key (starter, professional, enterprise)
+          description: 'Stable tier key (starter, professional, enterprise)'
         name:
           type: string
         description:
@@ -426,7 +565,9 @@ components:
           items:
             type: string
         stripePriceId:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           description: Live Stripe price id (null until Stripe products are seeded)
         available:
           type: boolean
@@ -435,7 +576,12 @@ components:
           type: boolean
     SignupInput:
       type: object
-      required: [companyName, adminName, email, password, tier]
+      required:
+        - companyName
+        - adminName
+        - email
+        - password
+        - tier
       properties:
         companyName:
           type: string
@@ -453,21 +599,27 @@ components:
           type: string
     CheckoutSession:
       type: object
-      required: [url]
+      required:
+        - url
       properties:
         url:
           type: string
           description: URL to redirect the browser to
     CheckoutCompleteInput:
       type: object
-      required: [sessionId]
+      required:
+        - sessionId
       properties:
         sessionId:
           type: string
           description: Stripe checkout session id from the success redirect
     ProvisionResult:
       type: object
-      required: [licenseKey, companyName, tier, email]
+      required:
+        - licenseKey
+        - companyName
+        - tier
+        - email
       properties:
         licenseKey:
           type: string
@@ -479,7 +631,9 @@ components:
           type: string
     LoginInput:
       type: object
-      required: [email, password]
+      required:
+        - email
+        - password
       properties:
         email:
           type: string
@@ -488,7 +642,14 @@ components:
           type: string
     SessionUser:
       type: object
-      required: [id, email, name, role, isMasterAdmin, companyId, companyName]
+      required:
+        - id
+        - email
+        - name
+        - role
+        - isMasterAdmin
+        - companyId
+        - companyName
       properties:
         id:
           type: string
@@ -498,7 +659,11 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, manager, staff, readonly]
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
         isMasterAdmin:
           type: boolean
         companyId:
@@ -507,30 +672,46 @@ components:
           type: string
     LicenseSummary:
       type: object
-      required: [key, status, statusReason]
+      required:
+        - key
+        - status
+        - statusReason
       properties:
         key:
           type: string
         status:
           type: string
-          enum: [active, paused, cancelled]
+          enum:
+            - active
+            - paused
+            - cancelled
           description: Effective status derived from the subscription lifecycle
         statusReason:
           type: string
           description: Human-readable explanation of the current status
         activatedAt:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
         lastVerifiedAt:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
         paidThrough:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
           description: End of the last paid billing period
     SubscriptionSummary:
       type: object
-      required: [tier, tierName, seats, status]
+      required:
+        - tier
+        - tierName
+        - seats
+        - status
       properties:
         tier:
           type: string
@@ -540,21 +721,32 @@ components:
           type: integer
         status:
           type: string
-          description: Raw Stripe subscription status (active, past_due, canceled, ...)
+          description: 'Raw Stripe subscription status (active, past_due, canceled, ...)'
         currentPeriodEnd:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
         cancelAtPeriodEnd:
           type: boolean
         priceMonthlyCents:
-          type: ["integer", "null"]
+          type:
+            - integer
+            - 'null'
     PortalOverview:
       type: object
-      required: [company, license, subscription, seatsUsed]
+      required:
+        - company
+        - license
+        - subscription
+        - seatsUsed
       properties:
         company:
           type: object
-          required: [id, name, contactEmail]
+          required:
+            - id
+            - name
+            - contactEmail
           properties:
             id:
               type: string
@@ -563,14 +755,21 @@ components:
             contactEmail:
               type: string
         license:
-          $ref: "#/components/schemas/LicenseSummary"
+          $ref: '#/components/schemas/LicenseSummary'
         subscription:
-          $ref: "#/components/schemas/SubscriptionSummary"
+          $ref: '#/components/schemas/SubscriptionSummary'
         seatsUsed:
           type: integer
     CompanyUser:
       type: object
-      required: [id, email, name, role, active, isMasterAdmin, status]
+      required:
+        - id
+        - email
+        - name
+        - role
+        - active
+        - isMasterAdmin
+        - status
       properties:
         id:
           type: string
@@ -580,33 +779,50 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, manager, staff, readonly]
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
         active:
           type: boolean
         isMasterAdmin:
           type: boolean
         status:
           type: string
-          enum: [active, invited, deactivated]
+          enum:
+            - active
+            - invited
+            - deactivated
         createdAt:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
     InviteInput:
       type: object
-      required: [email, role]
+      required:
+        - email
+        - role
       properties:
         email:
           type: string
           format: email
         role:
           type: string
-          enum: [admin, manager, staff, readonly]
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
     InviteResult:
       type: object
-      required: [user, inviteUrl]
+      required:
+        - user
+        - inviteUrl
       properties:
         user:
-          $ref: "#/components/schemas/CompanyUser"
+          $ref: '#/components/schemas/CompanyUser'
         inviteUrl:
           type: string
           description: Shareable link the invited user opens to set their password
@@ -615,12 +831,19 @@ components:
       properties:
         role:
           type: string
-          enum: [admin, manager, staff, readonly]
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
         active:
           type: boolean
     InviteDetails:
       type: object
-      required: [email, role, companyName]
+      required:
+        - email
+        - role
+        - companyName
       properties:
         email:
           type: string
@@ -630,7 +853,10 @@ components:
           type: string
     AcceptInviteInput:
       type: object
-      required: [token, name, password]
+      required:
+        - token
+        - name
+        - password
       properties:
         token:
           type: string
@@ -642,7 +868,13 @@ components:
           minLength: 8
     DirectoryUser:
       type: object
-      required: [id, email, name, role, active, isMasterAdmin]
+      required:
+        - id
+        - email
+        - name
+        - role
+        - active
+        - isMasterAdmin
       properties:
         id:
           type: string
@@ -652,14 +884,20 @@ components:
           type: string
         role:
           type: string
-          enum: [admin, manager, staff, readonly]
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
         active:
           type: boolean
         isMasterAdmin:
           type: boolean
     LicenseActivateInput:
       type: object
-      required: [licenseKey, deviceId]
+      required:
+        - licenseKey
+        - deviceId
       properties:
         licenseKey:
           type: string
@@ -670,7 +908,8 @@ components:
           type: string
     LicenseVerifyInput:
       type: object
-      required: [licenseKey]
+      required:
+        - licenseKey
       properties:
         licenseKey:
           type: string
@@ -678,16 +917,29 @@ components:
           type: string
     LicenseInfo:
       type: object
-      required: [status, statusReason, company, tier, seats, users, graceDays, verifiedAt]
+      required:
+        - status
+        - statusReason
+        - company
+        - tier
+        - seats
+        - users
+        - graceDays
+        - verifiedAt
       properties:
         status:
           type: string
-          enum: [active, paused, cancelled]
+          enum:
+            - active
+            - paused
+            - cancelled
         statusReason:
           type: string
         company:
           type: object
-          required: [id, name]
+          required:
+            - id
+            - name
           properties:
             id:
               type: string
@@ -698,15 +950,206 @@ components:
         seats:
           type: integer
         paidThrough:
-          type: ["string", "null"]
+          type:
+            - string
+            - 'null'
           format: date-time
         users:
           type: array
           items:
-            $ref: "#/components/schemas/DirectoryUser"
+            $ref: '#/components/schemas/DirectoryUser'
         graceDays:
           type: integer
           description: Days the desktop app may keep working offline before requiring re-verification
         verifiedAt:
           type: string
           format: date-time
+    ErrorMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    FieldEvidenceSync:
+      type: object
+      properties:
+        id:
+          type: string
+        photoDataUrl:
+          type: string
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        accuracyMeters:
+          type:
+            - number
+            - 'null'
+        capturedAt:
+          type: string
+        note:
+          type: string
+      required:
+        - id
+        - photoDataUrl
+        - latitude
+        - longitude
+        - accuracyMeters
+        - capturedAt
+        - note
+    FieldAssignmentSync:
+      type: object
+      properties:
+        id:
+          type: string
+        noticeId:
+          type: string
+        assigneeName:
+          type: string
+        instructions:
+          type: string
+        status:
+          type: string
+          enum:
+            - assigned
+            - in_progress
+            - completed
+            - cancelled
+        serviceMethod:
+          type:
+            - string
+            - 'null'
+          enum:
+            - personal
+            - substitute
+            - post_and_mail
+            - other
+            - null
+        completedAt:
+          type:
+            - string
+            - 'null'
+        serverNotes:
+          type: string
+        tenantNames:
+          type: array
+          items:
+            type: string
+        propertyAddress:
+          type: string
+        unit:
+          type: string
+        noticeType:
+          type: string
+        deadlineDate:
+          type:
+            - string
+            - 'null'
+        totalAmountCents:
+          type:
+            - integer
+            - 'null'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldEvidenceSync'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - noticeId
+        - assigneeName
+        - instructions
+        - status
+        - serviceMethod
+        - completedAt
+        - serverNotes
+        - tenantNames
+        - propertyAddress
+        - unit
+        - noticeType
+        - deadlineDate
+        - totalAmountCents
+        - evidence
+        - createdAt
+        - updatedAt
+    PushFieldAssignmentsRequest:
+      type: object
+      properties:
+        assignments:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldAssignmentSync'
+      required:
+        - assignments
+    PushFieldAssignmentsResult:
+      type: object
+      properties:
+        pushed:
+          type: integer
+      required:
+        - pushed
+    UpdateFieldAssignmentRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - assigned
+            - in_progress
+            - completed
+            - cancelled
+        serviceMethod:
+          type:
+            - string
+            - 'null'
+          enum:
+            - personal
+            - substitute
+            - post_and_mail
+            - other
+            - null
+        completedAt:
+          type:
+            - string
+            - 'null'
+        serverNotes:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - updatedAt
+    AddFieldEvidenceRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        photoDataUrl:
+          type: string
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        accuracyMeters:
+          type:
+            - number
+            - 'null'
+        capturedAt:
+          type: string
+        note:
+          type: string
+      required:
+        - id
+        - photoDataUrl
+        - capturedAt

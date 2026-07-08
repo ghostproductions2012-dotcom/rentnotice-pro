@@ -5,6 +5,7 @@ import checkoutRouter from "./checkout";
 import authRouter from "./auth";
 import portalRouter from "./portal";
 import licenseRouter from "./license";
+import fieldRouter from "./field";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use(checkoutRouter);
 router.use(authRouter);
 router.use(portalRouter);
 router.use(licenseRouter);
+router.use(fieldRouter);
 
 export default router;

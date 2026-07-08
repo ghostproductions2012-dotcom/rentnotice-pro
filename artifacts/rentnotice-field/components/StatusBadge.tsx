@@ -1,0 +1,60 @@
+import { StyleSheet, Text, View } from "react-native";
+
+import { fonts } from "@/constants/fonts";
+import { useColors } from "@/hooks/useColors";
+import { STATUS_LABELS } from "@/lib/format";
+import type { FieldAssignmentSyncStatus } from "@workspace/api-client-react";
+
+export function StatusBadge({
+  status,
+  size = "md",
+}: {
+  status: FieldAssignmentSyncStatus;
+  size?: "sm" | "md";
+}) {
+  const colors = useColors();
+
+  const palette: Record<
+    FieldAssignmentSyncStatus,
+    { bg: string; fg: string }
+  > = {
+    assigned: { bg: colors.accent, fg: colors.accentForeground },
+    in_progress: { bg: colors.primary, fg: colors.primaryForeground },
+    completed: { bg: colors.success, fg: colors.successForeground },
+    cancelled: { bg: colors.muted, fg: colors.mutedForeground },
+  };
+
+  const { bg, fg } = palette[status];
+  const isSm = size === "sm";
+
+  return (
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: bg,
+          borderRadius: colors.radius * 2,
+          paddingHorizontal: isSm ? 8 : 10,
+          paddingVertical: isSm ? 3 : 5,
+        },
+      ]}
+    >
+      <Text
+        style={[styles.text, { color: fg, fontSize: isSm ? 11 : 12 }]}
+        numberOfLines={1}
+      >
+        {STATUS_LABELS[status]}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  badge: {
+    alignSelf: "flex-start",
+  },
+  text: {
+    fontFamily: fonts.semibold,
+    letterSpacing: 0.2,
+  },
+});

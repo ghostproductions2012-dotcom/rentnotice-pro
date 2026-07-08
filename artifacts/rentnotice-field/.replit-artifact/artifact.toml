@@ -1,0 +1,27 @@
+kind = "mobile"
+previewPath = "/field/"
+title = "RentNotice Field"
+version = "1.0.0"
+id = "artifacts/rentnotice-field"
+router = "expo-domain"
+
+[[integratedSkills]]
+name = "expo"
+version = "1.0.0"
+
+[[services]]
+ensurePreviewReachable = "/status"
+name = "expo"
+paths = [ "/field/" ]
+localPort = 24772
+
+[services.development]
+run = "pnpm --filter @workspace/rentnotice-field run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rentnotice-field", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/rentnotice-field", "run", "serve" ]
+
+[services.env]
+PORT = "24772"
+BASE_PATH = "/field/"

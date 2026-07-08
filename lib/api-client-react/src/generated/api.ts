@@ -21,11 +21,14 @@ import type {
 
 import type {
   AcceptInviteInput,
+  AddFieldEvidenceRequest,
   CheckoutCompleteInput,
   CheckoutSession,
   CompanyUser,
   CompanyUserUpdate,
+  ErrorMessage,
   ErrorResponse,
+  FieldAssignmentSync,
   HealthStatus,
   InviteDetails,
   InviteInput,
@@ -33,12 +36,16 @@ import type {
   LicenseActivateInput,
   LicenseInfo,
   LicenseVerifyInput,
+  ListFieldAssignmentsParams,
   LoginInput,
   Plan,
   PortalOverview,
   ProvisionResult,
+  PushFieldAssignmentsRequest,
+  PushFieldAssignmentsResult,
   SessionUser,
-  SignupInput
+  SignupInput,
+  UpdateFieldAssignmentRequest
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1230,5 +1237,305 @@ export const useVerifyLicense = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getVerifyLicenseMutationOptions(options));
+    }
+
+export const getListFieldAssignmentsUrl = (params?: ListFieldAssignmentsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/field/assignments?${stringifiedParams}` : `/api/field/assignments`
+}
+
+/**
+ * Returns all relayed field assignments with their evidence
+ * @summary List field assignments
+ */
+export const listFieldAssignments = async (params?: ListFieldAssignmentsParams, options?: RequestInit): Promise<FieldAssignmentSync[]> => {
+
+  return customFetch<FieldAssignmentSync[]>(getListFieldAssignmentsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListFieldAssignmentsQueryKey = (params?: ListFieldAssignmentsParams,) => {
+    return [
+    `/api/field/assignments`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListFieldAssignmentsQueryOptions = <TData = Awaited<ReturnType<typeof listFieldAssignments>>, TError = ErrorType<unknown>>(params?: ListFieldAssignmentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFieldAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListFieldAssignmentsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listFieldAssignments>>> = ({ signal }) => listFieldAssignments(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listFieldAssignments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListFieldAssignmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listFieldAssignments>>>
+export type ListFieldAssignmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List field assignments
+ */
+
+export function useListFieldAssignments<TData = Awaited<ReturnType<typeof listFieldAssignments>>, TError = ErrorType<unknown>>(
+ params?: ListFieldAssignmentsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listFieldAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListFieldAssignmentsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getPushFieldAssignmentsUrl = () => {
+
+
+
+
+  return `/api/field/assignments`
+}
+
+/**
+ * Bulk-upserts assignments into the relay. Snapshot fields are always refreshed; mutable service fields use last-write-wins by updatedAt. Evidence is append-only by id.
+ * @summary Push field assignments from desktop
+ */
+export const pushFieldAssignments = async (pushFieldAssignmentsRequest: PushFieldAssignmentsRequest, options?: RequestInit): Promise<PushFieldAssignmentsResult> => {
+
+  return customFetch<PushFieldAssignmentsResult>(getPushFieldAssignmentsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(pushFieldAssignmentsRequest)
+  }
+);}
+
+
+
+
+export const getPushFieldAssignmentsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pushFieldAssignments>>, TError,{data: BodyType<PushFieldAssignmentsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof pushFieldAssignments>>, TError,{data: BodyType<PushFieldAssignmentsRequest>}, TContext> => {
+
+const mutationKey = ['pushFieldAssignments'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof pushFieldAssignments>>, {data: BodyType<PushFieldAssignmentsRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  pushFieldAssignments(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PushFieldAssignmentsMutationResult = NonNullable<Awaited<ReturnType<typeof pushFieldAssignments>>>
+    export type PushFieldAssignmentsMutationBody = BodyType<PushFieldAssignmentsRequest>
+    export type PushFieldAssignmentsMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Push field assignments from desktop
+ */
+export const usePushFieldAssignments = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof pushFieldAssignments>>, TError,{data: BodyType<PushFieldAssignmentsRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof pushFieldAssignments>>,
+        TError,
+        {data: BodyType<PushFieldAssignmentsRequest>},
+        TContext
+      > => {
+      return useMutation(getPushFieldAssignmentsMutationOptions(options));
+    }
+
+export const getUpdateFieldAssignmentUrl = (id: string,) => {
+
+
+
+
+  return `/api/field/assignments/${id}`
+}
+
+/**
+ * Records service progress from the field agent
+ * @summary Update a field assignment (mobile)
+ */
+export const updateFieldAssignment = async (id: string,
+    updateFieldAssignmentRequest: UpdateFieldAssignmentRequest, options?: RequestInit): Promise<FieldAssignmentSync> => {
+
+  return customFetch<FieldAssignmentSync>(getUpdateFieldAssignmentUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(updateFieldAssignmentRequest)
+  }
+);}
+
+
+
+
+export const getUpdateFieldAssignmentMutationOptions = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFieldAssignment>>, TError,{id: string;data: BodyType<UpdateFieldAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateFieldAssignment>>, TError,{id: string;data: BodyType<UpdateFieldAssignmentRequest>}, TContext> => {
+
+const mutationKey = ['updateFieldAssignment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateFieldAssignment>>, {id: string;data: BodyType<UpdateFieldAssignmentRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateFieldAssignment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateFieldAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof updateFieldAssignment>>>
+    export type UpdateFieldAssignmentMutationBody = BodyType<UpdateFieldAssignmentRequest>
+    export type UpdateFieldAssignmentMutationError = ErrorType<ErrorMessage>
+
+    /**
+ * @summary Update a field assignment (mobile)
+ */
+export const useUpdateFieldAssignment = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateFieldAssignment>>, TError,{id: string;data: BodyType<UpdateFieldAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateFieldAssignment>>,
+        TError,
+        {id: string;data: BodyType<UpdateFieldAssignmentRequest>},
+        TContext
+      > => {
+      return useMutation(getUpdateFieldAssignmentMutationOptions(options));
+    }
+
+export const getAddFieldEvidenceUrl = (id: string,) => {
+
+
+
+
+  return `/api/field/assignments/${id}/evidence`
+}
+
+/**
+ * Adds a photo + GPS evidence record to an assignment. Idempotent by client-generated evidence id so offline queues can safely retry.
+ * @summary Attach service evidence (mobile)
+ */
+export const addFieldEvidence = async (id: string,
+    addFieldEvidenceRequest: AddFieldEvidenceRequest, options?: RequestInit): Promise<FieldAssignmentSync> => {
+
+  return customFetch<FieldAssignmentSync>(getAddFieldEvidenceUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(addFieldEvidenceRequest)
+  }
+);}
+
+
+
+
+export const getAddFieldEvidenceMutationOptions = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addFieldEvidence>>, TError,{id: string;data: BodyType<AddFieldEvidenceRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addFieldEvidence>>, TError,{id: string;data: BodyType<AddFieldEvidenceRequest>}, TContext> => {
+
+const mutationKey = ['addFieldEvidence'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addFieldEvidence>>, {id: string;data: BodyType<AddFieldEvidenceRequest>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  addFieldEvidence(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddFieldEvidenceMutationResult = NonNullable<Awaited<ReturnType<typeof addFieldEvidence>>>
+    export type AddFieldEvidenceMutationBody = BodyType<AddFieldEvidenceRequest>
+    export type AddFieldEvidenceMutationError = ErrorType<ErrorMessage>
+
+    /**
+ * @summary Attach service evidence (mobile)
+ */
+export const useAddFieldEvidence = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addFieldEvidence>>, TError,{id: string;data: BodyType<AddFieldEvidenceRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addFieldEvidence>>,
+        TError,
+        {id: string;data: BodyType<AddFieldEvidenceRequest>},
+        TContext
+      > => {
+      return useMutation(getAddFieldEvidenceMutationOptions(options));
     }
 
