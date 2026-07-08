@@ -1,6 +1,6 @@
 // Where the desktop installers live. This is the ONLY place to update if the
 // GitHub repository ever moves.
-export const GITHUB_REPO = "OWNER/REPO"; // e.g. "acme/rentnotice-pro"
+export const GITHUB_REPO = "ghostproductions2012-dotcom/rentnotice-pro";
 
 export const RELEASES_LATEST_URL = `https://github.com/${GITHUB_REPO}/releases/latest`;
 export const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
