@@ -183,7 +183,8 @@ export const InviteCompanyUserResponse = zod.object({
   "status": zod.enum(['active', 'invited', 'deactivated']),
   "createdAt": zod.coerce.date().nullish()
 }),
-  "inviteUrl": zod.string().describe('Shareable link the invited user opens to set their password')
+  "inviteUrl": zod.string().describe('Shareable link the invited user opens to set their password'),
+  "emailSent": zod.boolean().describe('Whether the invite email was sent to the invited user')
 })
 
 

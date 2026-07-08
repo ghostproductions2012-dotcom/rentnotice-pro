@@ -17,6 +17,7 @@ import {
   setSessionCookie,
 } from "../lib/auth";
 import { generateLicenseKey } from "../lib/license";
+import { sendWelcomeEmail } from "../lib/email";
 import { logger } from "../lib/logger";
 
 const router: IRouter = Router();
@@ -210,6 +211,16 @@ router.post("/www/checkout/complete", async (req, res, next) => {
       { companyId: company.id, tier: signup.tier },
       "Provisioned company, master admin and license key",
     );
+
+    // Best-effort welcome email; the success page still shows the key.
+    void sendWelcomeEmail({
+      to: masterAdmin.email,
+      adminName: masterAdmin.name,
+      companyName: company.name,
+      planName: getPlanConfig(company.tier)?.name ?? company.tier,
+      licenseKey: license.key,
+      portalUrl: `${getPublicBaseUrl()}/portal`,
+    });
 
     const session = await createSession(masterAdmin.id);
     setSessionCookie(res, session.token, session.expiresAt);

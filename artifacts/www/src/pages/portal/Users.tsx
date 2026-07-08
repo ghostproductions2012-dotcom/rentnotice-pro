@@ -33,7 +33,7 @@ export default function Users() {
   const updateMutation = useUpdateCompanyUser();
   
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
-  const [inviteResult, setInviteResult] = useState<{url: string, email: string} | null>(null);
+  const [inviteResult, setInviteResult] = useState<{url: string, email: string, emailSent: boolean} | null>(null);
   const [copied, setCopied] = useState(false);
   
   const isAdmin = me?.role === 'admin';
@@ -49,7 +49,7 @@ export default function Users() {
     try {
       const res = await inviteMutation.mutateAsync({ data: values });
       queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
-      setInviteResult({ url: res.inviteUrl, email: values.email });
+      setInviteResult({ url: res.inviteUrl, email: values.email, emailSent: res.emailSent });
       form.reset();
     } catch (e) {
       console.error(e);
@@ -124,11 +124,15 @@ export default function Users() {
                   <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900/50">
                     <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
                     <AlertDescription className="text-green-800 dark:text-green-300">
-                      Invitation created for {inviteResult.email}.
+                      {inviteResult.emailSent
+                        ? `Invitation email sent to ${inviteResult.email}.`
+                        : `Invitation created for ${inviteResult.email}, but the email could not be sent. Share the link below instead.`}
                     </AlertDescription>
                   </Alert>
                   <div>
-                    <label className="text-sm font-medium mb-1.5 block">Share this link directly:</label>
+                    <label className="text-sm font-medium mb-1.5 block">
+                      {inviteResult.emailSent ? "Or share this link directly:" : "Share this link directly:"}
+                    </label>
                     <div className="flex gap-2">
                       <Input readOnly value={inviteResult.url} className="font-mono text-xs" />
                       <Button variant="secondary" onClick={copyInvite} className="shrink-0">

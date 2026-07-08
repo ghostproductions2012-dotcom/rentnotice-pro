@@ -75,6 +75,12 @@ packageExtensions:
   react-day-picker:
     peerDependencies:
       '@types/react': '*'
+  # lucide-react has the same issue: no @types/react peer, so its icon types
+  # can resolve against the mobile app's older @types/react instead of the
+  # consumer's. Flavor it per consumer as well.
+  lucide-react:
+    peerDependencies:
+      '@types/react': '*'
 
 onlyBuiltDependencies:
   - '@swc/core'

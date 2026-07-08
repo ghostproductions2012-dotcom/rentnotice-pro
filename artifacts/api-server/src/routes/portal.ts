@@ -21,6 +21,7 @@ import {
 import { getPlanConfig } from "../lib/plans";
 import { getUncachableStripeClient } from "../lib/stripeClient";
 import { getPublicBaseUrl } from "../lib/stripeData";
+import { sendInviteEmail } from "../lib/email";
 
 const router: IRouter = Router();
 
@@ -229,9 +230,19 @@ router.post(
         .returning();
       if (!invited) throw new Error("Failed to create invited user");
 
+      const inviteUrl = `${getPublicBaseUrl()}/invite/${inviteToken}`;
+      const emailSent = await sendInviteEmail({
+        to: email,
+        companyName: company.name,
+        role,
+        invitedByName: admin.name || admin.email,
+        inviteUrl,
+      });
+
       res.status(201).json({
         user: companyUserPayload(invited),
-        inviteUrl: `${getPublicBaseUrl()}/invite/${inviteToken}`,
+        inviteUrl,
+        emailSent,
       });
     } catch (err) {
       next(err);

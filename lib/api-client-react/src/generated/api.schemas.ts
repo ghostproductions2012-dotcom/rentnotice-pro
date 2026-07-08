@@ -192,6 +192,8 @@ export interface InviteResult {
   user: CompanyUser;
   /** Shareable link the invited user opens to set their password */
   inviteUrl: string;
+  /** Whether the invite email was sent to the invited user */
+  emailSent: boolean;
 }
 
 export type CompanyUserUpdateRole = typeof CompanyUserUpdateRole[keyof typeof CompanyUserUpdateRole];

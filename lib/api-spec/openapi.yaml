@@ -820,12 +820,16 @@ components:
       required:
         - user
         - inviteUrl
+        - emailSent
       properties:
         user:
           $ref: '#/components/schemas/CompanyUser'
         inviteUrl:
           type: string
           description: Shareable link the invited user opens to set their password
+        emailSent:
+          type: boolean
+          description: Whether the invite email was sent to the invited user
     CompanyUserUpdate:
       type: object
       properties:
