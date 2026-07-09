@@ -46,7 +46,7 @@ import {
 import { useLocation } from "wouter";
 import { downscalePhotoDataUrl } from "@/lib/images";
 
-const SYNC_URL = `${import.meta.env.BASE_URL}api/field/assignments`;
+const SYNC_URL = "/api/field/assignments";
 
 type RemoteEvidence = {
   id: string;

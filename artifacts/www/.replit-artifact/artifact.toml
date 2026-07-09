@@ -1,5 +1,5 @@
 kind = "web"
-previewPath = "/www/"
+previewPath = "/"
 title = "RentNotice Pro Website"
 version = "1.0.0"
 id = "artifacts/www"
@@ -11,7 +11,7 @@ version = "1.0.0"
 
 [[services]]
 name = "web"
-paths = [ "/www/" ]
+paths = [ "/" ]
 localPort = 25116
 
 [services.development]
@@ -28,4 +28,4 @@ to = "/index.html"
 
 [services.env]
 PORT = "25116"
-BASE_PATH = "/www/"
+BASE_PATH = "/"

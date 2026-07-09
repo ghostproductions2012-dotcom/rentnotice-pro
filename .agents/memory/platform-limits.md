@@ -24,6 +24,13 @@ Artifacts on the shared proxy own their preview path prefix (e.g. the Expo app o
 
 **How to apply:** When adding client-side routes to any web artifact, avoid path names matching other artifacts' preview paths (check registered artifacts). Renaming the SPA route (e.g. `/field-service`) fixes it.
 
+## Bare artifact base path 404s in the Vite dev server
+When an artifact is served at a non-root prefix (e.g. `/app/`), a request to the bare prefix without the trailing slash (`/app`) is forwarded by the shared proxy but Vite's dev server returns 404 — it does not redirect to the slashed base.
+
+**Why:** hit July 2026 moving the desktop web app from `/` to `/app/`; visitors typing the bare path got a 404 even with the service path registered without a trailing slash.
+
+**How to apply:** register the service path without the trailing slash (matches both forms) AND add a tiny `configureServer` middleware that 301-redirects the bare base to `basePath` (guarded to only fire when basePath !== "/", so desktop `BASE_PATH=./` builds are untouched). Production static serving with the `/* → /index.html` rewrite handles it already.
+
 ## Env vars are versioned in .replit — never put passwords there
 Non-secret env vars set via setEnvVars materialize into the `.replit` file's
 `[userenv.*]` sections, which is committed to version control. Any credential

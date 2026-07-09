@@ -26,9 +26,33 @@ if (!basePath) {
   );
 }
 
+const bareBase =
+  basePath.length > 1 && basePath.endsWith("/") ? basePath.slice(0, -1) : null;
+
 export default defineConfig({
   base: basePath,
   plugins: [
+    {
+      name: "redirect-bare-base-path",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          if (
+            bareBase &&
+            req.url &&
+            (req.url === bareBase || req.url.startsWith(`${bareBase}?`))
+          ) {
+            res.statusCode = 301;
+            res.setHeader(
+              "Location",
+              basePath + req.url.slice(bareBase.length + 1),
+            );
+            res.end();
+            return;
+          }
+          next();
+        });
+      },
+    },
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

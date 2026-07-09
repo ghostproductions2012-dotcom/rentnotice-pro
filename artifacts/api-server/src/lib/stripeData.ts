@@ -53,5 +53,5 @@ export function getPublicBaseUrl(): string {
   if (!domain) {
     throw new Error("REPLIT_DOMAINS environment variable is not set");
   }
-  return `https://${domain}/www`;
+  return `https://${domain}`;
 }
