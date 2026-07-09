@@ -94,6 +94,15 @@ function lineHasDate(line: PdfItem[]): boolean {
   return line.some((i) => parseDateToIso(i.str) !== null);
 }
 
+// Statement footer/summary lines that are not transactions ("Balance due
+// $5,395.00", "Total …", "Generated 07/07/2026 Page 1 of 1").
+const SUMMARY_LINE_RE = /^\s*(balance\s+due|total\b|amount\s+due|generated\b)/i;
+
+function isSummaryLine(line: PdfItem[]): boolean {
+  const text = line.map((i) => i.str).join(" ").trim();
+  return SUMMARY_LINE_RE.test(text) || /\bpage\s+\d+\s+of\s+\d+\s*$/i.test(text);
+}
+
 function lineHasMoney(line: PdfItem[]): boolean {
   return line.some((i) => looksLikeMoney(i.str));
 }
@@ -170,6 +179,7 @@ export async function parsePdfFile(
     for (let i = headerIdx + 1; i < allLines.length; i++) {
       const line = allLines[i];
       if (!lineHasDate(line) && !lineHasMoney(line)) continue;
+      if (isSummaryLine(line)) continue;
       const cells = rowFromLine(line, centers);
       if (cells.some((c) => c !== "")) rows.push(cells);
     }
@@ -178,7 +188,7 @@ export async function parsePdfFile(
       warnings.push("A header row was detected but no transaction rows could be parsed.");
     }
   } else {
-    const dataLines = allLines.filter((l) => lineHasDate(l) && lineHasMoney(l));
+    const dataLines = allLines.filter((l) => lineHasDate(l) && lineHasMoney(l) && !isSummaryLine(l));
     if (dataLines.length === 0) {
       warnings.push("No tabular data was detected in this PDF. It may be scanned — try OCR import.");
       table = { headers: [], rows: [] };

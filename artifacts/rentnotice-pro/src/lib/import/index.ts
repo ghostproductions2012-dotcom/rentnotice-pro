@@ -14,8 +14,9 @@ import { parseExcelFile } from "./parseExcel";
 import { parsePdfFile } from "./parsePdf";
 import { ocrTextToRawTable, ocrFileToText } from "./ocr";
 import { suggestMapping } from "./mapping";
-import { detectVendor } from "./presets";
+import { detectVendor, getPreset } from "./presets";
 import { tableToRecords } from "./normalize";
+import { extractStatementInfo } from "./statement";
 
 export * from "./types";
 export { parseMoneyToCents, looksLikeMoney } from "./money";
@@ -33,7 +34,8 @@ export { parsePdfFile } from "./parsePdf";
 export { ocrFileToText, ocrTextToRawTable, ocrToRawTable } from "./ocr";
 export { suggestMapping } from "./mapping";
 export { BUILTIN_PRESETS, detectVendor, getPreset } from "./presets";
-export { normalizeRecords, normalizeRows, tableToRecords } from "./normalize";
+export { normalizeRecords, normalizeRows, tableToRecords, isPriorBalanceDescription } from "./normalize";
+export { extractStatementInfo } from "./statement";
 
 const MAX_OCR_PAGES = 8;
 
@@ -157,17 +159,27 @@ export async function parseFile(
 export function toParsedLedgerFile(fileName: string, parsed: ParseResult): ParsedLedgerFile {
   const detection = detectVendor(parsed.table.headers);
   const suggestion = suggestMapping(parsed.table);
-  const mapping =
+  const statement = extractStatementInfo(parsed.lines ?? []);
+  let vendor = detection.vendor;
+  let mapping =
     detection.preset && detection.confidence >= 0.8 ? detection.preset.mapping : suggestion.mapping;
+  // A recognized tenant-statement header is a stronger signal than column
+  // headers alone: force the matching vendor preset when available.
+  if (statement && vendor === "generic") {
+    vendor = statement.vendor;
+    const preset = getPreset(statement.vendor);
+    if (preset) mapping = preset.mapping;
+  }
   const warnings = [...parsed.warnings, ...suggestion.warnings];
   return {
     sourceType: parsed.sourceType as LedgerSourceType,
     fileName,
     headers: parsed.table.headers,
     rows: tableToRecords(parsed.table),
-    detectedVendor: detection.vendor,
+    detectedVendor: vendor,
     suggestedMapping: mapping,
     warnings,
     ocrUsed: parsed.ocrUsed,
+    statement,
   };
 }

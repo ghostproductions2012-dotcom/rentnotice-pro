@@ -32,28 +32,28 @@ export async function generateNotice(
 
   b.documentTitle(title.toUpperCase());
 
-  // ---- addressee & premises (always structured) ----
-  b.paragraph(`TO: ${notice.tenantNames.join(", ")}, and all other tenants and occupants in possession:`, {
-    font: b.fonts.bold,
-    size: 11,
-    gapAfter: 4,
-  });
-  b.paragraph(`Premises: ${premisesAddress(ctx)}`, { gapAfter: 10 });
-
   if (ctx.template) {
+    // The template body carries the full statutory narrative — addressee,
+    // itemized rent breakdown, payment block, and signature — so it drives
+    // the document alone (no duplicated structured sections).
     renderFromTemplate(b, ctx);
   } else {
+    // ---- addressee & premises (structured) ----
+    b.paragraph(`TO: ${notice.tenantNames.join(", ")}, and all other tenants and occupants in possession:`, {
+      font: b.fonts.bold,
+      size: 11,
+      gapAfter: 4,
+    });
+    b.paragraph(`Premises: ${premisesAddress(ctx)}`, { gapAfter: 10 });
+
     renderBuiltIn(b, ctx);
-  }
 
-  // ---- itemized rent table (pay-or-quit only) ----
-  if (notice.noticeType === "pay_or_quit_3day") {
-    renderRentTable(b, ctx);
-    renderPaymentInstructions(b, ctx);
-  }
+    // ---- itemized rent table (pay-or-quit only) ----
+    if (notice.noticeType === "pay_or_quit_3day") {
+      renderRentTable(b, ctx);
+      renderPaymentInstructions(b, ctx);
+    }
 
-  // ---- signature block when the template did not carry one ----
-  if (!ctx.template) {
     renderSignature(b, ctx);
   }
 

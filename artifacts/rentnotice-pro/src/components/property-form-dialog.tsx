@@ -47,6 +47,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
   const [state, setState] = useState("CA");
   const [zip, setZip] = useState("");
   const [county, setCounty] = useState("");
+  const [bedrooms, setBedrooms] = useState("");
   const [units, setUnits] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [managementCompany, setManagementCompany] = useState("");
@@ -55,6 +56,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
   const [notes, setNotes] = useState("");
   // Payment profile
   const [payToName, setPayToName] = useState("");
+  const [payToPerson, setPayToPerson] = useState("");
   const [paymentAddress, setPaymentAddress] = useState("");
   const [paymentPhone, setPaymentPhone] = useState("");
   const [acceptedMethods, setAcceptedMethods] = useState<PaymentMethod[]>([]);
@@ -72,6 +74,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
     setState(property?.state ?? "CA");
     setZip(property?.zip ?? "");
     setCounty(property?.county ?? "");
+    setBedrooms(property?.bedrooms != null ? String(property.bedrooms) : "");
     setUnits(property ? property.units.join(", ") : "");
     setOwnerName(property?.ownerName ?? "");
     setManagementCompany(property?.managementCompany ?? "");
@@ -79,6 +82,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
     setIsLosAngelesCity(property?.isLosAngelesCity ?? false);
     setNotes(property?.notes ?? "");
     setPayToName(property?.payment.payToName ?? "");
+    setPayToPerson(property?.payment.payToPerson ?? "");
     setPaymentAddress(property?.payment.paymentAddress ?? "");
     setPaymentPhone(property?.payment.phone ?? "");
     setAcceptedMethods(property ? [...property.payment.acceptedMethods] : []);
@@ -93,13 +97,18 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
     .map((u) => u.trim())
     .filter(Boolean);
 
+  const bedroomsNum = bedrooms.trim() === "" ? null : Number(bedrooms);
+  const bedroomsValid =
+    bedroomsNum == null || (Number.isInteger(bedroomsNum) && bedroomsNum >= 0);
+
   const valid =
     nickname.trim().length > 0 &&
     addressLine1.trim().length > 0 &&
     city.trim().length > 0 &&
     state.trim().length === 2 &&
     zip.trim().length > 0 &&
-    ownerName.trim().length > 0;
+    ownerName.trim().length > 0 &&
+    bedroomsValid;
   const busy = createProperty.isPending || updateProperty.isPending;
 
   const toggleMethod = (m: PaymentMethod, checked: boolean) =>
@@ -107,6 +116,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
 
   const paymentPatch = {
     payToName: payToName.trim(),
+    payToPerson: payToPerson.trim(),
     paymentAddress: paymentAddress.trim(),
     phone: paymentPhone.trim(),
     acceptedMethods,
@@ -137,6 +147,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
             state: state.trim().toUpperCase(),
             zip: zip.trim(),
             county: county.trim(),
+            bedrooms: bedroomsNum,
             units: parsedUnits,
             ownerName: ownerName.trim(),
             managementCompany: managementCompany.trim(),
@@ -164,6 +175,7 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
           state: state.trim().toUpperCase(),
           zip: zip.trim(),
           county: county.trim() || undefined,
+          bedrooms: bedroomsNum,
           units: parsedUnits,
           ownerName: ownerName.trim(),
           managementCompany: managementCompany.trim() || undefined,
@@ -243,6 +255,18 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
               <Label>County</Label>
               <Input value={county} onChange={(e) => setCounty(e.target.value)} data-testid="input-property-county" />
             </div>
+            <div className="space-y-2 col-span-2 sm:col-span-1">
+              <Label>Bedrooms</Label>
+              <Input
+                type="number"
+                min={0}
+                step={1}
+                value={bedrooms}
+                onChange={(e) => setBedrooms(e.target.value)}
+                placeholder="e.g. 2"
+                data-testid="input-property-bedrooms"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Units</Label>
@@ -306,6 +330,15 @@ export function PropertyFormDialog({ open, onOpenChange, property }: PropertyFor
                   value={payToName}
                   onChange={(e) => setPayToName(e.target.value)}
                   data-testid="input-payment-payto"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Person to whom rent is paid</Label>
+                <Input
+                  value={payToPerson}
+                  onChange={(e) => setPayToPerson(e.target.value)}
+                  placeholder="Individual's name (CCP §1161(2))"
+                  data-testid="input-payment-payto-person"
                 />
               </div>
               <div className="space-y-2">

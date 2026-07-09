@@ -1,6 +1,9 @@
 import type { AppDatabase } from "./client";
 import { SCHEMA_SQL } from "./schema";
 import { nowIso } from "./util";
+import { PAY_OR_QUIT_BODY } from "../templates-data/ca";
+import { extractMergeFields } from "../documents/merge";
+import type { TemplateVersion } from "../types";
 
 export interface Migration {
   version: number;
@@ -96,6 +99,51 @@ export const MIGRATIONS: Migration[] = [
     name: "activation_status_reason",
     up: (db) => {
       db.exec("ALTER TABLE activation ADD COLUMN status_reason TEXT;");
+    },
+  },
+  {
+    version: 6,
+    name: "property_bedrooms_and_pay_or_quit_parity_template",
+    up: (db) => {
+      // Fresh databases already get the column from SCHEMA_SQL (migration 1).
+      const hasBedrooms = db
+        .all<{ name: string }>("PRAGMA table_info(properties)")
+        .some((c) => c.name === "bedrooms");
+      if (!hasBedrooms) {
+        db.exec("ALTER TABLE properties ADD COLUMN bedrooms INTEGER;");
+      }
+      // Upgrade the built-in CA 3-day pay-or-quit template to the reference
+      // notice format (new version appended; older versions preserved).
+      const row = db.get<{ versions: string; current_version: number }>(
+        "SELECT versions, current_version FROM templates WHERE id = 'tpl-ca-3day-pay'",
+      );
+      if (row) {
+        let versions: TemplateVersion[] = [];
+        try {
+          versions = JSON.parse(row.versions) as TemplateVersion[];
+        } catch {
+          versions = [];
+        }
+        const nextVersion =
+          versions.reduce((max, v) => Math.max(max, v.version), 0) + 1;
+        versions.push({
+          version: nextVersion,
+          body: PAY_OR_QUIT_BODY,
+          changedBy: null,
+          changedAt: nowIso(),
+          changeNote:
+            "Upgraded to the First Light PM reference notice format (CCP §1161(2)).",
+        });
+        db.run(
+          "UPDATE templates SET versions = ?, current_version = ?, merge_fields = ?, updated_at = ? WHERE id = 'tpl-ca-3day-pay'",
+          [
+            JSON.stringify(versions),
+            nextVersion,
+            JSON.stringify(extractMergeFields(PAY_OR_QUIT_BODY)),
+            nowIso(),
+          ],
+        );
+      }
     },
   },
 ];

@@ -49,7 +49,7 @@ const KEYWORD_RULES: KeywordRule[] = [
   { cls: "parking_fee", confidence: 90, words: ["parking", "garage", "carport"] },
   { cls: "storage_fee", confidence: 90, words: ["storage", "locker"] },
   { cls: "application_fee", confidence: 90, words: ["application fee", "application", "app fee", "screening", "background check", "credit check"] },
-  { cls: "admin_fee", confidence: 88, words: ["administrative fee", "admin fee", "administrative", "admin", "processing fee", "convenience fee", "eft fee", "eft convenience fee", "ach fee", "e check fee", "echeck fee", "electronic payment fee"] },
+  { cls: "admin_fee", confidence: 88, words: ["administrative fee", "admin fee", "administrative", "admin", "processing fee", "convenience fee", "eft fee", "eft fees", "eft convenience fee", "ach fee", "ach fees", "e check fee", "echeck fee", "electronic payment fee"] },
   { cls: "hoa", confidence: 90, words: ["hoa", "homeowners association", "homeowner", "association due", "association dues"] },
   { cls: "insurance", confidence: 90, words: ["insurance", "renters ins", "liability ins"] },
   { cls: "payment", confidence: 88, words: ["payment", "rent payment", "pmt", "paid", "received", "e check", "ach", "eft", "auto pay", "autopay", "money order", "cashier"] },
@@ -110,6 +110,10 @@ export interface ClassificationResult {
   matchedKeyword: string | null;
 }
 
+/** Rows whose description marks a balance carried forward from a prior period. */
+const PRIOR_BALANCE_RE =
+  /\b(previous|prior|opening|beginning)\s+balance\b|\bbalance\s+(forward|brought\s+forward|carried\s+forward)\b|\bcarry\s*over\b/i;
+
 /** Normalize free text into space-delimited alphanumeric tokens for matching. */
 function normalize(text: string): string {
   return ` ${text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()} `;
@@ -150,6 +154,22 @@ export function classifyRow(input: ClassificationInput): ClassificationResult {
   if (amount != null && amount < 0) {
     const moneyIn = classifyMoneyIn(text);
     return finalize(moneyIn.cls, moneyIn.kind, CONF_SIGN_MONEY_IN, moneyIn.keyword, categoryText, moneyIn.reason);
+  }
+
+  // Carried-forward balances ("Previous balance", "Balance forward") are
+  // treated as rent owed from the prior statement period, but always flagged
+  // for review — the carried amount could contain non-rent charges.
+  if (PRIOR_BALANCE_RE.test(input.description ?? "")) {
+    return {
+      category: "rent",
+      kind: "rent_charge",
+      confidence: 55,
+      includedInNotice: true,
+      needsReview: true,
+      reason:
+        "Balance carried forward from a prior statement period — treated as rent owed. Verify the carried amount contains rent only.",
+      matchedKeyword: "previous balance",
+    };
   }
 
   const match = firstMatch(text);

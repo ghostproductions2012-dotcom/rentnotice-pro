@@ -147,11 +147,14 @@ export default function NoticeNew() {
     return local.length > 0 ? local : all;
   }, [templates, jurisdiction]);
 
-  // Preselect delinquent months whenever the calculation changes.
+  // Preselect all ledger months whenever the calculation changes: delinquent
+  // months carry the demand, and fully-paid $0.00 months are listed on the
+  // notice for the complete period history (matching the reference notices).
   useEffect(() => {
     if (!calc) return;
+    const anyDelinquent = calc.months.some((m) => m.rentOnlyBalanceCents > 0);
     const next: Record<string, boolean> = {};
-    for (const m of calc.months) next[m.month] = m.rentOnlyBalanceCents > 0;
+    for (const m of calc.months) next[m.month] = anyDelinquent || m.rentOnlyBalanceCents > 0;
     setSelectedMonths(next);
   }, [calc]);
 
@@ -235,7 +238,9 @@ export default function NoticeNew() {
         tenantId,
         propertyId: property.id,
         unit: tenant.unit,
-        months: months.map((m) => m.month),
+        // Only delinquent months are relevant for duplicate detection —
+        // $0.00 history months are informational lines on the notice.
+        months: months.filter((m) => m.selectedAmountCents > 0).map((m) => m.month),
         noticeType,
       },
       {

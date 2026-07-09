@@ -99,6 +99,7 @@ import {
 import type { DirectoryUser, LicenseSummary } from "../licensing/types";
 import { evaluateLicenseGate, type LicenseGate } from "../licensing/gate";
 import {
+  isPriorBalanceDescription,
   looksLikeExcelSerialDate,
   parseDateToIso,
   parseExcelSerialStringToIso,
@@ -231,6 +232,7 @@ function emptyService(): ServiceRecord {
 function defaultPayment(company: CompanyProfile | null): PaymentProfile {
   return {
     payToName: company?.name ?? "",
+    payToPerson: "",
     paymentAddress: company?.address ?? "",
     phone: company?.phone ?? "",
     acceptedMethods: ["personal_check", "cashiers_check", "money_order"],
@@ -870,6 +872,7 @@ function createServices(): AppServices {
         state: input.state,
         zip: input.zip,
         county: input.county ?? "",
+        bedrooms: input.bedrooms ?? null,
         units: input.units ?? [],
         ownerName: input.ownerName,
         managementCompany: input.managementCompany ?? "",
@@ -1057,6 +1060,20 @@ function createServices(): AppServices {
                 ? -Math.abs(single)
                 : single;
             pushTxn(date, description, category, memo, negative, i + 1, balance, txnType);
+          }
+          // "Previous balance" statement rows carry no amount cell — mirror
+          // normalizeRecords and treat the running balance as the
+          // carried-forward amount owed at the start of the period.
+          if (
+            !charge &&
+            !payment &&
+            !credit &&
+            single == null &&
+            balance != null &&
+            balance !== 0 &&
+            isPriorBalanceDescription(description)
+          ) {
+            pushTxn(date, description, category, memo, balance, i + 1, balance, txnType);
           }
         });
       }

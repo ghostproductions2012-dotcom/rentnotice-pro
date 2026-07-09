@@ -66,6 +66,7 @@ export interface CreatePropertyInput {
   state: string;
   zip: string;
   county?: string;
+  bedrooms?: number | null;
   units?: string[];
   ownerName: string;
   managementCompany?: string;

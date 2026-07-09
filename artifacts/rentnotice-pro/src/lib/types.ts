@@ -99,7 +99,8 @@ export type PaymentMethod =
   | "other";
 
 export interface PaymentProfile {
-  payToName: string; // authorized payment recipient
+  payToName: string; // authorized payment recipient (company/payee on the check)
+  payToPerson: string; // individual person to whom rent is handed (CCP §1161(2))
   paymentAddress: string;
   phone: string;
   acceptedMethods: PaymentMethod[];
@@ -118,6 +119,7 @@ export interface Property {
   state: string; // 2-letter code
   zip: string;
   county: string;
+  bedrooms: number | null; // bedrooms of the (primary) unit, shown on CA notices
   units: string[]; // unit labels
   ownerName: string;
   managementCompany: string;
@@ -262,6 +264,20 @@ export interface LedgerTransaction {
 
 // ----------------------------- Import (wizard) -----------------------------
 
+/** Header details extracted from a recognized tenant statement (e.g. First Light). */
+export interface StatementInfo {
+  vendor: PmVendor;
+  tenantName: string | null;
+  street: string | null;
+  unit: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  leaseNumber: string | null;
+  periodStart: string | null; // ISO date
+  periodEnd: string | null; // ISO date
+}
+
 export interface ParsedLedgerFile {
   sourceType: LedgerSourceType;
   fileName: string;
@@ -271,6 +287,8 @@ export interface ParsedLedgerFile {
   suggestedMapping: ColumnMapping;
   warnings: string[];
   ocrUsed: boolean;
+  /** Present when the file was recognized as a tenant statement with a header block. */
+  statement: StatementInfo | null;
 }
 
 export interface ImportLedgerInput {

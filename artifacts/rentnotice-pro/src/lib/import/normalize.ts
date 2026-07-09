@@ -18,6 +18,18 @@ import {
 } from "./dates";
 import { parseMoneyToCents } from "./money";
 
+/**
+ * True when a row's description marks it as a balance carried forward from a
+ * prior statement period (e.g. "Previous balance", "Balance forward"). Such
+ * rows typically carry no amount cell — only a balance — and the balance is
+ * treated as the carried-forward charge.
+ */
+export function isPriorBalanceDescription(description: string): boolean {
+  return /\b(previous|prior|opening|beginning)\s+balance\b|\bbalance\s+(forward|brought\s+forward|carried\s+forward)\b|\bcarry\s*over\b/i.test(
+    description,
+  );
+}
+
 /** Convert a RawTable into header-keyed records (the ParsedLedgerFile row shape). */
 export function tableToRecords(table: RawTable): Record<string, string>[] {
   return table.rows.map((cells) => {
@@ -101,11 +113,6 @@ export function normalizeRecords(
           (charge ?? 0) - Math.abs(payment ?? 0) - Math.abs(credit ?? 0);
       }
     }
-    if (amountCents === null) {
-      skippedNoAmount += 1;
-      return;
-    }
-
     const month =
       parseMonthToIso(pick(record, mapping.month)) ?? dateIso.slice(0, 7);
     const balanceCents = parseMoneyToCents(pick(record, mapping.balance));
@@ -113,6 +120,17 @@ export function normalizeRecords(
       pick(record, mapping.description).trim() ||
       pick(record, mapping.category).trim() ||
       "(no description)";
+
+    // "Previous balance" statement rows carry no amount cell — the running
+    // balance IS the carried-forward amount owed at the start of the period.
+    if (amountCents === null && balanceCents !== null && isPriorBalanceDescription(description)) {
+      amountCents = balanceCents;
+      rowWarnings.push("Amount taken from the balance column (balance carried forward from a prior period).");
+    }
+    if (amountCents === null) {
+      skippedNoAmount += 1;
+      return;
+    }
 
     rows.push({
       rowIndex: index,

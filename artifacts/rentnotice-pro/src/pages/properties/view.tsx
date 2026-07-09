@@ -159,13 +159,25 @@ export default function PropertyView() {
               <CardHeader>
                 <CardTitle className="text-lg">Units ({property.units.length})</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
                 <div className="flex flex-wrap gap-2">
                   {property.units.map(unit => (
                     <div key={unit} className="px-3 py-1 bg-muted rounded-md text-sm font-medium">
                       {unit}
                     </div>
                   ))}
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">County</div>
+                    <div data-testid="text-property-county">{property.county || "Not set"}</div>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-muted-foreground">Bedrooms</div>
+                    <div data-testid="text-property-bedrooms">
+                      {property.bedrooms != null ? property.bedrooms : "Not set"}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -221,6 +233,12 @@ export default function PropertyView() {
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Pay To</div>
                   <div className="font-medium">{property.payment.payToName}</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-muted-foreground">Person to Whom Rent Is Paid</div>
+                  <div data-testid="text-property-pay-to-person">
+                    {property.payment.payToPerson || property.payment.payToName || "Not set"}
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm font-medium text-muted-foreground">Payment Address</div>

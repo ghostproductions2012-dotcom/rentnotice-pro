@@ -17,3 +17,4 @@
 - [Ledger import dual paths](ledger-import-dual-paths.md) — preview and final import parse rows separately; any date/amount parsing change must land in both or they disagree.
 - [Stale lib dist typechecks](stale-lib-dist-typecheck.md) — per-package tsc reads gitignored lib dist d.ts; "missing property" on generated types usually means run typecheck:libs, not edit code.
 - [Playwright on Nix](playwright-on-nix.md) — bundled chromium dies on NixOS; use nix chromium via executablePath from `which chromium`; context.request login shares the cookie jar.
+- [pdfjs in Node tests](pdfjs-node-tests.md) — modern build needs browser-only JS (toHex); alias bare pdfjs-dist to legacy build in vitest; parse real PDF fixtures, not guessed line layouts.

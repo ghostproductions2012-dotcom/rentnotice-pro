@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS properties (
   state TEXT NOT NULL,
   zip TEXT NOT NULL,
   county TEXT NOT NULL DEFAULT '',
+  bedrooms INTEGER,
   units TEXT NOT NULL DEFAULT '[]',
   owner_name TEXT NOT NULL DEFAULT '',
   management_company TEXT NOT NULL DEFAULT '',

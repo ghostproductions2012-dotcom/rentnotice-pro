@@ -24,6 +24,8 @@ import {
   usersRepo,
 } from "./repositories";
 import { sha256Hex } from "./util";
+import { PAY_OR_QUIT_BODY } from "../templates-data/ca";
+import { extractMergeFields } from "../documents/merge";
 import type {
   AppSettings,
   CompanyProfile,
@@ -165,6 +167,7 @@ function seedCompanyAndSettings(db: AppDatabase): void {
 
 const laPayment: PaymentProfile = {
   payToName: "Golden State Property Management, Inc.",
+  payToPerson: "",
   paymentAddress: "8383 Wilshire Blvd, Suite 400, Beverly Hills, CA 90211",
   phone: "(310) 555-0182",
   acceptedMethods: ["cashiers_check", "money_order", "online_portal"],
@@ -178,6 +181,7 @@ function property(over: Partial<Property> & Pick<Property, "id" | "nickname" | "
   return {
     addressLine2: "",
     state: "CA",
+    bedrooms: null,
     managementCompany: "Golden State Property Management, Inc.",
     managerContact: "",
     isLosAngelesCity: false,
@@ -320,48 +324,14 @@ function seedTemplates(db: AppDatabase): void {
       versions: [
         {
           version: 1,
-          body: [
-            "THREE-DAY NOTICE TO PAY RENT OR QUIT",
-            "",
-            "TO: {{tenant_names}}, and all others in possession of the premises located at:",
-            "{{property_address}}, Unit {{unit}}",
-            "",
-            "PLEASE TAKE NOTICE that the rent on the above-described premises is delinquent in the total sum of {{total_amount}}, representing rent due for the following period(s):",
-            "",
-            "{{rent_breakdown}}",
-            "",
-            "WITHIN THREE (3) DAYS after service on you of this notice (excluding Saturdays, Sundays, and judicial holidays), you are required to pay the above amount in full OR quit and deliver possession of the premises.",
-            "",
-            "Payment may be made to: {{pay_to_name}}",
-            "Address: {{payment_address}}",
-            "Telephone: {{payment_phone}}",
-            "",
-            "This notice is given pursuant to California Code of Civil Procedure section 1161(2).",
-            "",
-            "Date prepared: {{prepared_date}}",
-            "",
-            "____________________________________",
-            "{{owner_agent_name}}",
-            "{{management_company}}",
-          ].join("\n"),
+          body: PAY_OR_QUIT_BODY,
           changedBy: "user-admin",
           changedAt: "2026-01-15T18:00:00.000Z",
-          changeNote: "Attorney-reviewed revision",
+          changeNote:
+            "Attorney-reviewed revision matching the First Light PM reference notice format (CCP §1161(2)).",
         },
       ],
-      mergeFields: [
-        "tenant_names",
-        "property_address",
-        "unit",
-        "total_amount",
-        "rent_breakdown",
-        "pay_to_name",
-        "payment_address",
-        "payment_phone",
-        "prepared_date",
-        "owner_agent_name",
-        "management_company",
-      ],
+      mergeFields: extractMergeFields(PAY_OR_QUIT_BODY),
       builtIn: true,
       createdAt: SEED_TS,
       updatedAt: SEED_TS,
