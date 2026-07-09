@@ -1,18 +1,63 @@
-import { useProperty, useTenants } from "@/lib/api/hooks";
+import { useDeleteProperty, usePermissions, useProperty, useTenants } from "@/lib/api/hooks";
 import { useParams } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building, MapPin, Users, FileText, ArrowLeft, MoreHorizontal } from "lucide-react";
+import { MapPin, ArrowLeft, MoreHorizontal, Pencil, Trash2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { PropertyFormDialog } from "@/components/property-form-dialog";
+import { TenantFormDialog } from "@/components/tenant-form-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function PropertyView() {
   const { id } = useParams<{ id: string }>();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
   const { data: property, isLoading } = useProperty(id);
   const { data: tenants } = useTenants("", id);
+  const deleteProperty = useDeleteProperty();
+  const { can } = usePermissions();
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [addTenantOpen, setAddTenantOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (isLoading) return <div className="animate-pulse space-y-4"><div className="h-8 bg-muted w-1/3 rounded" /><div className="h-64 bg-muted rounded" /></div>;
   if (!property) return <div>Property not found</div>;
+
+  const canManage = can("property.manage");
+
+  const doDelete = () =>
+    deleteProperty.mutate(property.id, {
+      onSuccess: () => {
+        toast({ title: "Property deleted", description: `${property.nickname} was removed.` });
+        navigate("/properties");
+      },
+      onError: (e) =>
+        toast({
+          title: "Could not delete property",
+          description: e instanceof Error ? e.message : "Unknown error.",
+          variant: "destructive",
+        }),
+    });
 
   return (
     <div className="space-y-6">
@@ -36,10 +81,49 @@ export default function PropertyView() {
             {property.addressLine1}, {property.city}, {property.state} {property.zip}
           </p>
         </div>
-        <Button variant="outline">Edit</Button>
-        <Button variant="outline" size="icon">
-          <MoreHorizontal className="w-4 h-4" />
+        <Button
+          variant="outline"
+          onClick={() => setEditOpen(true)}
+          disabled={!canManage}
+          data-testid="button-edit-property"
+        >
+          Edit
         </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" data-testid="button-property-menu">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => setEditOpen(true)}
+              disabled={!canManage}
+              data-testid="menu-edit-property"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit property
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => setAddTenantOpen(true)}
+              disabled={!can("tenant.manage")}
+              data-testid="menu-add-tenant"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add tenant here
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => setDeleteOpen(true)}
+              disabled={!canManage}
+              data-testid="menu-delete-property"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete property
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <Tabs defaultValue="details" className="w-full">
@@ -89,6 +173,17 @@ export default function PropertyView() {
         </TabsContent>
         
         <TabsContent value="tenants" className="pt-6">
+          <div className="flex justify-end mb-4">
+            <Button
+              size="sm"
+              onClick={() => setAddTenantOpen(true)}
+              disabled={!can("tenant.manage")}
+              data-testid="button-add-tenant-property"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Add Tenant
+            </Button>
+          </div>
           <Card>
             <CardContent className="p-0">
               <div className="divide-y">
@@ -144,6 +239,41 @@ export default function PropertyView() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <PropertyFormDialog open={editOpen} onOpenChange={setEditOpen} property={property} />
+      <TenantFormDialog
+        open={addTenantOpen}
+        onOpenChange={setAddTenantOpen}
+        defaultPropertyId={property.id}
+      />
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this property?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{property.nickname}” will be permanently removed.
+              {(tenants?.length ?? 0) > 0 && (
+                <>
+                  {" "}
+                  {tenants!.length} tenant record{tenants!.length === 1 ? "" : "s"} currently
+                  reference this property and will lose that link.
+                </>
+              )}{" "}
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={doDelete}
+              data-testid="button-confirm-delete-property"
+            >
+              Delete Property
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

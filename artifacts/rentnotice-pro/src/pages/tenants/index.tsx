@@ -1,4 +1,4 @@
-import { useTenants } from "@/lib/api/hooks";
+import { usePermissions, useTenants } from "@/lib/api/hooks";
 import { Card, CardContent } from "@/components/ui/card";
 import { Users, Search, Plus, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,10 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
 import { useState } from "react";
 import { formatCents } from "@/lib/types";
+import { TenantFormDialog } from "@/components/tenant-form-dialog";
 
 export default function TenantsList() {
   const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const { data: tenants, isLoading } = useTenants(search);
+  const { can } = usePermissions();
 
   return (
     <div className="space-y-6">
@@ -18,7 +21,11 @@ export default function TenantsList() {
           <h1 className="text-3xl font-serif font-bold tracking-tight">Tenants</h1>
           <p className="text-muted-foreground mt-1">Manage tenant records and associated ledgers.</p>
         </div>
-        <Button>
+        <Button
+          onClick={() => setAddOpen(true)}
+          disabled={!can("tenant.manage")}
+          data-testid="button-add-tenant"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Tenant
         </Button>
@@ -46,7 +53,14 @@ export default function TenantsList() {
             <Users className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium">No tenants found</h3>
             <p className="text-muted-foreground mb-4">Get started by adding a tenant.</p>
-            <Button variant="outline">Add Tenant</Button>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(true)}
+              disabled={!can("tenant.manage")}
+              data-testid="button-add-tenant-empty"
+            >
+              Add Tenant
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -79,6 +93,8 @@ export default function TenantsList() {
           </div>
         </div>
       )}
+
+      <TenantFormDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }

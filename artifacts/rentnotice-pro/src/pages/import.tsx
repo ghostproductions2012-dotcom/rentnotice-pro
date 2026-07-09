@@ -38,8 +38,10 @@ import {
   Database,
   FileText,
   Loader2,
+  PencilLine,
   Upload,
 } from "lucide-react";
+import { ManualStatementDialog } from "@/components/manual-statement-dialog";
 
 const NONE = "__none__";
 
@@ -84,6 +86,7 @@ export default function ImportWizard() {
   const [savePreset, setSavePreset] = useState(false);
   const [presetName, setPresetName] = useState("");
   const [imported, setImported] = useState<Ledger | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const { data: tenants } = useTenants();
   const { data: presets } = useMappingPresets();
@@ -234,6 +237,33 @@ export default function ImportWizard() {
           </CardContent>
         </Card>
       )}
+
+      {step === "upload" && (
+        <div className="text-center">
+          <p className="text-sm text-muted-foreground">
+            No export file from your software?{" "}
+            <Button
+              variant="link"
+              className="px-1 h-auto"
+              onClick={() => setManualOpen(true)}
+              disabled={!can("ledger.manage")}
+              data-testid="button-enter-statement-import"
+            >
+              <PencilLine className="w-4 h-4 mr-1" />
+              Enter a statement manually
+            </Button>
+          </p>
+        </div>
+      )}
+
+      <ManualStatementDialog
+        open={manualOpen}
+        onOpenChange={setManualOpen}
+        onCreated={(ledger) => {
+          setImported(ledger);
+          setStep("done");
+        }}
+      />
 
       {step === "mapping" && parsed && mapping && (
         <div className="space-y-6">

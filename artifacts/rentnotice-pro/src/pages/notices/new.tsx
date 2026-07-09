@@ -358,6 +358,7 @@ export default function NoticeNew() {
                     {(ledgers ?? []).map((l) => (
                       <SelectItem key={l.id} value={l.id}>
                         {l.name} ({l.transactionCount} txns)
+                        {l.sourceType === "manual" ? " — manual entry" : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -368,7 +369,8 @@ export default function NoticeNew() {
                     <Link href="/import" className="text-primary underline">
                       Import a ledger
                     </Link>{" "}
-                    to calculate the rent-only demand.
+                    or enter a statement manually from the tenant's page to calculate the
+                    rent-only demand.
                   </p>
                 )}
               </div>

@@ -1,14 +1,17 @@
-import { useProperties } from "@/lib/api/hooks";
+import { usePermissions, useProperties } from "@/lib/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Building, MapPin, Search, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
 import { useState } from "react";
+import { PropertyFormDialog } from "@/components/property-form-dialog";
 
 export default function PropertiesList() {
   const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
   const { data: properties, isLoading } = useProperties(search);
+  const { can } = usePermissions();
 
   return (
     <div className="space-y-6">
@@ -17,7 +20,11 @@ export default function PropertiesList() {
           <h1 className="text-3xl font-serif font-bold tracking-tight">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage real estate assets and payment profiles.</p>
         </div>
-        <Button>
+        <Button
+          onClick={() => setAddOpen(true)}
+          disabled={!can("property.manage")}
+          data-testid="button-add-property"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Add Property
         </Button>
@@ -45,7 +52,14 @@ export default function PropertiesList() {
             <Building className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
             <h3 className="text-lg font-medium">No properties found</h3>
             <p className="text-muted-foreground mb-4">Get started by adding a new property.</p>
-            <Button variant="outline">Add Property</Button>
+            <Button
+              variant="outline"
+              onClick={() => setAddOpen(true)}
+              disabled={!can("property.manage")}
+              data-testid="button-add-property-empty"
+            >
+              Add Property
+            </Button>
           </CardContent>
         </Card>
       ) : (
@@ -85,6 +99,8 @@ export default function PropertiesList() {
           ))}
         </div>
       )}
+
+      <PropertyFormDialog open={addOpen} onOpenChange={setAddOpen} />
     </div>
   );
 }
