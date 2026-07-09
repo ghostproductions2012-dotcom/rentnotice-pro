@@ -79,6 +79,9 @@ router.post("/www/checkout/session", async (req, res, next) => {
       mode: "subscription",
       customer_email: normalizedEmail,
       line_items: [{ price: live.priceId, quantity: 1 }],
+      allow_promotion_codes: true,
+      // A 100%-off promo brings the total to $0; don't demand a card then.
+      payment_method_collection: "if_required",
       success_url: `${base}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${base}/pricing`,
       metadata: { pendingSignupId: signup.id, tier },
@@ -149,7 +152,12 @@ router.post("/www/checkout/complete", async (req, res, next) => {
 
     const stripe = await getUncachableStripeClient();
     const checkoutSession = await stripe.checkout.sessions.retrieve(sessionId);
-    if (checkoutSession.payment_status !== "paid") {
+    // "no_payment_required" is what Stripe reports for a fully discounted
+    // (100% off) subscription checkout -- treat it like a paid session.
+    if (
+      checkoutSession.payment_status !== "paid" &&
+      checkoutSession.payment_status !== "no_payment_required"
+    ) {
       res.status(400).json({
         error: "Payment has not completed for this session",
         code: "not_paid",
