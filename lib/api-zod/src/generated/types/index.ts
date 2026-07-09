@@ -68,6 +68,7 @@ export * from './provisionResult';
 export * from './pushFieldAssignmentsRequest';
 export * from './pushFieldAssignmentsResult';
 export * from './redeemInviteInput';
+export * from './regeneratedInviteCode';
 export * from './sessionUser';
 export * from './sessionUserRole';
 export * from './signupInput';

@@ -348,7 +348,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InviteCode'
+                $ref: '#/components/schemas/RegeneratedInviteCode'
         '403':
           description: Requires admin role
           content:
@@ -1212,6 +1212,16 @@ components:
             - manager
             - staff
             - readonly
+    RegeneratedInviteCode:
+      allOf:
+        - $ref: '#/components/schemas/InviteCode'
+        - type: object
+          required:
+            - emailSent
+          properties:
+            emailSent:
+              type: boolean
+              description: Whether the fresh invite code was emailed to the invitee
     CompanyUserUpdate:
       type: object
       properties:

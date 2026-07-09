@@ -248,7 +248,9 @@ export const RegenerateInviteCodeResponse = zod.object({
   "inviteCodeExpiresAt": zod.coerce.date().describe('When this code stops being redeemable (codes created before expiry tracking fall back to creation time + 14 days)'),
   "email": zod.string(),
   "role": zod.enum(['admin', 'manager', 'staff', 'readonly'])
-})
+}).and(zod.object({
+  "emailSent": zod.boolean().describe('Whether the fresh invite code was emailed to the invitee')
+}))
 
 
 /**

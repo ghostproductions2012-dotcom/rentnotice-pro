@@ -55,6 +55,7 @@ import type {
   PushFieldAssignmentsRequest,
   PushFieldAssignmentsResult,
   RedeemInviteInput,
+  RegeneratedInviteCode,
   SessionUser,
   SignupInput,
   UpdateFieldAssignmentRequest
@@ -1052,9 +1053,9 @@ export const getRegenerateInviteCodeUrl = (userId: string,) => {
 /**
  * @summary Regenerate the invite code for a still-pending invitee (invalidates the old code)
  */
-export const regenerateInviteCode = async (userId: string, options?: RequestInit): Promise<InviteCode> => {
+export const regenerateInviteCode = async (userId: string, options?: RequestInit): Promise<RegeneratedInviteCode> => {
 
-  return customFetch<InviteCode>(getRegenerateInviteCodeUrl(userId),
+  return customFetch<RegeneratedInviteCode>(getRegenerateInviteCodeUrl(userId),
   {
     ...options,
     method: 'POST'

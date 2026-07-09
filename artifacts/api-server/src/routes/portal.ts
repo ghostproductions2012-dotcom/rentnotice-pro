@@ -371,11 +371,40 @@ router.post(
         .where(eq(cloudUsersTable.id, target.id))
         .returning();
       if (!updated) throw new Error("Failed to regenerate invite code");
+
+      const [company] = await db
+        .select()
+        .from(companiesTable)
+        .where(eq(companiesTable.id, admin.companyId));
+
+      // Download link is best-effort: a missing REPLIT_DOMAINS must not
+      // block code regeneration (the email still carries the invite code).
+      let downloadUrl: string | undefined;
+      try {
+        downloadUrl = `${getPublicBaseUrl()}/download`;
+      } catch {
+        downloadUrl = undefined;
+      }
+
+      // Best-effort re-send of the invite email so the invitee isn't left
+      // holding a stale code; sendInviteEmail never throws.
+      const emailSent = company
+        ? await sendInviteEmail({
+            to: updated.email,
+            companyName: company.name,
+            role: updated.role,
+            invitedByName: admin.name || admin.email,
+            inviteCode,
+            downloadUrl,
+          })
+        : false;
+
       res.json({
         inviteCode,
         inviteCodeExpiresAt: inviteCodeExpiresAt.toISOString(),
         email: updated.email,
         role: updated.role,
+        emailSent,
       });
     } catch (err) {
       next(err);

@@ -221,6 +221,11 @@ export interface InviteCode {
   role: InviteCodeRole;
 }
 
+export type RegeneratedInviteCode = InviteCode & {
+  /** Whether the fresh invite code was emailed to the invitee */
+  emailSent: boolean;
+};
+
 export type CompanyUserUpdateRole = typeof CompanyUserUpdateRole[keyof typeof CompanyUserUpdateRole];
 
 

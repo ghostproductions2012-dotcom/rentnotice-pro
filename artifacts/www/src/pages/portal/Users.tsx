@@ -38,6 +38,8 @@ export default function Users() {
   const [copied, setCopied] = useState(false);
   const [inviteCodeTarget, setInviteCodeTarget] = useState<CompanyUser | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [regenResult, setRegenResult] = useState<{email: string, emailSent: boolean} | null>(null);
+  const [regenError, setRegenError] = useState(false);
   const [usernameTarget, setUsernameTarget] = useState<CompanyUser | null>(null);
   const [usernameValue, setUsernameValue] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
@@ -124,11 +126,15 @@ export default function Users() {
 
   const handleRegenerateCode = async () => {
     if (!inviteCodeTarget) return;
+    setRegenError(false);
     try {
-      await regenerateMutation.mutateAsync({ userId: inviteCodeTarget.id });
+      const res = await regenerateMutation.mutateAsync({ userId: inviteCodeTarget.id });
       queryClient.invalidateQueries({ queryKey: getGetInviteCodeQueryKey(inviteCodeTarget.id) });
+      setRegenResult({ email: res.email, emailSent: res.emailSent });
     } catch (e) {
       console.error(e);
+      setRegenResult(null);
+      setRegenError(true);
     }
   };
 
@@ -370,7 +376,7 @@ export default function Users() {
         </CardContent>
       </Card>
 
-      <Dialog open={inviteCodeTarget !== null} onOpenChange={(open) => { if (!open) { setInviteCodeTarget(null); setCodeCopied(false); } }}>
+      <Dialog open={inviteCodeTarget !== null} onOpenChange={(open) => { if (!open) { setInviteCodeTarget(null); setCodeCopied(false); setRegenResult(null); setRegenError(false); } }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite Code</DialogTitle>
@@ -381,6 +387,23 @@ export default function Users() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-3">
+            {regenResult && (
+              <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900/50">
+                <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-800 dark:text-green-300">
+                  {regenResult.emailSent
+                    ? `New code generated and emailed to ${regenResult.email}.`
+                    : `New code generated, but the email could not be sent. Copy the code below and share it with ${regenResult.email}.`}
+                </AlertDescription>
+              </Alert>
+            )}
+            {regenError && (
+              <Alert variant="destructive">
+                <AlertDescription>
+                  Could not generate a new code. Please try again.
+                </AlertDescription>
+              </Alert>
+            )}
             {inviteCodeQuery.isLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : inviteCodeQuery.data ? (
