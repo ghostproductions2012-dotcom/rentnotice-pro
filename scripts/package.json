@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "check:mobile-layout": "tsx ./src/mobile-layout-check.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@types/pg": "^8.20.0",
     "tsx": "catalog:"
+  },
+  "dependencies": {
+    "pg": "^8.22.0",
+    "playwright": "^1.61.1"
   }
 }

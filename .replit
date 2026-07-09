@@ -20,6 +20,10 @@ author = "agent"
 task = "workflow.run"
 args = "typecheck-rentnotice-pro"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "mobile-layout-www"
+
 [[workflows.workflow]]
 name = "typecheck-rentnotice-pro"
 author = "agent"
@@ -27,6 +31,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter rentnotice-pro exec tsc --noEmit"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "mobile-layout-www"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:mobile-layout"
 
 [workflows.workflow.metadata]
 isValidation = true

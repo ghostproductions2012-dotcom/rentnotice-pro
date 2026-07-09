@@ -15,10 +15,12 @@ interface DownloadButtonProps {
   testId: string;
 }
 
+const downloadButtonClasses = "w-full whitespace-normal h-auto min-h-10";
+
 function DownloadButton({ href, label, isLoading, variant = "default", testId }: DownloadButtonProps) {
   if (isLoading) {
     return (
-      <Button size="lg" variant={variant} className="w-full" disabled data-testid={testId}>
+      <Button size="lg" variant={variant} className={downloadButtonClasses} disabled data-testid={testId}>
         <DownloadIcon className="w-4 h-4 mr-2" />
         Loading…
       </Button>
@@ -26,14 +28,14 @@ function DownloadButton({ href, label, isLoading, variant = "default", testId }:
   }
   if (!href) {
     return (
-      <Button size="lg" variant={variant} className="w-full" disabled data-testid={testId}>
+      <Button size="lg" variant={variant} className={downloadButtonClasses} disabled data-testid={testId}>
         <DownloadIcon className="w-4 h-4 mr-2" />
         Temporarily unavailable
       </Button>
     );
   }
   return (
-    <Button asChild size="lg" variant={variant} className="w-full">
+    <Button asChild size="lg" variant={variant} className={downloadButtonClasses}>
       <a href={href} data-testid={testId}>
         <DownloadIcon className="w-4 h-4 mr-2" />
         {label}
