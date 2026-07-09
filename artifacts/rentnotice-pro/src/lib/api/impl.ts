@@ -135,11 +135,12 @@ import { downscalePhotoDataUrl } from "../images";
 let dbPromise: Promise<AppDatabase> | null = null;
 
 function getDb(): Promise<AppDatabase> {
+  // A failed open/migration deliberately STICKS: every caller sees the same
+  // rejection so the UI can show the startup error screen instead of each
+  // query silently re-running (and re-failing) the whole init. Recovery is
+  // explicit via retryDatabaseInit() (the error screen's Retry button).
   if (!dbPromise) {
-    dbPromise = initDatabase().catch((err) => {
-      dbPromise = null; // allow retry after a failed open
-      throw err;
-    });
+    dbPromise = initDatabase();
   }
   return dbPromise;
 }
@@ -1946,6 +1947,37 @@ function createServices(): AppServices {
       blobUrlCache.clear();
       logAudit(db, "backup_restored", "settings", null, `Restored backup from ${meta.exportedAt}`);
       return meta;
+    },
+
+    // --- startup recovery ---
+    async retryDatabaseInit(): Promise<void> {
+      // Drop the failed (stuck) promise and try the full open+migrate again.
+      // If the previous attempt actually succeeded, keep it — nothing to do.
+      if (dbPromise) {
+        try {
+          await dbPromise;
+          return;
+        } catch {
+          dbPromise = null;
+        }
+      }
+      await getDb();
+    },
+    async resetLocalData(): Promise<void> {
+      // Destructive last-resort recovery: erase the locally saved database so
+      // the app boots fresh. Only offered behind an explicit confirmation.
+      if (dbPromise) {
+        try {
+          const db = await dbPromise;
+          db.close();
+        } catch {
+          // The database never opened — nothing to close.
+        }
+        dbPromise = null;
+      }
+      session.user = null;
+      session.locked = false;
+      await clearPersistedDatabase();
     },
   } satisfies AppServices;
 

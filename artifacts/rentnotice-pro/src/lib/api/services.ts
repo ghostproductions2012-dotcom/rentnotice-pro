@@ -334,6 +334,15 @@ export interface AppServices {
   // --- backup / restore ---
   exportBackup(): Promise<Blob>;
   importBackup(file: File): Promise<BackupMeta>;
+
+  // --- startup recovery ---
+  /** Retry a failed database open/migration (used by the startup error screen). */
+  retryDatabaseInit(): Promise<void>;
+  /**
+   * Destructive recovery: erase the locally persisted database so the app can
+   * boot fresh. Callers must guard this behind an explicit confirmation.
+   */
+  resetLocalData(): Promise<void>;
 }
 
 let instance: AppServices | null = null;

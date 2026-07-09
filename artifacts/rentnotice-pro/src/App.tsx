@@ -4,6 +4,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, useSyncLicense } from "@/lib/api/hooks";
 import { FirstRunScreen, ActivationWizard } from "@/components/first-run";
+import { StartupErrorScreen } from "@/components/startup-error";
+import { computeRouterBase } from "@/lib/router-base";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { evaluateGraceWarning } from "@/lib/licensing/gate";
 import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, X } from "lucide-react";
@@ -31,7 +33,12 @@ import SettingsPage from "@/pages/settings";
 import FieldAssignmentsPage from "@/pages/field";
 import { useEffect, useRef, useState } from "react";
 
-const queryClient = new QueryClient();
+// All queries hit the local embedded database, so network-style retries only
+// delay error surfacing. One retry covers transient hiccups; a failed database
+// open sticks (see getDb) so the startup error screen appears quickly.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1 } },
+});
 
 function NotFound() {
   return (
@@ -247,8 +254,12 @@ function Sidebar() {
 }
 
 function Layout({ children }: { children: React.ReactNode }) {
-  const { data: session, isLoading } = useSession();
-  const { data: workspace, isLoading: workspaceLoading } = useWorkspaceState();
+  const { data: session, isLoading, error: sessionError } = useSession();
+  const {
+    data: workspace,
+    isLoading: workspaceLoading,
+    error: workspaceError,
+  } = useWorkspaceState();
   const syncLicense = useSyncLicense();
   const launchSyncDone = useRef(false);
   // Days-remaining value at which the user last dismissed the grace warning;
@@ -279,7 +290,23 @@ function Layout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(id);
   }, [workspace?.mode, lastVerifiedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (isLoading || workspaceLoading) return null;
+  // Surface startup failures (database open/migration errors) instead of
+  // silently falling through to the lock screen with no data behind it.
+  const bootError = sessionError ?? workspaceError;
+  if (bootError) return <StartupErrorScreen error={bootError} />;
+
+  // Visible boot indicator: never a fully blank window while the local
+  // database opens (or while a failure is still retrying).
+  if (isLoading || workspaceLoading) {
+    return (
+      <div className="min-h-[100dvh] w-full flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <span className="text-sm">Loading workspace…</span>
+        </div>
+      </div>
+    );
+  }
   if (workspace?.mode === "unset") return <FirstRunScreen />;
   if (!session?.user || session.locked) return <LockScreen />;
 
@@ -398,11 +425,15 @@ function Router() {
   );
 }
 
+// See computeRouterBase: the desktop build's relative BASE_URL ("./") must
+// never be used as the wouter base or no route ever matches (empty main pane).
+const routerBase = computeRouterBase(import.meta.env.BASE_URL);
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <WouterRouter base={routerBase}>
           <Router />
         </WouterRouter>
         <Toaster />
