@@ -2,6 +2,10 @@
 set -e
 pnpm install --frozen-lockfile
 
+# Rebuild composite lib declarations (dist/ is gitignored, so each env's
+# copy can go stale after merges and break per-package tsc typechecks).
+pnpm run typecheck:libs
+
 # Reconcile the invite_token -> invite_code rename before drizzle push:
 # push prompts interactively on renames and dies when stdin is closed.
 psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "

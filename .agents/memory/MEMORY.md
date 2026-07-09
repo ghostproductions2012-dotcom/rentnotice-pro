@@ -15,3 +15,4 @@
 - [Express behind Replit proxy](express-proxy-rate-limits.md) — per-IP logic needs `trust proxy` or all clients share one rate-limit bucket.
 - [License revocation semantics](license-revocation-semantics.md) — revoked keys present as "cancelled" to desktop; every key-selection query must exclude revoked.
 - [Ledger import dual paths](ledger-import-dual-paths.md) — preview and final import parse rows separately; any date/amount parsing change must land in both or they disagree.
+- [Stale lib dist typechecks](stale-lib-dist-typecheck.md) — per-package tsc reads gitignored lib dist d.ts; "missing property" on generated types usually means run typecheck:libs, not edit code.
