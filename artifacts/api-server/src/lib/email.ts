@@ -80,7 +80,7 @@ async function sendEmail(input: SendEmailInput): Promise<void> {
   const from =
     process.env.EMAIL_FROM ??
     fromEmail ??
-    "RentNotice Pro <onboarding@resend.dev>";
+    "RentNotice Pro <noreply@rentnoticepro.com>";
 
   const resp = await fetch("https://api.resend.com/emails", {
     method: "POST",
