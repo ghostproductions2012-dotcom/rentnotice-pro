@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { activateLicense, verifyLicense, login, redeemInvite } = vi.hoisted(() => ({
-  activateLicense: vi.fn(),
-  verifyLicense: vi.fn(),
-  login: vi.fn(),
-  redeemInvite: vi.fn(),
-}));
+const { activateLicense, verifyLicense, login, redeemInvite, changeCloudPassword } = vi.hoisted(
+  () => ({
+    activateLicense: vi.fn(),
+    verifyLicense: vi.fn(),
+    login: vi.fn(),
+    redeemInvite: vi.fn(),
+    changeCloudPassword: vi.fn(),
+  }),
+);
 
 vi.mock("@workspace/api-client-react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@workspace/api-client-react")>();
-  return { ...actual, activateLicense, verifyLicense, login, redeemInvite };
+  return { ...actual, activateLicense, verifyLicense, login, redeemInvite, changeCloudPassword };
 });
 
 import { ApiError, type LicenseInfo } from "@workspace/api-client-react";
@@ -410,6 +413,54 @@ describe("redeemInvite", () => {
         name: "X",
         password: "pw12345678",
       }),
+    ).rejects.toBeInstanceOf(LicensingUnavailableError);
+  });
+});
+
+describe("changePassword", () => {
+  it("normalizes the key and forwards credentials", async () => {
+    changeCloudPassword.mockResolvedValue(undefined);
+    await httpLicensingClient.changePassword(
+      "  rnp-test-1234-aaaa-bbbb ",
+      "jane.doe@acme.test",
+      "old-pass-123",
+      "new-pass-456",
+    );
+    expect(changeCloudPassword).toHaveBeenCalledWith({
+      licenseKey: "RNP-TEST-1234-AAAA-BBBB",
+      email: "jane.doe@acme.test",
+      currentPassword: "old-pass-123",
+      newPassword: "new-pass-456",
+    });
+  });
+
+  it("maps 401 bad_credentials to CloudCredentialsError", async () => {
+    changeCloudPassword.mockRejectedValue(
+      apiError(401, { error: "Current password is incorrect", code: "bad_credentials" }),
+    );
+    await expect(
+      httpLicensingClient.changePassword(freshKey(), "a@b.test", "wrong", "new-pass-456"),
+    ).rejects.toBeInstanceOf(CloudCredentialsError);
+  });
+
+  it("maps 404 unknown_key to LicenseInvalidError", async () => {
+    changeCloudPassword.mockRejectedValue(
+      apiError(404, { error: "Unknown license key", code: "unknown_key" }),
+    );
+    await expect(
+      httpLicensingClient.changePassword(freshKey(), "a@b.test", "old", "new-pass-456"),
+    ).rejects.toBeInstanceOf(LicenseInvalidError);
+  });
+
+  it("maps transport failures and 5xx to LicensingUnavailableError", async () => {
+    changeCloudPassword.mockRejectedValue(new TypeError("fetch failed"));
+    await expect(
+      httpLicensingClient.changePassword(freshKey(), "a@b.test", "old", "new-pass-456"),
+    ).rejects.toBeInstanceOf(LicensingUnavailableError);
+
+    changeCloudPassword.mockRejectedValue(apiError(500, { error: "boom" }));
+    await expect(
+      httpLicensingClient.changePassword(freshKey(), "a@b.test", "old", "new-pass-456"),
     ).rejects.toBeInstanceOf(LicensingUnavailableError);
   });
 });

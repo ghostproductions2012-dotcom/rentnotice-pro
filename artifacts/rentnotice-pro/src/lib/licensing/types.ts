@@ -108,4 +108,16 @@ export interface LicensingClient {
    * Throws InviteCodeInvalidError for unknown/used codes.
    */
   redeemInvite(input: RedeemInviteInput): Promise<InviteRedemption>;
+  /**
+   * Change a directory member's own password (also their customer-website
+   * password). The service verifies the current password before changing
+   * anything. Throws CloudCredentialsError when the current password is
+   * rejected and LicensingUnavailableError when the service is unreachable.
+   */
+  changePassword(
+    licenseKey: string,
+    email: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void>;
 }

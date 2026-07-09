@@ -443,6 +443,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /license/change-password:
+    post:
+      operationId: changeCloudPassword
+      tags:
+        - license
+      summary: Change a directory member's own password from the desktop app (verifies the current password)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeCloudPasswordInput'
+      responses:
+        '204':
+          description: Password changed; existing website sessions for the account are revoked
+        '400':
+          description: Invalid input (new password must be at least 8 characters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Current password is incorrect or the account cannot sign in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Unknown license key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /license/activate:
     post:
       operationId: activateLicense
@@ -1415,6 +1448,28 @@ components:
           type: string
         deviceId:
           type: string
+    ChangeCloudPasswordInput:
+      type: object
+      required:
+        - licenseKey
+        - email
+        - currentPassword
+        - newPassword
+      properties:
+        licenseKey:
+          type: string
+          description: The company license key this device is bound to
+        email:
+          type: string
+          description: Email of the directory member changing their password
+        currentPassword:
+          type: string
+          minLength: 1
+          description: The member's current password (verified before any change)
+        newPassword:
+          type: string
+          minLength: 8
+          description: The new password (also used on the customer website)
     LicenseInfo:
       type: object
       required:

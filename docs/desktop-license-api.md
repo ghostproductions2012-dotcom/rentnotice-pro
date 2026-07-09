@@ -84,6 +84,43 @@ new machine.
 - `404 Not Found` — `{ "error": "Unknown license key", "code": "unknown_key" }`
 - `400 Bad Request` — `{ "error": "Invalid input", "code": "invalid_input" }`
 
+### POST `/license/change-password`
+
+Called when a signed-in desktop user changes their own password from
+Settings → My Account. The cloud directory is the source of truth for
+credentials in activated workspaces (the same password is used on the customer
+website), so the desktop app updates the cloud first and only then refreshes
+its local offline sign-in hash. The server verifies the current password
+before changing anything and revokes the user's existing customer-website
+sessions on success.
+
+**Request body**
+
+```json
+{
+  "licenseKey": "RNP-XXXX-XXXX-XXXX-XXXX",
+  "email": "jane@acme.test",
+  "currentPassword": "old-password",
+  "newPassword": "new-password-min-8"
+}
+```
+
+| Field             | Type   | Required | Notes                                            |
+| ----------------- | ------ | -------- | ------------------------------------------------ |
+| `licenseKey`      | string | yes      | Case-insensitive; server normalizes to upper case. |
+| `email`           | string | yes      | The member's directory email (case-insensitive). |
+| `currentPassword` | string | yes      | Verified server-side before any change.          |
+| `newPassword`     | string | yes      | Minimum 8 characters.                            |
+
+**Responses**
+
+- `204 No Content` — password changed; existing website sessions revoked.
+- `401 Unauthorized` — `{ "error": "Current password is incorrect", "code": "bad_credentials" }`
+  (also returned for unknown/inactive/never-set-up accounts so the endpoint
+  does not reveal which emails exist).
+- `404 Not Found` — `{ "error": "Unknown license key", "code": "unknown_key" }`
+- `400 Bad Request` — `{ "error": "Invalid input (new password must be at least 8 characters)", "code": "invalid_input" }`
+
 ### POST `/license/verify`
 
 Called on app launch and periodically (recommended: every 24 hours) to

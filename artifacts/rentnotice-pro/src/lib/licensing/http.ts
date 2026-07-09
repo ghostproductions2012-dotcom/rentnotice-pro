@@ -16,6 +16,7 @@ import {
   verifyLicense,
   redeemInvite,
   login,
+  changeCloudPassword,
   ApiError,
   setBaseUrl,
   type LicenseInfo,
@@ -300,6 +301,33 @@ export const httpLicensingClient: LicensingClient = {
         throw new Error(errorMessage(err) ?? "The licensing service rejected the request.");
       }
       if (err instanceof LicensingUnavailableError) throw err;
+      throw new LicensingUnavailableError();
+    }
+  },
+
+  /**
+   * Change the member's own cloud password. The server verifies the current
+   * password before changing anything and revokes existing website sessions.
+   */
+  async changePassword(licenseKey, email, currentPassword, newPassword) {
+    try {
+      await changeCloudPassword({
+        licenseKey: licenseKey.trim().toUpperCase(),
+        email,
+        currentPassword,
+        newPassword,
+      });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status >= 500) throw new LicensingUnavailableError();
+        if (err.status === 401) {
+          throw new CloudCredentialsError("Current password is incorrect");
+        }
+        if (err.status === 404 && errorCode(err) === "unknown_key") {
+          throw new LicenseInvalidError();
+        }
+        throw new Error(errorMessage(err) ?? "The licensing service rejected the request.");
+      }
       throw new LicensingUnavailableError();
     }
   },

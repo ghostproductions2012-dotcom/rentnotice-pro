@@ -6,13 +6,18 @@ import {
   useSyncLicense,
   useUpdateSettings,
   usePermissions,
+  useSession,
+  useChangeMyPassword,
 } from "@/lib/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { ActivationWizard } from "@/components/first-run";
 import { KeyRound } from "lucide-react";
+import type { User } from "@/lib/types";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -26,10 +31,153 @@ const LICENSE_STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: "Administrator",
+  manager: "Manager",
+  staff: "Staff",
+  readonly: "Read-only",
+};
+
+function MyAccountCard({ user }: { user: User }) {
+  const changePassword = useChangeMyPassword();
+  const { toast } = useToast();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Accounts without a stored secret sign in without a password, so there is
+  // no "current password" to confirm.
+  const requiresCurrent = user.pin !== null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+    if (newPassword.length < 8) {
+      setFormError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setFormError("New password and confirmation do not match.");
+      return;
+    }
+    changePassword.mutate(
+      { currentPassword, newPassword },
+      {
+        onSuccess: () => {
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+          toast({
+            title: "Password changed",
+            description: "Use your new password the next time you sign in.",
+          });
+        },
+        onError: (err: unknown) => {
+          setFormError(err instanceof Error ? err.message : "Could not change password.");
+        },
+      },
+    );
+  };
+
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader>
+        <CardTitle>My Account</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Name</div>
+            <div data-testid="text-account-name">{user.name}</div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Username</div>
+            <div data-testid="text-account-username">{user.username}</div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Email</div>
+            <div data-testid="text-account-email">{user.email ?? "—"}</div>
+          </div>
+          <div>
+            <div className="text-sm font-medium text-muted-foreground">Role</div>
+            <div data-testid="text-account-role">{ROLE_LABELS[user.role] ?? user.role}</div>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="border-t pt-4 space-y-4">
+          <div>
+            <div className="font-medium">Change Password</div>
+            <div className="text-sm text-muted-foreground">
+              Your password is used to sign in on this device
+              {user.cloudUserId ? " and on the customer website" : ""}. Minimum 8 characters.
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl">
+            {requiresCurrent && (
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  required
+                  data-testid="input-current-password"
+                />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+                minLength={8}
+                data-testid="input-new-password"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm new password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                data-testid="input-confirm-password"
+              />
+            </div>
+          </div>
+          {formError && (
+            <p className="text-sm text-destructive" data-testid="text-change-password-error">
+              {formError}
+            </p>
+          )}
+          <Button
+            type="submit"
+            disabled={changePassword.isPending}
+            data-testid="button-change-password"
+          >
+            <KeyRound className="h-4 w-4 mr-2" />
+            {changePassword.isPending ? "Changing…" : "Change Password"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings } = useSettings();
   const { data: company } = useCompanyProfile();
   const { data: workspace } = useWorkspaceState();
+  const { data: session } = useSession();
   const syncLicense = useSyncLicense();
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const updateSettings = useUpdateSettings();
@@ -93,6 +241,8 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {session?.user && !session.locked && <MyAccountCard user={session.user} />}
+
         {!activation && (
           <Card className="md:col-span-2">
             <CardHeader>

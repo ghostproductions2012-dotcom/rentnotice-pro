@@ -195,4 +195,16 @@ export const mockLicensingClient: LicensingClient = {
       directory: [...DIRECTORY.map(stripSecret), me],
     };
   },
+
+  async changePassword(licenseKey, email, currentPassword, newPassword) {
+    await connect(licenseKey);
+    requireKnownKey(licenseKey);
+    const needle = email.trim().toLowerCase();
+    const entry = DIRECTORY.find((u) => (u.email ?? "").toLowerCase() === needle);
+    if (!entry || !entry.active || entry.secret !== currentPassword) {
+      throw new CloudCredentialsError("Current password is incorrect");
+    }
+    // In-memory only — resets on reload, which is fine for the mock service.
+    entry.secret = newPassword;
+  },
 };

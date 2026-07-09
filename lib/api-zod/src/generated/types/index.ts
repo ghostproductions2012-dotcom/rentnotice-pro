@@ -29,6 +29,7 @@ export * from './adminUpdateKeyInput';
 export * from './adminUpdateKeyInputStatus';
 export * from './adminUpdateUserInput';
 export * from './adminUpdateUserInputRole';
+export * from './changeCloudPasswordInput';
 export * from './checkoutCompleteInput';
 export * from './checkoutSession';
 export * from './companyUser';

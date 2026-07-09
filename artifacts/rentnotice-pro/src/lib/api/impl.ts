@@ -615,6 +615,59 @@ function createServices(): AppServices {
       logAudit(db, "user_updated", "user", id, `Updated user ${user.name}`);
       return user;
     },
+    async changeMyPassword({ currentPassword, newPassword }): Promise<User> {
+      const db = await getDb();
+      if (!session.user || session.locked) {
+        throw new Error("Sign in to change your password.");
+      }
+      const me = usersRepo.get(db, session.user.id);
+      if (!me || !me.active) throw new Error("Your account is no longer available.");
+      if (!looksLikeRawSecret(newPassword)) throw new Error(INVALID_SECRET_MESSAGE);
+
+      // Verify the current password against the locally cached hash. Legacy
+      // accounts may still carry a hash of a short numeric secret — comparing
+      // hashes accepts whatever they currently sign in with. Accounts without
+      // any stored secret (local-only, never set one) skip this check.
+      if (me.pin) {
+        const currentHash = await sha256Hex(currentPassword);
+        if (currentHash !== me.pin) throw new Error("Current password is incorrect");
+      }
+
+      // Activated workspaces: the cloud directory is the source of truth for
+      // credentials (same password as the customer website), so update it
+      // first — if the service is unreachable, change nothing locally either.
+      if (getWorkspaceMode(db) === "activated" && me.cloudUserId) {
+        const activation = activationRepo.get(db);
+        if (!activation) throw new Error("This workspace is missing its license activation.");
+        if (!me.email) {
+          throw new Error(
+            "Your account has no email on file. Ask your company admin to update it on the customer website first.",
+          );
+        }
+        try {
+          await getLicensingClient().changePassword(
+            activation.licenseKey,
+            me.email,
+            currentPassword,
+            newPassword,
+          );
+        } catch (err) {
+          if (err instanceof LicensingUnavailableError) {
+            throw new Error(
+              "Changing your password requires an internet connection so your company account stays in sync. Reconnect and try again.",
+            );
+          }
+          throw err;
+        }
+      }
+
+      // Refresh the local hash so offline sign-in works with the new password.
+      const updated = usersRepo.update(db, me.id, { pin: await sha256Hex(newPassword) });
+      session.user = updated;
+      logAudit(db, "user_updated", "user", me.id, `${me.name} changed their password`);
+      await db.flush();
+      return updated;
+    },
 
     // --- workspace activation ---
     async getWorkspaceState() {

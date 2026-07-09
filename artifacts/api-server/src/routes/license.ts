@@ -5,12 +5,14 @@ import {
   cloudUsersTable,
   companiesTable,
   licenseKeysTable,
+  webSessionsTable,
 } from "@workspace/db";
 import type { CloudUser, Company, LicenseKey } from "@workspace/db";
 import {
   ActivateLicenseBody,
   VerifyLicenseBody,
   RedeemInviteBody,
+  ChangeCloudPasswordBody,
 } from "@workspace/api-zod";
 import {
   computeLicenseStatus,
@@ -20,7 +22,7 @@ import {
   type ComputedLicenseStatus,
 } from "../lib/license";
 import { getPlanConfig } from "../lib/plans";
-import { hashPassword } from "../lib/auth";
+import { hashPassword, verifyPassword } from "../lib/auth";
 
 const router: IRouter = Router();
 
@@ -248,6 +250,70 @@ router.post("/license/redeem-invite", async (req, res, next) => {
       user: directoryUser(updated),
       license: await buildLicenseInfo(license, company, computed),
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post("/license/change-password", async (req, res, next) => {
+  try {
+    const parsed = ChangeCloudPasswordBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Invalid input (new password must be at least 8 characters)",
+        code: "invalid_input",
+      });
+      return;
+    }
+    const found = await findLicense(parsed.data.licenseKey);
+    if (!found) {
+      res
+        .status(404)
+        .json({ error: "Unknown license key", code: "unknown_key" });
+      return;
+    }
+    const { company } = found;
+
+    const email = parsed.data.email.trim().toLowerCase();
+    const [user] = await db
+      .select()
+      .from(cloudUsersTable)
+      .where(
+        and(
+          eq(cloudUsersTable.companyId, company.id),
+          eq(cloudUsersTable.email, email),
+        ),
+      );
+    // One generic error for every identity failure so this endpoint never
+    // reveals which accounts exist or whether they have finished setup.
+    if (
+      !user ||
+      !user.active ||
+      !user.passwordHash ||
+      !verifyPassword(parsed.data.currentPassword, user.passwordHash)
+    ) {
+      res.status(401).json({
+        error: "Current password is incorrect",
+        code: "bad_credentials",
+      });
+      return;
+    }
+
+    await db
+      .update(cloudUsersTable)
+      .set({
+        passwordHash: hashPassword(parsed.data.newPassword),
+        updatedAt: new Date(),
+      })
+      .where(eq(cloudUsersTable.id, user.id));
+
+    // Revoke existing website sessions — anyone holding an old session (for
+    // example on a shared computer) must sign in again with the new password.
+    await db
+      .delete(webSessionsTable)
+      .where(eq(webSessionsTable.userId, user.id));
+
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

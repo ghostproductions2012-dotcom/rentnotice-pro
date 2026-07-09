@@ -329,6 +329,24 @@ export const RedeemInviteResponse = zod.object({
 
 
 /**
+ * @summary Change a directory member's own password from the desktop app (verifies the current password)
+ */
+
+export const changeCloudPasswordBodyNewPasswordMin = 8;
+
+
+
+export const ChangeCloudPasswordBody = zod.object({
+  "licenseKey": zod.string().describe('The company license key this device is bound to'),
+  "email": zod.string().describe('Email of the directory member changing their password'),
+  "currentPassword": zod.string().min(1).describe('The member\'s current password (verified before any change)'),
+  "newPassword": zod.string().min(changeCloudPasswordBodyNewPasswordMin).describe('The new password (also used on the customer website)')
+})
+
+export const ChangeCloudPasswordResponse = zod.void()
+
+
+/**
  * @summary Activate a license key from the desktop app
  */
 export const ActivateLicenseBody = zod.object({

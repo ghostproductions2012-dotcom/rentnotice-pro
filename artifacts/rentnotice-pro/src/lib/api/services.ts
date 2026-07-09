@@ -109,6 +109,13 @@ export interface ActivateWorkspaceInput {
   secret: string;
 }
 
+export interface ChangeMyPasswordInput {
+  /** The signed-in user's current password (may be a legacy short numeric secret). */
+  currentPassword: string;
+  /** The new password — minimum 8 characters. */
+  newPassword: string;
+}
+
 export interface RedeemInviteCodeInput {
   /** Single-use invite code from a company admin (INV-XXXX-XXXX). */
   inviteCode: string;
@@ -172,6 +179,12 @@ export interface AppServices {
   lockApp(): Promise<SessionInfo>;
   createUser(input: CreateUserInput): Promise<User>;
   updateUser(id: Id, patch: Partial<Omit<User, "id" | "createdAt">>): Promise<User>;
+  /**
+   * Change the signed-in user's own password. Verifies the current password,
+   * updates the cloud directory first in activated workspaces (requires an
+   * internet connection there), then refreshes the local offline sign-in hash.
+   */
+  changeMyPassword(input: ChangeMyPasswordInput): Promise<User>;
 
   // --- workspace activation ---
   getWorkspaceState(): Promise<WorkspaceState>;

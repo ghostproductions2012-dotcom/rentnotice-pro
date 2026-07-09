@@ -32,6 +32,7 @@ import type {
   AdminSessionInfo,
   AdminUpdateKeyInput,
   AdminUpdateUserInput,
+  ChangeCloudPasswordInput,
   CheckoutCompleteInput,
   CheckoutSession,
   CompanyUser,
@@ -1336,6 +1337,76 @@ export const useRedeemInvite = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getRedeemInviteMutationOptions(options));
+    }
+
+export const getChangeCloudPasswordUrl = () => {
+
+
+
+
+  return `/api/license/change-password`
+}
+
+/**
+ * @summary Change a directory member's own password from the desktop app (verifies the current password)
+ */
+export const changeCloudPassword = async (changeCloudPasswordInput: ChangeCloudPasswordInput, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getChangeCloudPasswordUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(changeCloudPasswordInput)
+  }
+);}
+
+
+
+
+export const getChangeCloudPasswordMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeCloudPassword>>, TError,{data: BodyType<ChangeCloudPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof changeCloudPassword>>, TError,{data: BodyType<ChangeCloudPasswordInput>}, TContext> => {
+
+const mutationKey = ['changeCloudPassword'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof changeCloudPassword>>, {data: BodyType<ChangeCloudPasswordInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  changeCloudPassword(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ChangeCloudPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof changeCloudPassword>>>
+    export type ChangeCloudPasswordMutationBody = BodyType<ChangeCloudPasswordInput>
+    export type ChangeCloudPasswordMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Change a directory member's own password from the desktop app (verifies the current password)
+ */
+export const useChangeCloudPassword = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof changeCloudPassword>>, TError,{data: BodyType<ChangeCloudPasswordInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof changeCloudPassword>>,
+        TError,
+        {data: BodyType<ChangeCloudPasswordInput>},
+        TContext
+      > => {
+      return useMutation(getChangeCloudPasswordMutationOptions(options));
     }
 
 export const getActivateLicenseUrl = () => {

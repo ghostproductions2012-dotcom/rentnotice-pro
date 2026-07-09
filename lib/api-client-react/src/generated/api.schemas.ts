@@ -361,6 +361,23 @@ export interface LicenseVerifyInput {
   deviceId?: string;
 }
 
+export interface ChangeCloudPasswordInput {
+  /** The company license key this device is bound to */
+  licenseKey: string;
+  /** Email of the directory member changing their password */
+  email: string;
+  /**
+     * The member's current password (verified before any change)
+     * @minLength 1
+     */
+  currentPassword: string;
+  /**
+     * The new password (also used on the customer website)
+     * @minLength 8
+     */
+  newPassword: string;
+}
+
 export interface ErrorMessage {
   message: string;
 }

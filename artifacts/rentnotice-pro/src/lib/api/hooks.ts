@@ -15,6 +15,7 @@ import { getServices } from "./services";
 import { type Permission, can } from "./permissions";
 import type {
   ActivateWorkspaceInput,
+  ChangeMyPasswordInput,
   RedeemInviteCodeInput,
   AddAttachmentInput,
   ClassificationOverrideInput,
@@ -210,6 +211,14 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (input: CreateUserInput) => getServices().createUser(input),
     onSuccess: () => invalidate(qc, ["users", "audit"]),
+  });
+}
+
+export function useChangeMyPassword() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ChangeMyPasswordInput) => getServices().changeMyPassword(input),
+    onSuccess: () => invalidate(qc, ["users", "session", "audit"]),
   });
 }
 
