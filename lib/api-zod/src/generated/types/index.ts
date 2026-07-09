@@ -38,6 +38,7 @@ export * from './companyUserUpdate';
 export * from './companyUserUpdateRole';
 export * from './directoryUser';
 export * from './directoryUserRole';
+export * from './downloadInfo';
 export * from './errorMessage';
 export * from './errorResponse';
 export * from './fieldAssignmentSync';

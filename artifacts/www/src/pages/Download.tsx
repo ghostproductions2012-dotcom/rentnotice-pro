@@ -1,25 +1,54 @@
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useGetLatestDownloads, getGetLatestDownloadsQueryKey } from "@workspace/api-client-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Monitor, Apple, Download as DownloadIcon, ShieldAlert, ExternalLink } from "lucide-react";
-import {
-  fetchLatestRelease,
-  resolveDownloadLinks,
-  RELEASES_LATEST_URL,
-  type DownloadLinks,
-} from "@/lib/releases";
+import { Monitor, Apple, Download as DownloadIcon, ShieldAlert, AlertCircle } from "lucide-react";
+
+interface DownloadButtonProps {
+  href: string | null | undefined;
+  label: string;
+  loadingLabel?: string;
+  isLoading: boolean;
+  variant?: "default" | "outline";
+  testId: string;
+}
+
+function DownloadButton({ href, label, isLoading, variant = "default", testId }: DownloadButtonProps) {
+  if (isLoading) {
+    return (
+      <Button size="lg" variant={variant} className="w-full" disabled data-testid={testId}>
+        <DownloadIcon className="w-4 h-4 mr-2" />
+        Loading…
+      </Button>
+    );
+  }
+  if (!href) {
+    return (
+      <Button size="lg" variant={variant} className="w-full" disabled data-testid={testId}>
+        <DownloadIcon className="w-4 h-4 mr-2" />
+        Temporarily unavailable
+      </Button>
+    );
+  }
+  return (
+    <Button asChild size="lg" variant={variant} className="w-full">
+      <a href={href} data-testid={testId}>
+        <DownloadIcon className="w-4 h-4 mr-2" />
+        {label}
+      </a>
+    </Button>
+  );
+}
 
 export default function Download() {
-  const { data, isLoading } = useQuery({
-    queryKey: ["latest-release"],
-    queryFn: fetchLatestRelease,
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
+  const { data: links, isLoading, isError } = useGetLatestDownloads({
+    query: {
+      queryKey: getGetLatestDownloadsQueryKey(),
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
   });
-
-  const links: DownloadLinks | null = data ? resolveDownloadLinks(data) : null;
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
@@ -42,9 +71,22 @@ export default function Download() {
               <Link href="/portal" className="text-primary underline underline-offset-4">customer portal</Link>.
             </p>
             {links?.version && (
-              <p className="text-sm text-muted-foreground mt-3">Latest version: <span className="font-semibold">{links.version}</span></p>
+              <p className="text-sm text-muted-foreground mt-3" data-testid="text-latest-version">
+                Latest version: <span className="font-semibold">{links.version}</span>
+              </p>
             )}
           </div>
+
+          {isError && (
+            <Alert className="mb-8" data-testid="alert-downloads-unavailable">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Downloads temporarily unavailable</AlertTitle>
+              <AlertDescription>
+                We couldn't load the latest installers right now. Please check back in a few
+                minutes — no action is needed on your part.
+              </AlertDescription>
+            </Alert>
+          )}
 
           <div className="grid md:grid-cols-2 gap-8">
             {/* Windows */}
@@ -65,12 +107,12 @@ export default function Download() {
                 </p>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
-                <Button asChild size="lg" className="w-full" disabled={isLoading}>
-                  <a href={links?.windowsExe ?? RELEASES_LATEST_URL} data-testid="button-download-windows">
-                    <DownloadIcon className="w-4 h-4 mr-2" />
-                    {isLoading ? "Loading…" : "Download for Windows (.exe)"}
-                  </a>
-                </Button>
+                <DownloadButton
+                  href={links?.windowsExe}
+                  label="Download for Windows (.exe)"
+                  isLoading={isLoading}
+                  testId="button-download-windows"
+                />
                 {links?.windowsMsi && (
                   <a href={links.windowsMsi} className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4" data-testid="link-download-msi">
                     Prefer an MSI package? Download the .msi
@@ -97,18 +139,19 @@ export default function Download() {
                 </p>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
-                <Button asChild size="lg" className="w-full" disabled={isLoading}>
-                  <a href={links?.macAppleSilicon ?? RELEASES_LATEST_URL} data-testid="button-download-mac-arm">
-                    <DownloadIcon className="w-4 h-4 mr-2" />
-                    {isLoading ? "Loading…" : "Download for Apple Silicon (M1–M4)"}
-                  </a>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="w-full" disabled={isLoading}>
-                  <a href={links?.macIntel ?? RELEASES_LATEST_URL} data-testid="button-download-mac-intel">
-                    <DownloadIcon className="w-4 h-4 mr-2" />
-                    {isLoading ? "Loading…" : "Download for Intel Mac"}
-                  </a>
-                </Button>
+                <DownloadButton
+                  href={links?.macAppleSilicon}
+                  label="Download for Apple Silicon (M1–M4)"
+                  isLoading={isLoading}
+                  testId="button-download-mac-arm"
+                />
+                <DownloadButton
+                  href={links?.macIntel}
+                  label="Download for Intel Mac"
+                  isLoading={isLoading}
+                  variant="outline"
+                  testId="button-download-mac-intel"
+                />
               </CardFooter>
             </Card>
           </div>
@@ -118,21 +161,10 @@ export default function Download() {
             <AlertTitle>Why the security warnings?</AlertTitle>
             <AlertDescription>
               RentNotice Pro installers are not yet code-signed, so Windows and macOS show a one-time
-              caution message for software from new publishers. The download always comes directly from our
-              official GitHub releases page, and the steps above let you proceed safely.
+              caution message for software from new publishers. The download always comes directly from
+              our official release servers, and the steps above let you proceed safely.
             </AlertDescription>
           </Alert>
-
-          <div className="text-center mt-10">
-            <a
-              href={RELEASES_LATEST_URL}
-              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground underline underline-offset-4"
-              data-testid="link-all-releases"
-            >
-              <ExternalLink className="w-4 h-4" />
-              View all releases and release notes on GitHub
-            </a>
-          </div>
         </div>
       </main>
     </div>

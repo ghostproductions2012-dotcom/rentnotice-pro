@@ -15,6 +15,31 @@ export interface ErrorResponse {
   code?: string;
 }
 
+export interface DownloadInfo {
+  /** Release tag of the latest desktop build (e.g. v1.0.0) */
+  version: string;
+  /**
+     * Proxy download URL for the Windows NSIS installer
+     * @nullable
+     */
+  windowsExe: string | null;
+  /**
+     * Proxy download URL for the Windows MSI package
+     * @nullable
+     */
+  windowsMsi: string | null;
+  /**
+     * Proxy download URL for the Apple Silicon .dmg
+     * @nullable
+     */
+  macAppleSilicon: string | null;
+  /**
+     * Proxy download URL for the Intel Mac .dmg
+     * @nullable
+     */
+  macIntel: string | null;
+}
+
 export interface Plan {
   /** Stable tier key (starter, professional, enterprise) */
   tier: string;

@@ -36,6 +36,7 @@ import type {
   CheckoutSession,
   CompanyUser,
   CompanyUserUpdate,
+  DownloadInfo,
   ErrorMessage,
   ErrorResponse,
   FieldAssignmentSync,
@@ -231,6 +232,161 @@ export function useListPlans<TData = Awaited<ReturnType<typeof listPlans>>, TErr
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getListPlansQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetLatestDownloadsUrl = () => {
+
+
+
+
+  return `/api/www/downloads/latest`
+}
+
+/**
+ * @summary Latest desktop release version and proxied download URLs (public)
+ */
+export const getLatestDownloads = async ( options?: RequestInit): Promise<DownloadInfo> => {
+
+  return customFetch<DownloadInfo>(getGetLatestDownloadsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetLatestDownloadsQueryKey = () => {
+    return [
+    `/api/www/downloads/latest`
+    ] as const;
+    }
+
+
+export const getGetLatestDownloadsQueryOptions = <TData = Awaited<ReturnType<typeof getLatestDownloads>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLatestDownloads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetLatestDownloadsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getLatestDownloads>>> = ({ signal }) => getLatestDownloads({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getLatestDownloads>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetLatestDownloadsQueryResult = NonNullable<Awaited<ReturnType<typeof getLatestDownloads>>>
+export type GetLatestDownloadsQueryError = ErrorType<ErrorResponse>
+
+
+/**
+ * @summary Latest desktop release version and proxied download URLs (public)
+ */
+
+export function useGetLatestDownloads<TData = Awaited<ReturnType<typeof getLatestDownloads>>, TError = ErrorType<ErrorResponse>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getLatestDownloads>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetLatestDownloadsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getDownloadAssetUrl = (assetId: number,) => {
+
+
+
+
+  return `/api/www/downloads/assets/${assetId}`
+}
+
+/**
+ * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to the latest release are served.
+ * @summary Download an installer asset from the latest release (public)
+ */
+export const downloadAsset = async (assetId: number, options?: RequestInit): Promise<unknown> => {
+
+  return customFetch<unknown>(getDownloadAssetUrl(assetId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getDownloadAssetQueryKey = (assetId: number,) => {
+    return [
+    `/api/www/downloads/assets/${assetId}`
+    ] as const;
+    }
+
+
+export const getDownloadAssetQueryOptions = <TData = Awaited<ReturnType<typeof downloadAsset>>, TError = ErrorType<void | ErrorResponse>>(assetId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadAsset>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getDownloadAssetQueryKey(assetId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof downloadAsset>>> = ({ signal }) => downloadAsset(assetId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: assetId !== null && assetId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof downloadAsset>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type DownloadAssetQueryResult = NonNullable<Awaited<ReturnType<typeof downloadAsset>>>
+export type DownloadAssetQueryError = ErrorType<void | ErrorResponse>
+
+
+/**
+ * @summary Download an installer asset from the latest release (public)
+ */
+
+export function useDownloadAsset<TData = Awaited<ReturnType<typeof downloadAsset>>, TError = ErrorType<void | ErrorResponse>>(
+ assetId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof downloadAsset>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getDownloadAssetQueryOptions(assetId,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -11,6 +11,8 @@ tags:
     description: Health operations
   - name: plans
     description: Public pricing plans
+  - name: downloads
+    description: Desktop installer downloads (proxied through the API server)
   - name: auth
     description: Website account authentication
   - name: checkout
@@ -53,6 +55,55 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Plan'
+  /www/downloads/latest:
+    get:
+      operationId: getLatestDownloads
+      tags:
+        - downloads
+      summary: Latest desktop release version and proxied download URLs (public)
+      responses:
+        '200':
+          description: Latest release with per-platform proxy download URLs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadInfo'
+        '503':
+          description: Release lookup failed (downloads temporarily unavailable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/downloads/assets/{assetId}':
+    get:
+      operationId: downloadAsset
+      tags:
+        - downloads
+      summary: Download an installer asset from the latest release (public)
+      description: >-
+        Redirects to a short-lived signed URL for the requested release asset.
+        Only assets belonging to the latest release are served.
+      parameters:
+        - name: assetId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '302':
+          description: Redirect to the signed installer download URL
+        '404':
+          description: Asset does not belong to the latest release
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Downloads temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /www/checkout/session:
     post:
       operationId: startCheckout
@@ -886,6 +937,38 @@ components:
         code:
           type: string
           description: Machine-readable error code
+    DownloadInfo:
+      type: object
+      required:
+        - version
+        - windowsExe
+        - windowsMsi
+        - macAppleSilicon
+        - macIntel
+      properties:
+        version:
+          type: string
+          description: Release tag of the latest desktop build (e.g. v1.0.0)
+        windowsExe:
+          type:
+            - string
+            - 'null'
+          description: Proxy download URL for the Windows NSIS installer
+        windowsMsi:
+          type:
+            - string
+            - 'null'
+          description: Proxy download URL for the Windows MSI package
+        macAppleSilicon:
+          type:
+            - string
+            - 'null'
+          description: Proxy download URL for the Apple Silicon .dmg
+        macIntel:
+          type:
+            - string
+            - 'null'
+          description: Proxy download URL for the Intel Mac .dmg
     Plan:
       type: object
       required:

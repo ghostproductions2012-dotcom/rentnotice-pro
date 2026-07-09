@@ -35,6 +35,29 @@ export const ListPlansResponse = zod.array(ListPlansResponseItem)
 
 
 /**
+ * @summary Latest desktop release version and proxied download URLs (public)
+ */
+export const GetLatestDownloadsResponse = zod.object({
+  "version": zod.string().describe('Release tag of the latest desktop build (e.g. v1.0.0)'),
+  "windowsExe": zod.string().nullable().describe('Proxy download URL for the Windows NSIS installer'),
+  "windowsMsi": zod.string().nullable().describe('Proxy download URL for the Windows MSI package'),
+  "macAppleSilicon": zod.string().nullable().describe('Proxy download URL for the Apple Silicon .dmg'),
+  "macIntel": zod.string().nullable().describe('Proxy download URL for the Intel Mac .dmg')
+})
+
+
+/**
+ * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to the latest release are served.
+ * @summary Download an installer asset from the latest release (public)
+ */
+export const DownloadAssetParams = zod.object({
+  "assetId": zod.coerce.number()
+})
+
+export const DownloadAssetResponse = zod.void()
+
+
+/**
  * @summary Start signup + Stripe checkout for a plan
  */
 
