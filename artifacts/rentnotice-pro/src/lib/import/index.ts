@@ -19,7 +19,13 @@ import { tableToRecords } from "./normalize";
 
 export * from "./types";
 export { parseMoneyToCents, looksLikeMoney } from "./money";
-export { parseDateToIso, parseMonthToIso } from "./dates";
+export {
+  looksLikeExcelSerialDate,
+  parseDateToIso,
+  parseExcelSerialStringToIso,
+  parseMonthToIso,
+  shouldInterpretExcelSerialDates,
+} from "./dates";
 export { dedupeHeaders, buildTable, matrixToRawTable } from "./tableUtils";
 export { parseCsvText, parseCsvFile } from "./parseCsv";
 export { parseExcelFile } from "./parseExcel";

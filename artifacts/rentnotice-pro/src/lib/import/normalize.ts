@@ -9,7 +9,13 @@
 
 import type { ColumnMapping } from "../types";
 import type { NormalizedTransaction, NormalizeResult, RawTable } from "./types";
-import { parseDateToIso, parseMonthToIso } from "./dates";
+import {
+  looksLikeExcelSerialDate,
+  parseDateToIso,
+  parseExcelSerialStringToIso,
+  parseMonthToIso,
+  shouldInterpretExcelSerialDates,
+} from "./dates";
 import { parseMoneyToCents } from "./money";
 
 /** Convert a RawTable into header-keyed records (the ParsedLedgerFile row shape). */
@@ -49,11 +55,33 @@ export function normalizeRecords(
   let skippedNoDate = 0;
   let skippedNoAmount = 0;
 
+  // Pre-scan the mapped date column. Excel date cells stored as raw serial
+  // numbers *without* a date format arrive here as bare strings like "46204".
+  // If the column's unparseable values are mostly such serials (and they make
+  // up a meaningful share of the column), interpret them as Excel dates
+  // instead of silently skipping those rows.
+  const interpretSerialDates = shouldInterpretExcelSerialDates(
+    records.filter((r) => !isRowEmpty(r)).map((r) => pick(r, mapping.date)),
+  );
+  let serialInterpretedCount = 0;
+  let serialSkippedCount = 0;
+  let serialExample: string | null = null;
+
   records.forEach((record, index) => {
     if (isRowEmpty(record)) return;
 
     const rowWarnings: string[] = [];
-    const dateIso = parseDateToIso(pick(record, mapping.date));
+    const rawDate = pick(record, mapping.date);
+    let dateIso = parseDateToIso(rawDate);
+    if (!dateIso && looksLikeExcelSerialDate(rawDate)) {
+      serialExample = serialExample ?? rawDate.trim();
+      if (interpretSerialDates) {
+        dateIso = parseExcelSerialStringToIso(rawDate);
+        if (dateIso) serialInterpretedCount += 1;
+      } else {
+        serialSkippedCount += 1;
+      }
+    }
     if (!dateIso) {
       skippedNoDate += 1;
       return;
@@ -101,6 +129,16 @@ export function normalizeRecords(
     });
   });
 
+  if (serialInterpretedCount > 0) {
+    warnings.push(
+      `Date column "${mapping.date}": ${serialInterpretedCount} value(s) were unformatted Excel serial date numbers (e.g. "${serialExample}") and were interpreted as dates. Verify the imported dates look correct.`,
+    );
+  }
+  if (serialSkippedCount > 0) {
+    warnings.push(
+      `Date column "${mapping.date}": ${serialSkippedCount} skipped value(s) look like Excel serial date numbers (e.g. "${serialExample}"). If these are dates, apply a date format to that column in Excel and re-import, or check that the right column is mapped as the date.`,
+    );
+  }
   if (skippedNoDate > 0) {
     warnings.push(`${skippedNoDate} row(s) skipped: no recognizable date.`);
   }

@@ -146,6 +146,86 @@ describe("Excel serial-number dates", () => {
     expect(result.rows[0]!.date).toBe("2026-07-01");
     expect(result.rows[1]!.date).toBe("2026-08-01");
   });
+
+  it("interprets unformatted serial-date cells (no date format) instead of skipping rows", async () => {
+    // Hand-edited workbooks can hold dates as raw serial numbers with NO date
+    // format; the pipeline then sees plain strings like "46204".
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ["Date", "Description", "Amount"],
+      [0, "Rent charge July", 2000],
+      [0, "Online payment", -1500],
+      [0, "Rent charge August", 2000],
+    ]);
+    sheet["A2"] = { t: "n", v: 46204 }; // 2026-07-01, no z format
+    sheet["A3"] = { t: "n", v: 46213 }; // 2026-07-10
+    sheet["A4"] = { t: "n", v: 46235 }; // 2026-08-01
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Ledger");
+    const out = XLSX.write(workbook, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
+
+    const table = await parseExcelFile(new Blob([out]));
+    // Sanity: unformatted serials arrive as bare number strings.
+    expect(table.rows[0]![0]).toBe("46204");
+
+    const { mapping } = suggestMapping(table);
+    const result = normalizeRows(table, mapping);
+    // No rows silently dropped.
+    expect(result.rows).toHaveLength(3);
+    expect(result.rows.map((r) => r.date)).toEqual([
+      "2026-07-01",
+      "2026-07-10",
+      "2026-08-01",
+    ]);
+    // A specific warning names the date column so the user can verify.
+    const warning = result.warnings.find((w) => w.includes('Date column "Date"'));
+    expect(warning).toBeDefined();
+    expect(warning).toContain("Excel serial date numbers");
+    expect(warning).toContain("interpreted as dates");
+    // The generic "no recognizable date" warning must NOT appear.
+    expect(result.warnings.some((w) => w.includes("no recognizable date"))).toBe(false);
+  });
+
+  it("warns (but does not reinterpret) when only a minority of date values look like serials", async () => {
+    const table = await parseExcelFile(
+      makeXlsxBlob([
+        ["Date", "Description", "Amount"],
+        ["07/01/2026", "Rent", 2000],
+        ["07/03/2026", "Payment", -2000],
+        ["46235", "Hand-edited row", 100],
+        ["08/02/2026", "Late fee", 50],
+      ]),
+    );
+    const { mapping } = suggestMapping(table);
+    const result = normalizeRows(table, mapping);
+    // The serial-looking row is still skipped (too risky to guess)...
+    expect(result.rows).toHaveLength(3);
+    // ...but the warning is specific and names the column instead of only the
+    // generic skip count.
+    const warning = result.warnings.find((w) => w.includes('Date column "Date"'));
+    expect(warning).toBeDefined();
+    expect(warning).toContain('"46235"');
+    expect(warning).toContain("apply a date format");
+    expect(result.warnings.some((w) => w.includes("1 row(s) skipped: no recognizable date"))).toBe(
+      true,
+    );
+  });
+
+  it("does not treat 5-digit IDs as dates when the column is not serial-like", async () => {
+    // A wrongly-mapped column full of small integers must not become dates.
+    const table = await parseExcelFile(
+      makeXlsxBlob([
+        ["Date", "Description", "Amount"],
+        ["10001", "Ref A", 100],
+        ["10002", "Ref B", 200],
+      ]),
+    );
+    const { mapping } = suggestMapping(table);
+    const result = normalizeRows(table, mapping);
+    // 10001/10002 are outside the plausible serial-date window -> skipped.
+    expect(result.rows).toHaveLength(0);
+    expect(result.warnings.some((w) => w.includes("no recognizable date"))).toBe(true);
+    expect(result.warnings.some((w) => w.includes("interpreted as dates"))).toBe(false);
+  });
 });
 
 describe("single signed-amount column mode", () => {

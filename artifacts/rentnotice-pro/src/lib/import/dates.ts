@@ -108,7 +108,10 @@ export function parseDateToIso(raw: string | number | null | undefined): string 
   if (m) return buildIso(+m[1], +m[2], +m[3]);
 
   // Fallback: native Date, but only trust it if a 4-digit year is present.
-  if (/\d{4}/.test(s)) {
+  // Bare digit strings (e.g. "46204", "2026") are excluded: native Date would
+  // read them as a year, yielding nonsense like "46204-01-01". The valid
+  // all-digit form (YYYYMMDD) is already handled above.
+  if (/\d{4}/.test(s) && !/^\d+$/.test(s)) {
     const d = new Date(s);
     if (!Number.isNaN(d.getTime())) {
       return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -116,6 +119,49 @@ export function parseDateToIso(raw: string | number | null | undefined): string 
   }
 
   return null;
+}
+
+// Plausible range for Excel serial dates that show up as bare 5-digit strings
+// in unformatted cells: 20000 ≈ 1954-10-03, 60000 ≈ 2064-04-08. Ledger dates
+// outside this window are far more likely to be IDs or amounts than dates.
+const EXCEL_SERIAL_MIN = 20000;
+const EXCEL_SERIAL_MAX = 60000;
+
+/**
+ * True when a string cell value looks like an unformatted Excel serial date
+ * (a bare 5-digit number in a plausible date range, e.g. "46204" = 2026-07-01).
+ */
+export function looksLikeExcelSerialDate(raw: string): boolean {
+  const s = String(raw).trim();
+  if (!/^\d{5}(?:\.\d+)?$/.test(s)) return false;
+  const n = Number(s);
+  return n >= EXCEL_SERIAL_MIN && n <= EXCEL_SERIAL_MAX;
+}
+
+/** Parse a serial-looking string ("46204") as an Excel serial date. */
+export function parseExcelSerialStringToIso(raw: string): string | null {
+  if (!looksLikeExcelSerialDate(raw)) return null;
+  return parseDateToIso(Number(String(raw).trim()));
+}
+
+/**
+ * Column-level heuristic: given the non-empty values of a mapped date column,
+ * decide whether unparseable values should be interpreted as unformatted
+ * Excel serial dates. True only when serial-looking values dominate both the
+ * unparseable values (>= 80%) and the column overall (>= 50%), so stray IDs
+ * in an otherwise-normal date column are never reinterpreted.
+ */
+export function shouldInterpretExcelSerialDates(values: string[]): boolean {
+  const nonEmpty = values.map((v) => v.trim()).filter((v) => v.length > 0);
+  if (nonEmpty.length === 0) return false;
+  const unparseable = nonEmpty.filter((v) => parseDateToIso(v) === null);
+  if (unparseable.length === 0) return false;
+  const serialLike = unparseable.filter(looksLikeExcelSerialDate);
+  return (
+    serialLike.length > 0 &&
+    serialLike.length / unparseable.length >= 0.8 &&
+    serialLike.length / nonEmpty.length >= 0.5
+  );
 }
 
 /**

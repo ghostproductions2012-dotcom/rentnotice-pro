@@ -14,3 +14,4 @@
 - [GitHub Actions CI gotchas](github-actions-desktop-ci.md) — connector token can't push workflows (need PAT); pin packageManager; platform-binary exclusions break mac/win runners; empty APPLE_CERTIFICATE env kills Tauri mac builds.
 - [Express behind Replit proxy](express-proxy-rate-limits.md) — per-IP logic needs `trust proxy` or all clients share one rate-limit bucket.
 - [License revocation semantics](license-revocation-semantics.md) — revoked keys present as "cancelled" to desktop; every key-selection query must exclude revoked.
+- [Ledger import dual paths](ledger-import-dual-paths.md) — preview and final import parse rows separately; any date/amount parsing change must land in both or they disagree.

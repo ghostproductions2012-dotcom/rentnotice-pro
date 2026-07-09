@@ -2,7 +2,7 @@ import type { ColumnMapping } from "../types";
 import type { AmountMode, ColumnAnalysis, LedgerField, MappingSuggestion, RawTable } from "./types";
 import { EMPTY_MAPPING, MAPPING_FIELDS } from "./types";
 import { looksLikeMoney, parseMoneyToCents } from "./money";
-import { parseDateToIso, parseMonthToIso } from "./dates";
+import { looksLikeExcelSerialDate, parseDateToIso, parseMonthToIso } from "./dates";
 
 // Header keyword hints per logical field. Multi-word hints are matched as
 // substrings; single words are matched as whole tokens (with a weaker
@@ -74,6 +74,8 @@ interface ColumnStat {
   header: string;
   sampleCount: number;
   dateFrac: number;
+  /** Fraction of samples that look like unformatted Excel serial dates ("46204"). */
+  serialDateFrac: number;
   moneyFrac: number;
   monthFrac: number;
   negFrac: number;
@@ -119,6 +121,7 @@ function computeStat(header: string, index: number, rows: string[][]): ColumnSta
   }
   const denom = samples.length || 1;
   let dates = 0;
+  let serialDates = 0;
   let money = 0;
   let months = 0;
   let negatives = 0;
@@ -128,6 +131,7 @@ function computeStat(header: string, index: number, rows: string[][]): ColumnSta
     const isMoney = looksLikeMoney(value);
     const isMonth = !isDate && parseMonthToIso(value) !== null;
     if (isDate) dates++;
+    if (!isDate && looksLikeExcelSerialDate(value)) serialDates++;
     if (isMoney) {
       money++;
       const cents = parseMoneyToCents(value);
@@ -141,6 +145,7 @@ function computeStat(header: string, index: number, rows: string[][]): ColumnSta
     header,
     sampleCount: samples.length,
     dateFrac: dates / denom,
+    serialDateFrac: serialDates / denom,
     moneyFrac: money / denom,
     monthFrac: months / denom,
     negFrac: money ? negatives / money : 0,
@@ -191,6 +196,10 @@ function pairScore(field: LedgerField, st: ColumnStat): number {
 
   if (hs > 0) {
     // Header claims a typed field but the data contradicts it: heavily damp.
+    // A date-hinted header whose cells are unformatted Excel serial numbers
+    // ("46204") still deserves the date mapping — normalize handles the
+    // serial interpretation and warns the user.
+    if (field === "date" && st.serialDateFrac >= 0.6) return hs;
     if (isMoney && st.sampleCount > 0 && st.moneyFrac < 0.3) return hs * 0.45;
     if (field === "date" && st.sampleCount > 0 && st.dateFrac < 0.3) return hs * 0.45;
     if (field === "month" && st.sampleCount > 0 && st.monthFrac < 0.3 && st.dateFrac < 0.3) return hs * 0.5;

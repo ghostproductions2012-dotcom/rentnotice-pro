@@ -8,6 +8,7 @@ import {
   useTenants,
 } from "@/lib/api/hooks";
 import type { ColumnMapping, Ledger, ParsedLedgerFile, PmVendor } from "@/lib/types";
+import { normalizeRecords } from "@/lib/import";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -91,6 +92,13 @@ export default function ImportWizard() {
   const { can } = usePermissions();
 
   const activeTenants = useMemo(() => (tenants ?? []).filter((t) => !t.archived), [tenants]);
+
+  // Dry-run the normalization pipeline against the current mapping so
+  // row-level problems (e.g. unreadable date cells) are visible before import.
+  const normalizeWarnings = useMemo(() => {
+    if (!parsed || !mapping) return [];
+    return normalizeRecords(parsed.rows, mapping).warnings;
+  }, [parsed, mapping]);
 
   const handleFile = (file: File | undefined | null) => {
     if (!file) return;
@@ -229,7 +237,7 @@ export default function ImportWizard() {
 
       {step === "mapping" && parsed && mapping && (
         <div className="space-y-6">
-          {(parsed.warnings.length > 0 || parsed.ocrUsed) && (
+          {(parsed.warnings.length > 0 || normalizeWarnings.length > 0 || parsed.ocrUsed) && (
             <Card className="border-accent/40 bg-accent/5">
               <CardContent className="p-4 space-y-1">
                 {parsed.ocrUsed && (
@@ -240,6 +248,12 @@ export default function ImportWizard() {
                 )}
                 {parsed.warnings.map((w, i) => (
                   <p key={i} className="text-sm flex gap-2">
+                    <AlertTriangle className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+                    {w}
+                  </p>
+                ))}
+                {normalizeWarnings.map((w, i) => (
+                  <p key={`n-${i}`} className="text-sm flex gap-2" data-testid={`text-normalize-warning-${i}`}>
                     <AlertTriangle className="w-4 h-4 text-accent shrink-0 mt-0.5" />
                     {w}
                   </p>

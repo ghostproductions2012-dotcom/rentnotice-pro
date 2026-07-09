@@ -98,7 +98,15 @@ import {
 } from "../licensing";
 import type { DirectoryUser, LicenseSummary } from "../licensing/types";
 import { evaluateLicenseGate, type LicenseGate } from "../licensing/gate";
-import { parseDateToIso, parseFile, parseMoneyToCents, toParsedLedgerFile } from "../import";
+import {
+  looksLikeExcelSerialDate,
+  parseDateToIso,
+  parseExcelSerialStringToIso,
+  parseFile,
+  parseMoneyToCents,
+  shouldInterpretExcelSerialDates,
+  toParsedLedgerFile,
+} from "../import";
 import {
   STATE_RULES,
   addDays,
@@ -961,8 +969,18 @@ function createServices(): AppServices {
           pushTxn(mt.date, mt.description, mt.category, mt.memo ?? "", mt.amountCents, i + 1, null),
         );
       } else if (m) {
+        // Match normalizeRecords: a date column full of unformatted Excel
+        // serial numbers ("46204") is interpreted as serial dates so the
+        // final import keeps the same rows the mapping preview showed.
+        const interpretSerialDates = shouldInterpretExcelSerialDates(
+          input.rows.map((row) => (m.date ? row[m.date] ?? "" : "")),
+        );
         input.rows.forEach((row, i) => {
-          const date = parseDateToIso(m.date ? row[m.date] ?? "" : "");
+          const rawDate = m.date ? row[m.date] ?? "" : "";
+          let date = parseDateToIso(rawDate);
+          if (!date && interpretSerialDates && looksLikeExcelSerialDate(rawDate)) {
+            date = parseExcelSerialStringToIso(rawDate);
+          }
           if (!date) return;
           const description = (m.description ? row[m.description] : "") ?? "";
           const category = (m.category ? row[m.category] : "") ?? "";
