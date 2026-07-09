@@ -265,12 +265,22 @@ router.post(
         .returning();
       if (!invited) throw new Error("Failed to create invited user");
 
+      // Download link is best-effort: a missing REPLIT_DOMAINS must not
+      // block invite creation (the email still carries the invite code).
+      let downloadUrl: string | undefined;
+      try {
+        downloadUrl = `${getPublicBaseUrl()}/download`;
+      } catch {
+        downloadUrl = undefined;
+      }
+
       const emailSent = await sendInviteEmail({
         to: email,
         companyName: company.name,
         role,
         invitedByName: admin.name || admin.email,
         inviteCode,
+        downloadUrl,
       });
 
       res.status(201).json({

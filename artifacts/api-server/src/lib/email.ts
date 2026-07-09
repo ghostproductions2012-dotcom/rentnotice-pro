@@ -145,6 +145,8 @@ export interface InviteEmailInput {
   role: string;
   invitedByName: string;
   inviteCode: string;
+  /** Public URL of the website's download page; omitted if unresolvable. */
+  downloadUrl?: string;
 }
 
 /**
@@ -156,6 +158,19 @@ export async function sendInviteEmail(
   input: InviteEmailInput,
 ): Promise<boolean> {
   const subject = `You've been invited to join ${input.companyName} on RentNotice Pro`;
+  const downloadHtml = input.downloadUrl
+    ? `
+    <p style="text-align:center;margin:0 0 24px;">
+      <a href="${escapeHtml(input.downloadUrl)}"
+         style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;">
+        Download RentNotice Pro
+      </a>
+    </p>
+    <p style="margin:0 0 24px;color:#71717a;font-size:13px;line-height:1.6;text-align:center;">
+      Don't have the desktop app yet? Download it free, then use your invite
+      code to sign in.
+    </p>`
+    : "";
   const bodyHtml = `
     <p style="margin:0 0 12px;line-height:1.6;">
       ${escapeHtml(input.invitedByName)} has invited you to join
@@ -168,18 +183,21 @@ export async function sendInviteEmail(
         ${escapeHtml(input.inviteCode)}
       </code>
     </p>
-    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;">
+    <p style="margin:0 0 24px;color:#71717a;font-size:13px;line-height:1.6;">
       Open the RentNotice Pro desktop app, choose
       <strong>"I have an invite code"</strong>, and enter this code to set up
       your account. The code can only be used once and expires in 14 days.
-    </p>`;
+    </p>${downloadHtml}`;
+  const downloadText = input.downloadUrl
+    ? `\n\nDon't have the desktop app yet? Download RentNotice Pro:\n${input.downloadUrl}`
+    : "";
   const text =
     `${input.invitedByName} has invited you to join ${input.companyName} ` +
     `on RentNotice Pro as ${input.role}.\n\n` +
     `Your invite code:\n${input.inviteCode}\n\n` +
     `Open the RentNotice Pro desktop app, choose "I have an invite code", ` +
     `and enter this code to set up your account. The code can only be used ` +
-    `once and expires in 14 days.`;
+    `once and expires in 14 days.${downloadText}`;
 
   try {
     await sendEmail({
