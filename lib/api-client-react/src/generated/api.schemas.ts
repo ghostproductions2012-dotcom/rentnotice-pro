@@ -449,6 +449,221 @@ export interface AddFieldEvidenceRequest {
   note?: string;
 }
 
+export interface AdminLoginInput {
+  email: string;
+  password: string;
+}
+
+export interface AdminSessionInfo {
+  /** The platform admin email configured for the panel */
+  email: string;
+}
+
+export interface AdminTierBreakdown {
+  tier: string;
+  tierName: string;
+  companies: number;
+}
+
+export interface AdminMetrics {
+  totalCompanies: number;
+  /** Companies whose effective license status is active */
+  activeSubscriptions: number;
+  /** Sum of monthly prices across active subscriptions */
+  mrrCents: number;
+  totalUsers: number;
+  activeUsers: number;
+  totalLicenseKeys: number;
+  /** Keys that have been activated on at least one device */
+  activatedLicenseKeys: number;
+  /** Signups that never completed checkout */
+  pendingSignups: number;
+  byTier: AdminTierBreakdown[];
+}
+
+/**
+ * Effective license status derived from the subscription
+ */
+export type AdminCompanySummaryLicenseStatus = typeof AdminCompanySummaryLicenseStatus[keyof typeof AdminCompanySummaryLicenseStatus];
+
+
+export const AdminCompanySummaryLicenseStatus = {
+  active: 'active',
+  paused: 'paused',
+  cancelled: 'cancelled',
+} as const;
+
+export interface AdminCompanySummary {
+  id: string;
+  name: string;
+  contactEmail: string;
+  tier: string;
+  tierName: string;
+  seats: number;
+  seatsUsed: number;
+  /** Effective license status derived from the subscription */
+  licenseStatus: AdminCompanySummaryLicenseStatus;
+  /** Raw Stripe subscription status (active, past_due, unknown, ...) */
+  subscriptionStatus: string;
+  /** Number of non-revoked license keys */
+  keyCount: number;
+  /** @nullable */
+  priceMonthlyCents?: number | null;
+  createdAt: string;
+}
+
+export interface AdminLicenseKey {
+  id: string;
+  key: string;
+  /** Stored key status (active, paused, cancelled, revoked) */
+  status: string;
+  /** @nullable */
+  activatedAt?: string | null;
+  /** @nullable */
+  lastVerifiedAt?: string | null;
+  /** @nullable */
+  deviceId?: string | null;
+  /** @nullable */
+  deviceName?: string | null;
+  createdAt: string;
+}
+
+export type AdminCompanyUserRole = typeof AdminCompanyUserRole[keyof typeof AdminCompanyUserRole];
+
+
+export const AdminCompanyUserRole = {
+  admin: 'admin',
+  manager: 'manager',
+  staff: 'staff',
+  readonly: 'readonly',
+} as const;
+
+export type AdminCompanyUserStatus = typeof AdminCompanyUserStatus[keyof typeof AdminCompanyUserStatus];
+
+
+export const AdminCompanyUserStatus = {
+  active: 'active',
+  invited: 'invited',
+  deactivated: 'deactivated',
+} as const;
+
+export interface AdminCompanyUser {
+  id: string;
+  email: string;
+  name: string;
+  /** @nullable */
+  username?: string | null;
+  role: AdminCompanyUserRole;
+  active: boolean;
+  isMasterAdmin: boolean;
+  status: AdminCompanyUserStatus;
+  /**
+     * Present only while the invite is still pending
+     * @nullable
+     */
+  inviteCode?: string | null;
+  /** @nullable */
+  inviteCodeExpiresAt?: string | null;
+  /** @nullable */
+  createdAt?: string | null;
+}
+
+export type AdminAuditCheckStatus = typeof AdminAuditCheckStatus[keyof typeof AdminAuditCheckStatus];
+
+
+export const AdminAuditCheckStatus = {
+  pass: 'pass',
+  warn: 'warn',
+  info: 'info',
+} as const;
+
+export interface AdminAuditCheck {
+  id: string;
+  label: string;
+  status: AdminAuditCheckStatus;
+  detail: string;
+}
+
+export type AdminCompanyDetailCompany = {
+  id: string;
+  name: string;
+  contactEmail: string;
+  tier: string;
+  createdAt: string;
+  /** @nullable */
+  stripeCustomerId?: string | null;
+  /** @nullable */
+  stripeSubscriptionId?: string | null;
+};
+
+export type AdminCompanyDetailLicenseStatus = typeof AdminCompanyDetailLicenseStatus[keyof typeof AdminCompanyDetailLicenseStatus];
+
+
+export const AdminCompanyDetailLicenseStatus = {
+  active: 'active',
+  paused: 'paused',
+  cancelled: 'cancelled',
+} as const;
+
+export type AdminCompanyDetailLicense = {
+  status: AdminCompanyDetailLicenseStatus;
+  statusReason: string;
+  /** @nullable */
+  paidThrough?: string | null;
+};
+
+export interface AdminCompanyDetail {
+  company: AdminCompanyDetailCompany;
+  subscription: SubscriptionSummary;
+  license: AdminCompanyDetailLicense;
+  licenses: AdminLicenseKey[];
+  users: AdminCompanyUser[];
+  /** Tier-enforcement audit checklist for this company */
+  audit: AdminAuditCheck[];
+}
+
+export interface AdminCreateKeyInput {
+  /** When true, all other non-revoked keys for the company are revoked */
+  rotate?: boolean;
+}
+
+export type AdminUpdateKeyInputStatus = typeof AdminUpdateKeyInputStatus[keyof typeof AdminUpdateKeyInputStatus];
+
+
+export const AdminUpdateKeyInputStatus = {
+  active: 'active',
+  revoked: 'revoked',
+} as const;
+
+export interface AdminUpdateKeyInput {
+  status: AdminUpdateKeyInputStatus;
+}
+
+export type AdminUpdateUserInputRole = typeof AdminUpdateUserInputRole[keyof typeof AdminUpdateUserInputRole];
+
+
+export const AdminUpdateUserInputRole = {
+  admin: 'admin',
+  manager: 'manager',
+  staff: 'staff',
+  readonly: 'readonly',
+} as const;
+
+export interface AdminUpdateUserInput {
+  active?: boolean;
+  role?: AdminUpdateUserInputRole;
+}
+
+export interface AdminPendingSignup {
+  id: string;
+  companyName: string;
+  adminName: string;
+  email: string;
+  tier: string;
+  status: string;
+  createdAt: string;
+}
+
 export type ListFieldAssignmentsParams = {
 status?: ListFieldAssignmentsStatus;
 };

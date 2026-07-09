@@ -21,6 +21,8 @@ tags:
     description: License verification API used by the desktop app
   - name: field
     description: Field assignment sync relay for the mobile companion
+  - name: admin
+    description: Platform owner admin panel (separate from the company portal)
 paths:
   /healthz:
     get:
@@ -560,6 +562,311 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
+  /www/admin/login:
+    post:
+      operationId: adminLogin
+      tags:
+        - admin
+      summary: Log in to the platform admin panel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminLoginInput'
+      responses:
+        '200':
+          description: Logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSessionInfo'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many failed attempts - try again later
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Admin panel credentials not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /www/admin/logout:
+    post:
+      operationId: adminLogout
+      tags:
+        - admin
+      summary: Log out of the platform admin panel
+      responses:
+        '204':
+          description: Logged out
+  /www/admin/me:
+    get:
+      operationId: getAdminMe
+      tags:
+        - admin
+      summary: Get the current platform admin session
+      responses:
+        '200':
+          description: Current platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSessionInfo'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /www/admin/metrics:
+    get:
+      operationId: getAdminMetrics
+      tags:
+        - admin
+      summary: 'Platform metrics: companies, users, license keys, MRR, tier breakdown'
+      responses:
+        '200':
+          description: Platform metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMetrics'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /www/admin/companies:
+    get:
+      operationId: listAdminCompanies
+      tags:
+        - admin
+      summary: List all companies with subscription, seat and license summaries
+      responses:
+        '200':
+          description: All companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminCompanySummary'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/admin/companies/{companyId}':
+    get:
+      operationId: getAdminCompany
+      tags:
+        - admin
+      summary: 'Company detail: subscription, employees, license keys and tier audit'
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Company detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCompanyDetail'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/admin/companies/{companyId}/license-keys':
+    post:
+      operationId: createAdminLicenseKey
+      tags:
+        - admin
+      summary: Generate a new license key for a company (optionally revoking existing keys)
+      parameters:
+        - name: companyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateKeyInput'
+      responses:
+        '201':
+          description: New license key created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLicenseKey'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Company not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/admin/license-keys/{keyId}':
+    patch:
+      operationId: updateAdminLicenseKey
+      tags:
+        - admin
+      summary: Revoke or reactivate a license key
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateKeyInput'
+      responses:
+        '200':
+          description: Updated license key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLicenseKey'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: License key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/admin/license-keys/{keyId}/reset-device':
+    post:
+      operationId: resetAdminLicenseDevice
+      tags:
+        - admin
+      summary: Clear the device binding so the key can be activated on a new computer
+      parameters:
+        - name: keyId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: License key with device binding cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminLicenseKey'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: License key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/www/admin/users/{userId}':
+    patch:
+      operationId: updateAdminUser
+      tags:
+        - admin
+      summary: Change any user's role or deactivate/reactivate them (platform-level)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserInput'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminCompanyUser'
+        '400':
+          description: Invalid change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /www/admin/pending-signups:
+    get:
+      operationId: listAdminPendingSignups
+      tags:
+        - admin
+      summary: List signup attempts that have not completed checkout
+      responses:
+        '200':
+          description: Pending signups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminPendingSignup'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
     HealthStatus:
@@ -1253,3 +1560,357 @@ components:
         - id
         - photoDataUrl
         - capturedAt
+    AdminLoginInput:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    AdminSessionInfo:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          description: The platform admin email configured for the panel
+    AdminTierBreakdown:
+      type: object
+      required:
+        - tier
+        - tierName
+        - companies
+      properties:
+        tier:
+          type: string
+        tierName:
+          type: string
+        companies:
+          type: integer
+    AdminMetrics:
+      type: object
+      required:
+        - totalCompanies
+        - activeSubscriptions
+        - mrrCents
+        - totalUsers
+        - activeUsers
+        - totalLicenseKeys
+        - activatedLicenseKeys
+        - pendingSignups
+        - byTier
+      properties:
+        totalCompanies:
+          type: integer
+        activeSubscriptions:
+          type: integer
+          description: Companies whose effective license status is active
+        mrrCents:
+          type: integer
+          description: Sum of monthly prices across active subscriptions
+        totalUsers:
+          type: integer
+        activeUsers:
+          type: integer
+        totalLicenseKeys:
+          type: integer
+        activatedLicenseKeys:
+          type: integer
+          description: Keys that have been activated on at least one device
+        pendingSignups:
+          type: integer
+          description: Signups that never completed checkout
+        byTier:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminTierBreakdown'
+    AdminCompanySummary:
+      type: object
+      required:
+        - id
+        - name
+        - contactEmail
+        - tier
+        - tierName
+        - seats
+        - seatsUsed
+        - licenseStatus
+        - subscriptionStatus
+        - keyCount
+        - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        contactEmail:
+          type: string
+        tier:
+          type: string
+        tierName:
+          type: string
+        seats:
+          type: integer
+        seatsUsed:
+          type: integer
+        licenseStatus:
+          type: string
+          enum:
+            - active
+            - paused
+            - cancelled
+          description: Effective license status derived from the subscription
+        subscriptionStatus:
+          type: string
+          description: 'Raw Stripe subscription status (active, past_due, unknown, ...)'
+        keyCount:
+          type: integer
+          description: Number of non-revoked license keys
+        priceMonthlyCents:
+          type:
+            - integer
+            - 'null'
+        createdAt:
+          type: string
+          format: date-time
+    AdminLicenseKey:
+      type: object
+      required:
+        - id
+        - key
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        status:
+          type: string
+          description: 'Stored key status (active, paused, cancelled, revoked)'
+        activatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        lastVerifiedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        deviceId:
+          type:
+            - string
+            - 'null'
+        deviceName:
+          type:
+            - string
+            - 'null'
+        createdAt:
+          type: string
+          format: date-time
+    AdminCompanyUser:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - role
+        - active
+        - isMasterAdmin
+        - status
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        username:
+          type:
+            - string
+            - 'null'
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
+        active:
+          type: boolean
+        isMasterAdmin:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - active
+            - invited
+            - deactivated
+        inviteCode:
+          type:
+            - string
+            - 'null'
+          description: Present only while the invite is still pending
+        inviteCodeExpiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    AdminAuditCheck:
+      type: object
+      required:
+        - id
+        - label
+        - status
+        - detail
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        status:
+          type: string
+          enum:
+            - pass
+            - warn
+            - info
+        detail:
+          type: string
+    AdminCompanyDetail:
+      type: object
+      required:
+        - company
+        - subscription
+        - license
+        - licenses
+        - users
+        - audit
+      properties:
+        company:
+          type: object
+          required:
+            - id
+            - name
+            - contactEmail
+            - tier
+            - createdAt
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            contactEmail:
+              type: string
+            tier:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+            stripeCustomerId:
+              type:
+                - string
+                - 'null'
+            stripeSubscriptionId:
+              type:
+                - string
+                - 'null'
+        subscription:
+          $ref: '#/components/schemas/SubscriptionSummary'
+        license:
+          type: object
+          required:
+            - status
+            - statusReason
+          properties:
+            status:
+              type: string
+              enum:
+                - active
+                - paused
+                - cancelled
+            statusReason:
+              type: string
+            paidThrough:
+              type:
+                - string
+                - 'null'
+              format: date-time
+        licenses:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminLicenseKey'
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminCompanyUser'
+        audit:
+          type: array
+          description: Tier-enforcement audit checklist for this company
+          items:
+            $ref: '#/components/schemas/AdminAuditCheck'
+    AdminCreateKeyInput:
+      type: object
+      properties:
+        rotate:
+          type: boolean
+          default: false
+          description: When true, all other non-revoked keys for the company are revoked
+    AdminUpdateKeyInput:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - active
+            - revoked
+    AdminUpdateUserInput:
+      type: object
+      properties:
+        active:
+          type: boolean
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
+    AdminPendingSignup:
+      type: object
+      required:
+        - id
+        - companyName
+        - adminName
+        - email
+        - tier
+        - status
+        - createdAt
+      properties:
+        id:
+          type: string
+        companyName:
+          type: string
+        adminName:
+          type: string
+        email:
+          type: string
+        tier:
+          type: string
+        status:
+          type: string
+        createdAt:
+          type: string
+          format: date-time

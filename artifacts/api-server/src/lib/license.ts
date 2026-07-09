@@ -273,6 +273,9 @@ export async function syncStoredLicenseStatus(
   license: LicenseKey,
   computed: ComputedLicenseStatus,
 ): Promise<void> {
+  // A revoked key was explicitly killed by the platform admin; never let the
+  // subscription-derived status resurrect it.
+  if (license.status === "revoked") return;
   if (license.status === computed.status) return;
   const { licenseKeysTable } = await import("@workspace/db");
   const { eq } = await import("drizzle-orm");

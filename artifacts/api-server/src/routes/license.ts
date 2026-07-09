@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne, asc } from "drizzle-orm";
 import {
   db,
   cloudUsersTable,
@@ -23,6 +23,14 @@ import { getPlanConfig } from "../lib/plans";
 import { hashPassword } from "../lib/auth";
 
 const router: IRouter = Router();
+
+/**
+ * Message shown when a key was explicitly revoked by the platform admin.
+ * Revoked keys report "cancelled" to the desktop app (which understands
+ * active/paused/cancelled) so existing installs degrade gracefully.
+ */
+const REVOKED_KEY_MESSAGE =
+  "This license key has been revoked. Ask your administrator for the current key from the customer portal.";
 
 function directoryUser(user: CloudUser) {
   return {
@@ -96,6 +104,14 @@ router.post("/license/activate", async (req, res, next) => {
     }
     const { license, company } = found;
 
+    if (license.status === "revoked") {
+      res.status(403).json({
+        error: REVOKED_KEY_MESSAGE,
+        code: "license_cancelled",
+      });
+      return;
+    }
+
     const computed = await computeLicenseStatus(company);
     await syncStoredLicenseStatus(license, computed);
 
@@ -166,11 +182,19 @@ router.post("/license/redeem-invite", async (req, res, next) => {
       .select()
       .from(companiesTable)
       .where(eq(companiesTable.id, invitee.companyId));
+    // Bind the invitee to the oldest non-revoked key for the company
     const [license] = company
       ? await db
           .select()
           .from(licenseKeysTable)
-          .where(eq(licenseKeysTable.companyId, company.id))
+          .where(
+            and(
+              eq(licenseKeysTable.companyId, company.id),
+              ne(licenseKeysTable.status, "revoked"),
+            ),
+          )
+          .orderBy(asc(licenseKeysTable.createdAt))
+          .limit(1)
       : [];
     if (!company || !license) {
       res.status(400).json({
@@ -244,6 +268,20 @@ router.post("/license/verify", async (req, res, next) => {
       return;
     }
     const { license, company } = found;
+
+    if (license.status === "revoked") {
+      // Report as cancelled (desktop understands active/paused/cancelled)
+      // without recording device activity for a dead key.
+      const computed = await computeLicenseStatus(company);
+      res.json(
+        await buildLicenseInfo(license, company, {
+          ...computed,
+          status: "cancelled",
+          statusReason: REVOKED_KEY_MESSAGE,
+        }),
+      );
+      return;
+    }
 
     const computed = await computeLicenseStatus(company);
     await syncStoredLicenseStatus(license, computed);

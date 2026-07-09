@@ -12,6 +12,9 @@ import Login from "@/pages/Login";
 import CheckoutSuccess from "@/pages/CheckoutSuccess";
 import Dashboard from "@/pages/portal/Dashboard";
 import Users from "@/pages/portal/Users";
+import AdminLogin from "@/pages/admin/AdminLogin";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminCompanyDetail from "@/pages/admin/AdminCompanyDetail";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +29,9 @@ function Router() {
       <Route path="/checkout/success" component={CheckoutSuccess} />
       <Route path="/portal" component={Dashboard} />
       <Route path="/portal/users" component={Users} />
+      <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin" component={AdminDashboard} />
+      <Route path="/admin/companies/:companyId" component={AdminCompanyDetail} />
       <Route component={NotFound} />
     </Switch>
   );

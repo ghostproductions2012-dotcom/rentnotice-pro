@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 import {
   db,
   cloudUsersTable,
@@ -63,11 +63,18 @@ router.get("/www/portal/overview", requireAuth, async (req, res, next) => {
     let [license] = await db
       .select()
       .from(licenseKeysTable)
-      .where(eq(licenseKeysTable.companyId, company.id));
+      .where(
+        and(
+          eq(licenseKeysTable.companyId, company.id),
+          ne(licenseKeysTable.status, "revoked"),
+        ),
+      )
+      .orderBy(licenseKeysTable.createdAt)
+      .limit(1);
     if (!license) {
-      // Self-heal: a company without a license key row is an inconsistent
-      // state (checkout and the admin seed both create one). Provision a key
-      // lazily so the portal never shows "License key not found", then
+      // Self-heal: a company without a usable license key row (none at all,
+      // or every key revoked by the platform admin) would strand the portal
+      // on "License key not found". Provision a fresh key lazily, then
       // re-read so a concurrent request's insert wins deterministically.
       await db.insert(licenseKeysTable).values({
         companyId: company.id,
@@ -77,7 +84,12 @@ router.get("/www/portal/overview", requireAuth, async (req, res, next) => {
       [license] = await db
         .select()
         .from(licenseKeysTable)
-        .where(eq(licenseKeysTable.companyId, company.id))
+        .where(
+          and(
+            eq(licenseKeysTable.companyId, company.id),
+            ne(licenseKeysTable.status, "revoked"),
+          ),
+        )
         .orderBy(licenseKeysTable.createdAt)
         .limit(1);
     }

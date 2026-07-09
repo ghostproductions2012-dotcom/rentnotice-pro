@@ -537,3 +537,242 @@ export const AddFieldEvidenceResponse = zod.object({
 })
 
 
+/**
+ * @summary Log in to the platform admin panel
+ */
+export const AdminLoginBody = zod.object({
+  "email": zod.string().email(),
+  "password": zod.string()
+})
+
+export const AdminLoginResponse = zod.object({
+  "email": zod.string().describe('The platform admin email configured for the panel')
+})
+
+
+/**
+ * @summary Log out of the platform admin panel
+ */
+export const AdminLogoutResponse = zod.void()
+
+
+/**
+ * @summary Get the current platform admin session
+ */
+export const GetAdminMeResponse = zod.object({
+  "email": zod.string().describe('The platform admin email configured for the panel')
+})
+
+
+/**
+ * @summary Platform metrics: companies, users, license keys, MRR, tier breakdown
+ */
+export const GetAdminMetricsResponse = zod.object({
+  "totalCompanies": zod.number(),
+  "activeSubscriptions": zod.number().describe('Companies whose effective license status is active'),
+  "mrrCents": zod.number().describe('Sum of monthly prices across active subscriptions'),
+  "totalUsers": zod.number(),
+  "activeUsers": zod.number(),
+  "totalLicenseKeys": zod.number(),
+  "activatedLicenseKeys": zod.number().describe('Keys that have been activated on at least one device'),
+  "pendingSignups": zod.number().describe('Signups that never completed checkout'),
+  "byTier": zod.array(zod.object({
+  "tier": zod.string(),
+  "tierName": zod.string(),
+  "companies": zod.number()
+}))
+})
+
+
+/**
+ * @summary List all companies with subscription, seat and license summaries
+ */
+export const ListAdminCompaniesResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "contactEmail": zod.string(),
+  "tier": zod.string(),
+  "tierName": zod.string(),
+  "seats": zod.number(),
+  "seatsUsed": zod.number(),
+  "licenseStatus": zod.enum(['active', 'paused', 'cancelled']).describe('Effective license status derived from the subscription'),
+  "subscriptionStatus": zod.string().describe('Raw Stripe subscription status (active, past_due, unknown, ...)'),
+  "keyCount": zod.number().describe('Number of non-revoked license keys'),
+  "priceMonthlyCents": zod.number().nullish(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminCompaniesResponse = zod.array(ListAdminCompaniesResponseItem)
+
+
+/**
+ * @summary Company detail: subscription, employees, license keys and tier audit
+ */
+export const GetAdminCompanyParams = zod.object({
+  "companyId": zod.coerce.string()
+})
+
+export const GetAdminCompanyResponse = zod.object({
+  "company": zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "contactEmail": zod.string(),
+  "tier": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "stripeCustomerId": zod.string().nullish(),
+  "stripeSubscriptionId": zod.string().nullish()
+}),
+  "subscription": zod.object({
+  "tier": zod.string(),
+  "tierName": zod.string(),
+  "seats": zod.number(),
+  "status": zod.string().describe('Raw Stripe subscription status (active, past_due, canceled, ...)'),
+  "currentPeriodEnd": zod.coerce.date().nullish(),
+  "cancelAtPeriodEnd": zod.boolean().optional(),
+  "priceMonthlyCents": zod.number().nullish()
+}),
+  "license": zod.object({
+  "status": zod.enum(['active', 'paused', 'cancelled']),
+  "statusReason": zod.string(),
+  "paidThrough": zod.coerce.date().nullish()
+}),
+  "licenses": zod.array(zod.object({
+  "id": zod.string(),
+  "key": zod.string(),
+  "status": zod.string().describe('Stored key status (active, paused, cancelled, revoked)'),
+  "activatedAt": zod.coerce.date().nullish(),
+  "lastVerifiedAt": zod.coerce.date().nullish(),
+  "deviceId": zod.string().nullish(),
+  "deviceName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "users": zod.array(zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "username": zod.string().nullish(),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
+  "active": zod.boolean(),
+  "isMasterAdmin": zod.boolean(),
+  "status": zod.enum(['active', 'invited', 'deactivated']),
+  "inviteCode": zod.string().nullish().describe('Present only while the invite is still pending'),
+  "inviteCodeExpiresAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date().nullish()
+})),
+  "audit": zod.array(zod.object({
+  "id": zod.string(),
+  "label": zod.string(),
+  "status": zod.enum(['pass', 'warn', 'info']),
+  "detail": zod.string()
+})).describe('Tier-enforcement audit checklist for this company')
+})
+
+
+/**
+ * @summary Generate a new license key for a company (optionally revoking existing keys)
+ */
+export const CreateAdminLicenseKeyParams = zod.object({
+  "companyId": zod.coerce.string()
+})
+
+export const createAdminLicenseKeyBodyRotateDefault = false;
+
+export const CreateAdminLicenseKeyBody = zod.object({
+  "rotate": zod.boolean().default(createAdminLicenseKeyBodyRotateDefault).describe('When true, all other non-revoked keys for the company are revoked')
+})
+
+export const CreateAdminLicenseKeyResponse = zod.object({
+  "id": zod.string(),
+  "key": zod.string(),
+  "status": zod.string().describe('Stored key status (active, paused, cancelled, revoked)'),
+  "activatedAt": zod.coerce.date().nullish(),
+  "lastVerifiedAt": zod.coerce.date().nullish(),
+  "deviceId": zod.string().nullish(),
+  "deviceName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Revoke or reactivate a license key
+ */
+export const UpdateAdminLicenseKeyParams = zod.object({
+  "keyId": zod.coerce.string()
+})
+
+export const UpdateAdminLicenseKeyBody = zod.object({
+  "status": zod.enum(['active', 'revoked'])
+})
+
+export const UpdateAdminLicenseKeyResponse = zod.object({
+  "id": zod.string(),
+  "key": zod.string(),
+  "status": zod.string().describe('Stored key status (active, paused, cancelled, revoked)'),
+  "activatedAt": zod.coerce.date().nullish(),
+  "lastVerifiedAt": zod.coerce.date().nullish(),
+  "deviceId": zod.string().nullish(),
+  "deviceName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Clear the device binding so the key can be activated on a new computer
+ */
+export const ResetAdminLicenseDeviceParams = zod.object({
+  "keyId": zod.coerce.string()
+})
+
+export const ResetAdminLicenseDeviceResponse = zod.object({
+  "id": zod.string(),
+  "key": zod.string(),
+  "status": zod.string().describe('Stored key status (active, paused, cancelled, revoked)'),
+  "activatedAt": zod.coerce.date().nullish(),
+  "lastVerifiedAt": zod.coerce.date().nullish(),
+  "deviceId": zod.string().nullish(),
+  "deviceName": zod.string().nullish(),
+  "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Change any user's role or deactivate/reactivate them (platform-level)
+ */
+export const UpdateAdminUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const UpdateAdminUserBody = zod.object({
+  "active": zod.boolean().optional(),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly']).optional()
+})
+
+export const UpdateAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "email": zod.string(),
+  "name": zod.string(),
+  "username": zod.string().nullish(),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
+  "active": zod.boolean(),
+  "isMasterAdmin": zod.boolean(),
+  "status": zod.enum(['active', 'invited', 'deactivated']),
+  "inviteCode": zod.string().nullish().describe('Present only while the invite is still pending'),
+  "inviteCodeExpiresAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date().nullish()
+})
+
+
+/**
+ * @summary List signup attempts that have not completed checkout
+ */
+export const ListAdminPendingSignupsResponseItem = zod.object({
+  "id": zod.string(),
+  "companyName": zod.string(),
+  "adminName": zod.string(),
+  "email": zod.string(),
+  "tier": zod.string(),
+  "status": zod.string(),
+  "createdAt": zod.coerce.date()
+})
+export const ListAdminPendingSignupsResponse = zod.array(ListAdminPendingSignupsResponseItem)
+
+

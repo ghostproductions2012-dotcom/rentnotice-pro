@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and, ne, asc } from "drizzle-orm";
 import {
   db,
   cloudUsersTable,
@@ -135,10 +135,19 @@ router.post("/www/checkout/complete", async (req, res, next) => {
         });
         return;
       }
+      // Oldest non-revoked key: never hand back a key the platform admin
+      // has rotated away.
       const [license] = await db
         .select()
         .from(licenseKeysTable)
-        .where(eq(licenseKeysTable.companyId, user.companyId));
+        .where(
+          and(
+            eq(licenseKeysTable.companyId, user.companyId),
+            ne(licenseKeysTable.status, "revoked"),
+          ),
+        )
+        .orderBy(asc(licenseKeysTable.createdAt))
+        .limit(1);
       const session = await createSession(user.id);
       setSessionCookie(res, session.token, session.expiresAt);
       res.json({

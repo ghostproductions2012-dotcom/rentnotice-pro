@@ -27,3 +27,7 @@ channel = "stable-25_05"
 
 [userenv.shared]
 EMAIL_FROM = "RentNotice Pro <noreply@rentnoticepro.com>"
+
+[userenv.development]
+ADMIN_PANEL_EMAIL = "admin@rentnoticepro.com"
+ADMIN_PANEL_PASSWORD = "rnp-dev-admin-2026"

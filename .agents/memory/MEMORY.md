@@ -12,3 +12,5 @@
 - [Task-env dev DB is isolated](isolated-env-dev-db.md) — data seeded in a task env's dev Postgres never reaches main; run seeds from scripts/post-merge.sh. No prod DB until first publish.
 - [Prod DB write path](prod-db-write-path.md) — prod Postgres is a one-time copy of dev at first publish; only the deployed app can write to it (agent prod SQL is read-only), so prod data fixes ship as self-heal code + republish.
 - [GitHub Actions CI gotchas](github-actions-desktop-ci.md) — connector token can't push workflows (need PAT); pin packageManager; platform-binary exclusions break mac/win runners; empty APPLE_CERTIFICATE env kills Tauri mac builds.
+- [Express behind Replit proxy](express-proxy-rate-limits.md) — per-IP logic needs `trust proxy` or all clients share one rate-limit bucket.
+- [License revocation semantics](license-revocation-semantics.md) — revoked keys present as "cancelled" to desktop; every key-selection query must exclude revoked.

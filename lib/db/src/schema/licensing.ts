@@ -104,6 +104,17 @@ export const webSessionsTable = pgTable(
   (t) => [index("web_sessions_user_idx").on(t.userId)],
 );
 
+// Sessions for the platform owner's admin panel. Credentials live in env
+// secrets (ADMIN_PANEL_EMAIL / ADMIN_PANEL_PASSWORD), so this table has no
+// user FK — a row simply proves the platform admin logged in.
+export const adminSessionsTable = pgTable("admin_sessions", {
+  token: text("token").primaryKey(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const pendingSignupsTable = pgTable("pending_signups", {
   id: text("id")
     .primaryKey()
@@ -143,4 +154,5 @@ export type InsertLicenseKey = z.infer<typeof insertLicenseKeySchema>;
 export type LicenseKey = typeof licenseKeysTable.$inferSelect;
 
 export type WebSession = typeof webSessionsTable.$inferSelect;
+export type AdminSession = typeof adminSessionsTable.$inferSelect;
 export type PendingSignup = typeof pendingSignupsTable.$inferSelect;
