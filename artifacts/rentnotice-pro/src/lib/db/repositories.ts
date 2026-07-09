@@ -6,7 +6,7 @@
 //
 // Method shapes and list filters mirror the AppServices contract in
 // src/lib/api/services.ts. These functions are intentionally free of session /
-// business logic (audit logging, PIN hashing, calculation, validation) — the
+// business logic (audit logging, password hashing, calculation, validation) — the
 // service layer composes them.
 // ---------------------------------------------------------------------------
 
@@ -114,7 +114,7 @@ function rowToUser(r: Row): User {
     username: asStr(r.username),
     email: strOrNull(r.email),
     role: asStr(r.role) as UserRole,
-    // The schema stores the SHA-256 hex digest in pin_hash; null = no PIN.
+    // The schema stores the SHA-256 hex digest in pin_hash; null = no secret.
     pin: strOrNull(r.pin_hash),
     active: toBool(r.active),
     createdAt: asStr(r.created_at),

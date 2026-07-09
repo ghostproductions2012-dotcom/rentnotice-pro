@@ -167,7 +167,7 @@ export interface AppServices {
   // --- session & users ---
   getSession(): Promise<SessionInfo>;
   listUsers(): Promise<User[]>;
-  /** Sign in with an email plus the account's password (legacy usernames and numeric PINs are still accepted). */
+  /** Sign in with an email plus the account's password (legacy usernames and short numeric secrets are still accepted). */
   login(identifier: string, secret: string): Promise<SessionInfo>;
   lockApp(): Promise<SessionInfo>;
   createUser(input: CreateUserInput): Promise<User>;

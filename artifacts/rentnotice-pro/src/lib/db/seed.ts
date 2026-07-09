@@ -1,7 +1,10 @@
 // ---------------------------------------------------------------------------
 // Seed data — populates a fresh database with realistic demo content.
 // Runs only when the users table is empty (see initDatabase in index.ts).
-// PINs are stored as SHA-256 hex digests via WebCrypto (see util.sha256Hex).
+// Sign-in secrets are stored as SHA-256 hex digests via WebCrypto (see
+// util.sha256Hex). The demo accounts keep legacy short numeric secrets — login
+// hashes whatever is typed and compares, so they still work even though newly
+// set credentials must be passwords of at least 8 characters.
 // All money is integer cents; all dates are ISO strings.
 // ---------------------------------------------------------------------------
 

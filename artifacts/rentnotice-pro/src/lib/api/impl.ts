@@ -243,9 +243,12 @@ function initialsOf(name: string): string {
 }
 
 /**
- * A raw (not-yet-hashed) sign-in secret: a 4-6 digit PIN or a password of at
- * least 8 characters. Stored values are SHA-256 hex digests, which we never
- * re-hash.
+ * A raw (not-yet-hashed) sign-in secret: a password of at least 8 characters.
+ * Stored values are SHA-256 hex digests, which we never re-hash. Accounts
+ * created before the password-only policy may still carry hashes of short
+ * numeric secrets — those keep signing in unchanged (login hashes whatever is
+ * typed and compares), but newly set or changed credentials must be proper
+ * passwords.
  */
 function isStoredSecretHash(value: string): boolean {
   return /^[0-9a-f]{64}$/i.test(value);
@@ -254,10 +257,10 @@ function isStoredSecretHash(value: string): boolean {
 function looksLikeRawSecret(secret: string | null | undefined): secret is string {
   if (typeof secret !== "string") return false;
   if (isStoredSecretHash(secret)) return false; // already a stored hash
-  return /^\d{4,6}$/.test(secret) || secret.length >= 8;
+  return secret.length >= 8;
 }
 
-const INVALID_SECRET_MESSAGE = "Secret must be a 4-6 digit PIN or a password of at least 8 characters";
+const INVALID_SECRET_MESSAGE = "Password must be at least 8 characters";
 
 function normalizeUsername(username: string): string {
   return username.trim().toLowerCase();
@@ -575,7 +578,7 @@ function createServices(): AppServices {
       const db = await getDb();
       const next = { ...patch };
       // next.pin may be: undefined (no change), null/"" (clear), an existing
-      // stored hash (pass through), or a raw PIN/password (hash it). Anything
+      // stored hash (pass through), or a raw password (hash it). Anything
       // else is an invalid raw secret and must be rejected — never stored.
       if (typeof next.pin === "string" && !isStoredSecretHash(next.pin)) {
         if (next.pin === "") next.pin = null;
