@@ -23,3 +23,12 @@ Artifacts on the shared proxy own their preview path prefix (e.g. the Expo app o
 **Why:** localhost:80 routes by path prefix before the SPA's router ever runs (hit July 2026: desktop route `/field` collided with the mobile artifact's `/field` preview path).
 
 **How to apply:** When adding client-side routes to any web artifact, avoid path names matching other artifacts' preview paths (check registered artifacts). Renaming the SPA route (e.g. `/field-service`) fixes it.
+
+## Env vars are versioned in .replit — never put passwords there
+Non-secret env vars set via setEnvVars materialize into the `.replit` file's
+`[userenv.*]` sections, which is committed to version control. Any credential
+(password, token) stored that way ships in every commit and trips security
+review. **Why:** an admin-panel dev password stored as a development env var
+landed in a task commit and got the task rejected. **How to apply:** anything
+credential-shaped must go through requestEnvVar as a secret (secrets live
+outside the repo); env vars are only for non-sensitive config.
