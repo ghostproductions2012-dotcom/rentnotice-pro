@@ -11,6 +11,7 @@ import {
 import type { FieldAssignment, FieldEvidence, Notice } from "@/lib/types";
 import { NOTICE_TYPE_LABELS, formatCents } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
+import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -624,26 +625,12 @@ export default function FieldAssignmentsPage() {
               Photos captured on-site by {evidenceView?.assigneeName}. GPS coordinates and timestamps are recorded at capture.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto py-2">
-            {evidenceView?.evidence.map((e) => (
-              <div key={e.id} className="border rounded-lg overflow-hidden bg-muted/30">
-                <img src={e.photoDataUrl} alt="Service evidence" className="w-full h-44 object-cover" />
-                <div className="p-3 text-xs space-y-1">
-                  <div className="font-medium">{new Date(e.capturedAt).toLocaleString()}</div>
-                  {e.latitude != null && e.longitude != null ? (
-                    <div className="text-muted-foreground flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      {e.latitude.toFixed(5)}, {e.longitude.toFixed(5)}
-                      {e.accuracyMeters != null && ` (±${Math.round(e.accuracyMeters)}m)`}
-                    </div>
-                  ) : (
-                    <div className="text-muted-foreground">No GPS fix recorded</div>
-                  )}
-                  {e.note && <div className="text-muted-foreground">{e.note}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
+          {evidenceView && (
+            <FieldEvidenceGallery
+              evidence={evidenceView.evidence}
+              className="max-h-[60vh] overflow-y-auto py-2"
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

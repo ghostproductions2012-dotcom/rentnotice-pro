@@ -23,6 +23,7 @@ import {
 } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -62,7 +63,6 @@ import {
   FileText,
   Loader2,
   Lock,
-  MapPin,
   Send,
   Stamp,
   Truck,
@@ -485,38 +485,7 @@ export default function NoticeView() {
                         No evidence captured yet for this assignment.
                       </p>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {a.evidence.map((e) => (
-                          <div
-                            key={e.id}
-                            className="border rounded-lg overflow-hidden bg-muted/30"
-                            data-testid={`field-evidence-${e.id}`}
-                          >
-                            <img
-                              src={e.photoDataUrl}
-                              alt="Service evidence"
-                              className="w-full h-44 object-cover"
-                            />
-                            <div className="p-3 text-xs space-y-1">
-                              <div className="font-medium">
-                                {new Date(e.capturedAt).toLocaleString()}
-                              </div>
-                              {e.latitude != null && e.longitude != null ? (
-                                <div className="text-muted-foreground flex items-center gap-1">
-                                  <MapPin className="w-3 h-3" />
-                                  {e.latitude.toFixed(5)}, {e.longitude.toFixed(5)}
-                                  {e.accuracyMeters != null
-                                    ? ` (±${Math.round(e.accuracyMeters)} m)`
-                                    : ""}
-                                </div>
-                              ) : (
-                                <div className="text-muted-foreground">GPS not available</div>
-                              )}
-                              {e.note && <div className="text-muted-foreground">{e.note}</div>}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                      <FieldEvidenceGallery evidence={a.evidence} />
                     )}
                   </div>
                 ))}
