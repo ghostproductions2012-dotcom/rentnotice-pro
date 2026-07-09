@@ -45,11 +45,15 @@ website change needed.
 
 ## Things to know
 
-- **Unsigned installers:** Until you buy code-signing certificates, Windows
-  shows a SmartScreen warning ("More info" → "Run anyway") and macOS requires
-  right-click → Open the first time. The Download page explains this to
-  customers. To remove the warnings later, see `BUILDING.md` §3.2 (signing
-  secrets).
+- **Mac builds are signed & notarized:** the six `APPLE_*` GitHub Actions
+  secrets are configured, so every release's `.dmg` files are Developer ID
+  signed and notarized by Apple automatically — Macs open them with no
+  warnings. (If the Apple certificate is ever renewed, update the secrets —
+  see `BUILDING.md` §3.2/§3.3.)
+- **Windows is still unsigned:** Windows shows a SmartScreen warning
+  ("More info" → "Run anyway") until a Windows code-signing certificate or
+  cloud signing service is set up. The Download page explains this to
+  customers. See `BUILDING.md` §3.3.
 - **If the licensing server URL ever changes:** edit the single
   `VITE_LICENSE_API_URL` value at the top of `.github/workflows/release.yml`,
   then cut a new release.

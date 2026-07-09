@@ -128,9 +128,8 @@ export default function Download() {
               <CardContent className="flex-1 text-sm text-muted-foreground space-y-2">
                 <p>Download the .dmg for your Mac, open it, and drag RentNotice Pro into Applications.</p>
                 <p>
-                  The first time you open the software, macOS may say it "cannot verify the developer."{" "}
-                  <span className="font-semibold text-foreground">Right-click (or Control-click) the software and choose Open</span>,
-                  then click Open again to confirm.
+                  RentNotice Pro is signed and notarized by Apple, so it opens normally — no
+                  security warnings, no extra steps.
                 </p>
               </CardContent>
               <CardFooter className="flex flex-col gap-2">
@@ -153,11 +152,11 @@ export default function Download() {
 
           <Alert className="mt-10">
             <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>Why the security warnings?</AlertTitle>
+            <AlertTitle>Why the Windows security warning?</AlertTitle>
             <AlertDescription>
-              RentNotice Pro installers are not yet code-signed, so Windows and macOS show a one-time
-              caution message for software from new publishers. The download always comes directly from
-              our official release servers, and the steps above let you proceed safely.
+              The Windows installer is not yet code-signed, so Windows SmartScreen shows a one-time
+              caution message for software from new publishers. The Mac version is signed and notarized
+              by Apple. Every download comes directly from our official release servers.
             </AlertDescription>
           </Alert>
         </div>
