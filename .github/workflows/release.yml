@@ -128,6 +128,18 @@ jobs:
           Remove-Item $pfxPath -Force
           Write-Host "Imported Windows signing certificate ($($cert.Thumbprint))."
 
+          # Wire the thumbprint into the Tauri bundler config so the MSI/NSIS
+          # installers are actually signed. The checkout is ephemeral, so
+          # patching tauri.conf.json in place is safe and keeps the committed
+          # config free of machine-specific values.
+          $confPath = "artifacts/rentnotice-pro/src-tauri/tauri.conf.json"
+          $conf = Get-Content $confPath -Raw | ConvertFrom-Json
+          $conf.bundle.windows | Add-Member -NotePropertyName certificateThumbprint -NotePropertyValue $cert.Thumbprint -Force
+          $conf.bundle.windows | Add-Member -NotePropertyName digestAlgorithm -NotePropertyValue "sha256" -Force
+          $conf.bundle.windows | Add-Member -NotePropertyName timestampUrl -NotePropertyValue "http://timestamp.digicert.com" -Force
+          $conf | ConvertTo-Json -Depth 32 | Set-Content $confPath -Encoding UTF8
+          Write-Host "Patched tauri.conf.json with signing thumbprint for this build."
+
       - name: Build desktop installers
         uses: tauri-apps/tauri-action@v0
         env:

@@ -183,19 +183,61 @@ installers (nothing hard-fails). Add secrets under
 | `WINDOWS_CERTIFICATE_PASSWORD`        | Windows  | Password for the `.pfx`                                       | Optional  |
 
 **Windows signing note:** `release.yml` imports `WINDOWS_CERTIFICATE` into the
-runner's certificate store (only when set) and exports its thumbprint as
-`WINDOWS_SIGN_THUMBPRINT`. To actually sign the Windows bundles, add the
-thumbprint to `src-tauri/tauri.conf.json` under `bundle.windows`:
+runner's certificate store (only when set) and automatically patches
+`bundle.windows` in `src-tauri/tauri.conf.json` **during the CI build** with the
+certificate thumbprint, `sha256` digest, and a DigiCert timestamp URL. No
+manual config edit is needed — just set the two `WINDOWS_*` secrets and the
+MSI/NSIS installers come out signed. Leave the secrets unset for unsigned CI
+builds. (Do not commit a thumbprint to `tauri.conf.json`; it is machine/cert
+specific and CI injects it per-build.)
 
-```jsonc
-"windows": {
-  "certificateThumbprint": "<your-thumbprint>",
-  "digestAlgorithm": "sha256",
-  "timestampUrl": "http://timestamp.digicert.com"
-}
-```
+**macOS signing/notarization note:** when the six `APPLE_*` secrets are set,
+`tauri-action` signs the app with the Developer ID Application certificate and
+submits it to Apple for notarization automatically (this adds ~5–15 minutes to
+the macOS jobs). All six secrets must be set together for notarization to work.
 
-Leave it unset for unsigned CI builds.
+### 3.3 Obtaining the signing certificates (owner checklist)
+
+Both certificates require enrollment/purchases only the business owner can do.
+
+**Apple (removes the macOS "cannot verify the developer" warning):**
+
+1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/enroll/)
+   — 99 USD/year. Enrolling as an organization requires a D-U-N-S number.
+2. In your Apple Developer account (Certificates → +), create a
+   **Developer ID Application** certificate. Generate the CSR with Keychain
+   Access on any Mac, download the certificate, and install it into the keychain.
+3. Export the certificate + private key from Keychain Access as a `.p12` with a
+   password, then base64-encode it: `base64 -i cert.p12 | pbcopy`.
+4. Create an **app-specific password** for your Apple ID at
+   <https://account.apple.com> (Sign-In & Security → App-Specific Passwords).
+5. Find your **Team ID** on the Apple Developer membership page.
+6. Set the GitHub secrets: `APPLE_CERTIFICATE` (the base64),
+   `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`
+   (`Developer ID Application: <Name> (<TEAMID>)`), `APPLE_ID`,
+   `APPLE_PASSWORD` (the app-specific password), `APPLE_TEAM_ID`.
+
+**Windows (removes the SmartScreen "Windows protected your PC" warning):**
+
+- Buy an **OV or EV code-signing certificate** from a CA such as Sectigo,
+  DigiCert, or SSL.com (roughly 200–500 USD/year; identity/business validation
+  takes a few days). Ask for a certificate you can export as a password-protected
+  `.pfx` file. Base64-encode it (`base64 -w0 cert.pfx` on Linux/macOS, or
+  `[Convert]::ToBase64String([IO.File]::ReadAllBytes("cert.pfx"))` in
+  PowerShell) and set `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD`.
+- **Caveat:** since June 2023, CAs must deliver most code-signing certificates
+  on hardware tokens or in cloud HSMs, which cannot be exported as a `.pfx`.
+  If your CA cannot provide an exportable file, the current CI signing step
+  won't work as-is — cloud signing services (e.g. Azure Trusted Signing at
+  ~9.99 USD/month, or SSL.com eSigner) are the modern alternative but need a
+  different CI step. Confirm delivery format **before** buying.
+- Note: with an OV certificate, SmartScreen warnings fade only after the signed
+  app builds download reputation (days to weeks). EV certificates and Azure
+  Trusted Signing generally get immediate reputation.
+
+After the secrets are in place, cut a new release (bump the version, push a
+`v*` tag), verify a fresh download installs without warnings on both OSes, and
+update the security-warning copy on the website's `/download` page.
 
 ---
 
