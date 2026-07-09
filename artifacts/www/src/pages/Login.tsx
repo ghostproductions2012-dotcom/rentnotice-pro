@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQueryClient } from "@tanstack/react-query";
+import SiteHeader from "@/components/SiteHeader";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -42,8 +43,12 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md bg-card p-8 rounded-xl shadow-sm border border-border">
+    <div className="min-h-[100dvh] flex flex-col bg-muted/30">
+      <div className="bg-background border-b">
+        <SiteHeader />
+      </div>
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md bg-card p-6 sm:p-8 rounded-xl shadow-sm border border-border">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-serif text-foreground">Welcome back</h2>
           <p className="text-muted-foreground mt-2">Log in to your RentNotice Pro portal</p>
@@ -85,6 +90,7 @@ export default function Login() {
             </Button>
           </form>
         </Form>
+      </div>
       </div>
     </div>
   );

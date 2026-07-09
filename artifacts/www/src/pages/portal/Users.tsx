@@ -296,7 +296,7 @@ export default function Users() {
                   <TableHead>User</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Added</TableHead>
+                  <TableHead className="hidden sm:table-cell">Added</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -321,7 +321,7 @@ export default function Users() {
                     <TableCell>
                       {getStatusBadge(user.status)}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
+                    <TableCell className="hidden sm:table-cell text-muted-foreground text-sm">
                       {user.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : '-'}
                     </TableCell>
                     <TableCell className="text-right">

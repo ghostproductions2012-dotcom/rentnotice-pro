@@ -55,18 +55,18 @@ export default function AdminLayout({
   return (
     <div className="min-h-[100dvh] flex flex-col bg-muted/20">
       <header className="border-b bg-card sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-2 sm:gap-4">
           <Link
             href="/admin"
-            className="flex items-center gap-2 font-serif font-bold text-lg text-primary"
+            className="flex items-center gap-2 font-serif font-bold text-base sm:text-lg text-primary min-w-0"
           >
-            <ShieldCheck className="w-5 h-5" />
-            RentNotice Pro
-            <span className="text-xs font-sans font-semibold uppercase tracking-wide bg-primary/10 text-primary rounded px-2 py-0.5">
+            <ShieldCheck className="w-5 h-5 shrink-0" />
+            <span className="truncate">RentNotice Pro</span>
+            <span className="hidden sm:inline-block text-xs font-sans font-semibold uppercase tracking-wide bg-primary/10 text-primary rounded px-2 py-0.5 whitespace-nowrap">
               Platform Admin
             </span>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <span className="hidden sm:block text-sm text-muted-foreground truncate max-w-[220px]">
               {admin.email}
             </span>

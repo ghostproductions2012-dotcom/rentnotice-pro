@@ -82,11 +82,11 @@ export default function Dashboard() {
             <CardContent className="space-y-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">Your Key</label>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 bg-muted/50 p-2.5 rounded border border-border/50 text-sm break-all font-semibold">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <code className="flex-1 min-w-0 bg-muted/50 p-2.5 rounded border border-border/50 text-sm break-all font-semibold">
                     {overview.license.key}
                   </code>
-                  <Button variant="secondary" size="sm" onClick={handleCopyLicense} className="shrink-0 h-10">
+                  <Button variant="secondary" size="sm" onClick={handleCopyLicense} className="shrink-0 h-10 w-full sm:w-auto">
                     {copied ? "Copied!" : "Copy"}
                   </Button>
                 </div>

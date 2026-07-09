@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import SiteHeader from "@/components/SiteHeader";
 import { useGetLatestDownloads, getGetLatestDownloadsQueryKey } from "@workspace/api-client-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,20 +53,12 @@ export default function Download() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
-      <header className="flex items-center justify-between py-6 px-8 max-w-7xl mx-auto w-full">
-        <Link href="/" className="text-2xl font-serif font-bold text-primary tracking-tight">RentNotice Pro</Link>
-        <nav className="flex items-center gap-6 text-sm font-medium">
-          <Link href="/download" className="text-foreground font-semibold">Download</Link>
-          <Link href="/pricing" className="text-foreground/80 hover:text-foreground transition-colors">Pricing</Link>
-          <Link href="/login" className="text-foreground/80 hover:text-foreground transition-colors">Log in</Link>
-          <Link href="/signup" className="bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Get Started</Link>
-        </nav>
-      </header>
+      <SiteHeader />
 
-      <main className="flex-1 py-16 px-8">
+      <main className="flex-1 py-10 md:py-16 px-4 sm:px-8">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-4">Download RentNotice Pro</h1>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif text-foreground mb-4">Download RentNotice Pro</h1>
             <p className="text-xl text-muted-foreground">
               Install the desktop software on Windows or Mac, then activate it with the license key from your{" "}
               <Link href="/portal" className="text-primary underline underline-offset-4">customer portal</Link>.

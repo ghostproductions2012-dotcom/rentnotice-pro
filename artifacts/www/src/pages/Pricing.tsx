@@ -4,15 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import SiteHeader from "@/components/SiteHeader";
 
 export default function Pricing() {
   const { data: plans, isLoading } = useListPlans();
 
   return (
-    <div className="min-h-[100dvh] bg-background py-24 px-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-4">Simple, transparent pricing</h1>
+    <div className="min-h-[100dvh] bg-background flex flex-col">
+      <SiteHeader />
+      <div className="py-12 md:py-24 px-4 sm:px-8 max-w-7xl mx-auto w-full">
+        <div className="text-center mb-10 md:mb-16">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif text-foreground mb-4">Simple, transparent pricing</h1>
           <p className="text-xl text-muted-foreground">Choose the plan that fits your property portfolio.</p>
         </div>
 
@@ -25,9 +27,9 @@ export default function Pricing() {
         ) : (
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {plans?.map((plan) => (
-              <Card key={plan.tier} className={`flex flex-col ${plan.highlighted ? 'border-primary shadow-lg scale-105 relative z-10' : ''}`}>
+              <Card key={plan.tier} className={`flex flex-col ${plan.highlighted ? 'border-primary shadow-lg md:scale-105 relative z-10 mt-3 md:mt-0' : ''}`}>
                 {plan.highlighted && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-primary text-primary-foreground text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider whitespace-nowrap">
                     Most Popular
                   </div>
                 )}

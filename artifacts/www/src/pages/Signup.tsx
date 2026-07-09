@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useLocation } from "wouter";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import SiteHeader from "@/components/SiteHeader";
 
 const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
@@ -52,8 +53,12 @@ export default function Signup() {
   }
 
   return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-muted/30 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md bg-card p-8 rounded-xl shadow-sm border border-border">
+    <div className="min-h-[100dvh] flex flex-col bg-muted/30">
+      <div className="bg-background border-b">
+        <SiteHeader />
+      </div>
+      <div className="flex-1 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md bg-card p-6 sm:p-8 rounded-xl shadow-sm border border-border">
         <div className="mb-8 text-center">
           <h2 className="text-3xl font-serif text-foreground">Create your account</h2>
           <p className="text-muted-foreground mt-2">Start your subscription to RentNotice Pro</p>
@@ -118,6 +123,7 @@ export default function Signup() {
             </Button>
           </form>
         </Form>
+      </div>
       </div>
     </div>
   );
