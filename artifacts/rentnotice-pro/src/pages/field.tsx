@@ -44,6 +44,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useLocation } from "wouter";
+import { downscalePhotoDataUrl } from "@/lib/images";
 
 const SYNC_URL = `${import.meta.env.BASE_URL}api/field/assignments`;
 
@@ -242,17 +243,21 @@ export default function FieldAssignmentsPage() {
         const l = local.find((a) => a.id === r.id);
         if (!l) continue; // desktop is the source of assignments
         const localEvidenceIds = new Set(l.evidence.map((e) => e.id));
-        const newEvidence: FieldEvidence[] = r.evidence
-          .filter((e) => !localEvidenceIds.has(e.id))
-          .map((e) => ({
+        const incoming = r.evidence.filter((e) => !localEvidenceIds.has(e.id));
+        const newEvidence: FieldEvidence[] = [];
+        for (const e of incoming) {
+          newEvidence.push({
             id: e.id,
-            photoDataUrl: e.photoDataUrl,
+            // Downscale/recompress at ingest so oversized phone photos never
+            // bloat the local database or the generated notice packet.
+            photoDataUrl: await downscalePhotoDataUrl(e.photoDataUrl),
             latitude: e.latitude,
             longitude: e.longitude,
             accuracyMeters: e.accuracyMeters,
             capturedAt: e.capturedAt,
             note: e.note,
-          }));
+          });
+        }
         const remoteNewer = r.updatedAt > l.updatedAt;
         if (!remoteNewer && newEvidence.length === 0) continue;
         await updateAssignment.mutateAsync({

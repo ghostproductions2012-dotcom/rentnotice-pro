@@ -119,6 +119,7 @@ import {
   type KindedDocument,
 } from "../documents";
 import { extractMergeFields } from "../documents/merge";
+import { downscalePhotoDataUrl } from "../images";
 
 // ------------------------------- lazy database ------------------------------
 
@@ -1632,7 +1633,10 @@ function createServices(): AppServices {
     async addFieldEvidence(assignmentId, evidence): Promise<FieldAssignment> {
       requirePermission("field.manage");
       const db = await getDb();
-      const full: FieldEvidence = { ...evidence, id: uid("ev") };
+      // Downscale/recompress at ingest so oversized phone photos never bloat
+      // the local database or the generated notice packet.
+      const photoDataUrl = await downscalePhotoDataUrl(evidence.photoDataUrl);
+      const full: FieldEvidence = { ...evidence, photoDataUrl, id: uid("ev") };
       return fieldAssignmentsRepo.addEvidence(db, assignmentId, full);
     },
 

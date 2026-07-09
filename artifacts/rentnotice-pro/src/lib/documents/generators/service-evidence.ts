@@ -12,6 +12,7 @@ import { NOTICE_TYPE_LABELS } from "../../types";
 import { premisesAddress } from "../merge";
 import type { DocumentContext, GeneratedDocument, GenerateOptions } from "../context";
 import { fileName, finalize, newBuilder } from "./common";
+import { downscalePhotoDataUrl } from "../../images";
 
 const METHOD_LABELS: Record<ServiceMethod, string> = {
   personal: "Personal service",
@@ -93,7 +94,11 @@ export async function generateServiceEvidence(
         b.paragraph(`Photo ${n}`, { font: b.fonts.bold, size: 10.5, gapAfter: 3 });
         let embedError: string | null = null;
         try {
-          await b.image(e.photoDataUrl, { maxWidth: 380, maxHeight: 300 });
+          // Safety net for photos ingested before downscaling existed (or via
+          // older sync paths): recompress oversized images before embedding so
+          // the packet stays small and base64 decoding stays cheap.
+          const photo = await downscalePhotoDataUrl(e.photoDataUrl);
+          await b.image(photo, { maxWidth: 380, maxHeight: 300 });
         } catch (err) {
           embedError = err instanceof Error ? err.message : "Unknown error";
         }
