@@ -2,7 +2,7 @@ import { useGetMe, useLogout, getGetMeQueryKey } from "@workspace/api-client-rea
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LogOut, LayoutDashboard, Users, ShieldCheck } from "lucide-react";
+import { LogOut, LayoutDashboard, Users, ShieldCheck, Download } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 
@@ -64,6 +64,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           <Link href="/portal/users" className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors ${location === "/portal/users" ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-muted-foreground hover:text-foreground"}`}>
               <Users className="w-4 h-4" />
               Team
+          </Link>
+          <Link href="/download" className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
+              <Download className="w-4 h-4" />
+              Download App
           </Link>
         </nav>
 

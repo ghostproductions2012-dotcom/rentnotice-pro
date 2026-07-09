@@ -6,6 +6,7 @@ export default function Home() {
       <header className="flex items-center justify-between py-6 px-8 max-w-7xl mx-auto w-full">
         <div className="text-2xl font-serif font-bold text-primary tracking-tight">RentNotice Pro</div>
         <nav className="flex items-center gap-6 text-sm font-medium">
+          <Link href="/download" className="text-foreground/80 hover:text-foreground transition-colors">Download</Link>
           <Link href="/pricing" className="text-foreground/80 hover:text-foreground transition-colors">Pricing</Link>
           <Link href="/login" className="text-foreground/80 hover:text-foreground transition-colors">Log in</Link>
           <Link href="/signup" className="bg-primary text-primary-foreground px-5 py-2.5 rounded-md hover:bg-primary/90 transition-colors shadow-sm">Get Started</Link>
@@ -27,6 +28,9 @@ export default function Home() {
           <div className="flex items-center gap-4 mt-4">
             <Link href="/pricing" className="bg-primary text-primary-foreground px-8 py-4 rounded-md text-lg font-medium hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 duration-200">
               View pricing
+            </Link>
+            <Link href="/download" className="border border-primary/30 text-primary px-8 py-4 rounded-md text-lg font-medium hover:bg-primary/5 transition-colors">
+              Download the app
             </Link>
           </div>
         </section>
