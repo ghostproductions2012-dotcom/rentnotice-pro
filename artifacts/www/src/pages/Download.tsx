@@ -38,7 +38,7 @@ export default function Download() {
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-4">Download RentNotice Pro</h1>
             <p className="text-xl text-muted-foreground">
-              Install the desktop app on Windows or Mac, then activate it with the license key from your{" "}
+              Install the desktop software on Windows or Mac, then activate it with the license key from your{" "}
               <Link href="/portal" className="text-primary underline underline-offset-4">customer portal</Link>.
             </p>
             {links?.version && (
@@ -91,8 +91,8 @@ export default function Download() {
               <CardContent className="flex-1 text-sm text-muted-foreground space-y-2">
                 <p>Download the .dmg for your Mac, open it, and drag RentNotice Pro into Applications.</p>
                 <p>
-                  The first time you open the app, macOS may say it "cannot verify the developer."{" "}
-                  <span className="font-semibold text-foreground">Right-click (or Control-click) the app and choose Open</span>,
+                  The first time you open the software, macOS may say it "cannot verify the developer."{" "}
+                  <span className="font-semibold text-foreground">Right-click (or Control-click) the software and choose Open</span>,
                   then click Open again to confirm.
                 </p>
               </CardContent>
@@ -118,7 +118,7 @@ export default function Download() {
             <AlertTitle>Why the security warnings?</AlertTitle>
             <AlertDescription>
               RentNotice Pro installers are not yet code-signed, so Windows and macOS show a one-time
-              caution message for apps from new publishers. The download always comes directly from our
+              caution message for software from new publishers. The download always comes directly from our
               official GitHub releases page, and the steps above let you proceed safely.
             </AlertDescription>
           </Alert>

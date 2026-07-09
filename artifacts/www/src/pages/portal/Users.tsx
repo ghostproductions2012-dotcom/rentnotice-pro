@@ -161,7 +161,7 @@ export default function Users() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
         <div>
           <h1 className="text-3xl font-serif text-foreground">Team Management</h1>
-          <p className="text-muted-foreground mt-1">Manage access to the RentNotice Pro desktop app.</p>
+          <p className="text-muted-foreground mt-1">Manage access to the RentNotice Pro desktop software.</p>
         </div>
 
         {isAdmin && (
@@ -180,7 +180,7 @@ export default function Users() {
                 <DialogTitle>Invite Team Member</DialogTitle>
                 <DialogDescription>
                   Invite a colleague by email and role. You'll get a single-use
-                  invite code they enter in the RentNotice Pro desktop app.
+                  invite code they enter in the RentNotice Pro desktop software.
                 </DialogDescription>
               </DialogHeader>
 
@@ -205,7 +205,7 @@ export default function Users() {
                       </Button>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      They enter this code in the desktop app to set up their account. It can only be used once
+                      They enter this code in the desktop software to set up their account. It can only be used once
                       and expires on {format(new Date(inviteResult.expiresAt), 'MMM d, yyyy')}.
                     </p>
                   </div>
@@ -382,7 +382,7 @@ export default function Users() {
             <DialogTitle>Invite Code</DialogTitle>
             <DialogDescription>
               {inviteCodeTarget && (
-                <>Share this single-use code with {inviteCodeTarget.email}. They enter it in the RentNotice Pro desktop app to set up their account.</>
+                <>Share this single-use code with {inviteCodeTarget.email}. They enter it in the RentNotice Pro desktop software to set up their account.</>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -452,7 +452,7 @@ export default function Users() {
             <DialogTitle>Desktop Username</DialogTitle>
             <DialogDescription>
               {usernameTarget && (
-                <>Choose the username {usernameTarget.name || usernameTarget.email} types to sign in to the RentNotice Pro desktop app. Leave blank to use an automatic one based on their email.</>
+                <>Choose the username {usernameTarget.name || usernameTarget.email} types to sign in to the RentNotice Pro desktop software. Leave blank to use an automatic one based on their email.</>
               )}
             </DialogDescription>
           </DialogHeader>

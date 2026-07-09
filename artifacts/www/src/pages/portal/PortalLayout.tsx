@@ -67,7 +67,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </Link>
           <Link href="/download" className="flex items-center gap-3 px-3 py-2 rounded-md transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
               <Download className="w-4 h-4" />
-              Download App
+              Download Software
           </Link>
         </nav>
 

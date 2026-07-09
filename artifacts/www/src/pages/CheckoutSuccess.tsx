@@ -89,7 +89,7 @@ export default function CheckoutSuccess() {
                 <div className="bg-primary/5 border border-primary/20 rounded-md p-4 space-y-2">
                   <h4 className="font-semibold text-primary">Next Steps:</h4>
                   <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground ml-1">
-                    <li>Download the RentNotice Pro desktop app if you haven't already.</li>
+                    <li>Download the RentNotice Pro desktop software if you haven't already.</li>
                     <li>Open the application and select "Activate License".</li>
                     <li>Paste the license key above to unlock full functionality.</li>
                   </ol>

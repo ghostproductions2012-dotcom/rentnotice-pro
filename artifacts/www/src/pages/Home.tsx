@@ -23,14 +23,14 @@ export default function Home() {
             <span className="text-primary italic">Zero stress.</span>
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed">
-            Stop worrying about technicalities and paperwork rejection. Generate perfect, localized rent increase and eviction notices in seconds with our professional desktop app.
+            Stop worrying about technicalities and paperwork rejection. Generate perfect, localized rent increase and eviction notices in seconds with our professional desktop software.
           </p>
           <div className="flex items-center gap-4 mt-4">
             <Link href="/pricing" className="bg-primary text-primary-foreground px-8 py-4 rounded-md text-lg font-medium hover:bg-primary/90 transition-colors shadow-lg hover:shadow-xl hover:-translate-y-0.5 duration-200">
               View pricing
             </Link>
             <Link href="/download" className="border border-primary/30 text-primary px-8 py-4 rounded-md text-lg font-medium hover:bg-primary/5 transition-colors">
-              Download the app
+              Download the software
             </Link>
           </div>
         </section>
