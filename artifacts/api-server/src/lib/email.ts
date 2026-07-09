@@ -167,7 +167,7 @@ export async function sendInviteEmail(
       </a>
     </p>
     <p style="margin:0 0 24px;color:#71717a;font-size:13px;line-height:1.6;text-align:center;">
-      Don't have the desktop app yet? Download it free, then use your invite
+      Don't have the desktop software yet? Download it free, then use your invite
       code to sign in.
     </p>`
     : "";
@@ -184,18 +184,18 @@ export async function sendInviteEmail(
       </code>
     </p>
     <p style="margin:0 0 24px;color:#71717a;font-size:13px;line-height:1.6;">
-      Open the RentNotice Pro desktop app, choose
+      Open the RentNotice Pro desktop software, choose
       <strong>"I have an invite code"</strong>, and enter this code to set up
       your account. The code can only be used once and expires in 14 days.
     </p>${downloadHtml}`;
   const downloadText = input.downloadUrl
-    ? `\n\nDon't have the desktop app yet? Download RentNotice Pro:\n${input.downloadUrl}`
+    ? `\n\nDon't have the desktop software yet? Download RentNotice Pro:\n${input.downloadUrl}`
     : "";
   const text =
     `${input.invitedByName} has invited you to join ${input.companyName} ` +
     `on RentNotice Pro as ${input.role}.\n\n` +
     `Your invite code:\n${input.inviteCode}\n\n` +
-    `Open the RentNotice Pro desktop app, choose "I have an invite code", ` +
+    `Open the RentNotice Pro desktop software, choose "I have an invite code", ` +
     `and enter this code to set up your account. The code can only be used ` +
     `once and expires in 14 days.${downloadText}`;
 
@@ -235,12 +235,12 @@ export async function sendPaymentFailedEmail(
 ): Promise<boolean> {
   const subject = "Action needed: payment failed for RentNotice Pro";
   const paidThroughLine = input.paidThrough
-    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.paidThrough))}</strong>. If payment isn't resolved by then, the desktop app will pause until billing is fixed.`
-    : `If payment isn't resolved soon, the desktop app will pause until billing is fixed.`;
+    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.paidThrough))}</strong>. If payment isn't resolved by then, the desktop software will pause until billing is fixed.`
+    : `If payment isn't resolved soon, the desktop software will pause until billing is fixed.`;
   const paidThroughText = input.paidThrough
     ? `Your team keeps full access through ${formatDateLong(input.paidThrough)}. ` +
-      `If payment isn't resolved by then, the desktop app will pause until billing is fixed.`
-    : `If payment isn't resolved soon, the desktop app will pause until billing is fixed.`;
+      `If payment isn't resolved by then, the desktop software will pause until billing is fixed.`
+    : `If payment isn't resolved soon, the desktop software will pause until billing is fixed.`;
 
   const bodyHtml = `
     <p style="margin:0 0 12px;line-height:1.6;">
@@ -310,13 +310,13 @@ export async function sendCancellationScheduledEmail(
 ): Promise<boolean> {
   const subject = "Your RentNotice Pro subscription is set to cancel";
   const endsLineHtml = input.accessEndsAt
-    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.accessEndsAt))}</strong>. After that, the desktop app will pause until you resubscribe.`
-    : `Your team keeps full access through the end of the current billing period. After that, the desktop app will pause until you resubscribe.`;
+    ? `Your team keeps full access through <strong>${escapeHtml(formatDateLong(input.accessEndsAt))}</strong>. After that, the desktop software will pause until you resubscribe.`
+    : `Your team keeps full access through the end of the current billing period. After that, the desktop software will pause until you resubscribe.`;
   const endsLineText = input.accessEndsAt
     ? `Your team keeps full access through ${formatDateLong(input.accessEndsAt)}. ` +
-      `After that, the desktop app will pause until you resubscribe.`
+      `After that, the desktop software will pause until you resubscribe.`
     : `Your team keeps full access through the end of the current billing period. ` +
-      `After that, the desktop app will pause until you resubscribe.`;
+      `After that, the desktop software will pause until you resubscribe.`;
 
   const bodyHtml = `
     <p style="margin:0 0 12px;line-height:1.6;">
@@ -404,7 +404,7 @@ export async function sendWelcomeEmail(
       </code>
     </p>
     <p style="margin:0 0 24px;line-height:1.6;">
-      Enter this key in the RentNotice Pro desktop app to unlock it.
+      Enter this key in the RentNotice Pro desktop software to unlock it.
       Keep this email for your records.
     </p>
     <p style="text-align:center;margin:0 0 8px;">
@@ -421,7 +421,7 @@ export async function sendWelcomeEmail(
     `Thanks for purchasing RentNotice Pro for ${input.companyName} ` +
     `(${input.planName} plan). Your account is ready.\n\n` +
     `Your license key:\n${input.licenseKey}\n\n` +
-    `Enter this key in the RentNotice Pro desktop app to unlock it. ` +
+    `Enter this key in the RentNotice Pro desktop software to unlock it. ` +
     `Keep this email for your records.\n\n` +
     `Manage your team, billing, and license any time:\n${input.portalUrl}`;
 
