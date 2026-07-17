@@ -28,6 +28,11 @@ export interface FieldAssignmentSync {
   deadlineDate: string | null;
   /** @nullable */
   totalAmountCents: number | null;
+  /**
+     * Origin of the underlying tenant/ledger data (e.g. "buildium"). Omitted or null for manually entered data.
+     * @nullable
+     */
+  source?: string | null;
   evidence: FieldEvidenceSync[];
   createdAt: string;
   updatedAt: string;

@@ -81,29 +81,34 @@ export interface GithubReleaseAsset {
   size: number;
 }
 
-export interface GithubLatestRelease {
+export interface GithubRelease {
   tagName: string;
   assets: GithubReleaseAsset[];
 }
 
-// Cache the latest-release lookup for a few minutes to stay well under
+// How many published releases to consider when a platform's installer is
+// missing from the newest release (e.g. Mac builds still in CI).
+const RELEASE_FALLBACK_DEPTH = 10;
+
+// Cache the releases lookup for a few minutes to stay well under
 // GitHub API rate limits (the Download page is public).
 const CACHE_TTL_MS = 5 * 60 * 1000;
-let cachedRelease: { release: GithubLatestRelease; fetchedAt: number } | null =
+let cachedReleases: { releases: GithubRelease[]; fetchedAt: number } | null =
   null;
 
 /**
- * Fetches the latest published GitHub release (authenticated, works for
- * private repos). Results are cached in memory for 5 minutes.
+ * Fetches recent published GitHub releases, newest first (authenticated,
+ * works for private repos). Drafts and prereleases are excluded. Results
+ * are cached in memory for 5 minutes.
  */
-export async function getLatestRelease(): Promise<GithubLatestRelease> {
-  if (cachedRelease && Date.now() - cachedRelease.fetchedAt < CACHE_TTL_MS) {
-    return cachedRelease.release;
+export async function getRecentReleases(): Promise<GithubRelease[]> {
+  if (cachedReleases && Date.now() - cachedReleases.fetchedAt < CACHE_TTL_MS) {
+    return cachedReleases.releases;
   }
 
   const token = await getGithubToken();
   const resp = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+    `https://api.github.com/repos/${GITHUB_REPO}/releases?per_page=${RELEASE_FALLBACK_DEPTH}`,
     {
       headers: {
         Accept: "application/vnd.github+json",
@@ -116,30 +121,42 @@ export async function getLatestRelease(): Promise<GithubLatestRelease> {
 
   if (!resp.ok) {
     // Serve a stale cache rather than failing if GitHub is having a moment.
-    if (cachedRelease) {
+    if (cachedReleases) {
       logger.warn(
         { status: resp.status },
-        "GitHub latest-release lookup failed; serving stale cache",
+        "GitHub releases lookup failed; serving stale cache",
       );
-      return cachedRelease.release;
+      return cachedReleases.releases;
     }
-    throw new Error(`GitHub API returned ${resp.status} for latest release`);
+    throw new Error(`GitHub API returned ${resp.status} for releases list`);
   }
 
-  const body = (await resp.json()) as {
+  const body = (await resp.json()) as Array<{
     tag_name?: string;
+    draft?: boolean;
+    prerelease?: boolean;
     assets?: Array<{ id?: number; name?: string; size?: number }>;
-  };
+  }>;
 
-  const release: GithubLatestRelease = {
-    tagName: body.tag_name ?? "",
-    assets: (body.assets ?? [])
-      .filter((a) => typeof a.id === "number" && typeof a.name === "string")
-      .map((a) => ({ id: a.id!, name: a.name!, size: a.size ?? 0 })),
-  };
+  const releases: GithubRelease[] = (Array.isArray(body) ? body : [])
+    .filter((r) => !r.draft && !r.prerelease && typeof r.tag_name === "string")
+    .map((r) => ({
+      tagName: r.tag_name!,
+      assets: (r.assets ?? [])
+        .filter((a) => typeof a.id === "number" && typeof a.name === "string")
+        .map((a) => ({ id: a.id!, name: a.name!, size: a.size ?? 0 })),
+    }));
 
-  cachedRelease = { release, fetchedAt: Date.now() };
-  return release;
+  if (releases.length === 0) {
+    if (cachedReleases) {
+      logger.warn("GitHub returned no published releases; serving stale cache");
+      return cachedReleases.releases;
+    }
+    throw new Error("GitHub returned no published releases");
+  }
+
+  cachedReleases = { releases, fetchedAt: Date.now() };
+  return releases;
 }
 
 /**

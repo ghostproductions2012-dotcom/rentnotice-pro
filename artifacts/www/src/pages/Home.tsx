@@ -26,6 +26,10 @@ export default function Home() {
               Download the software
             </Link>
           </div>
+          <p className="text-sm text-muted-foreground" data-testid="text-buildium-mention">
+            Now with Buildium integration — import your properties, tenants, and
+            outstanding balances in one click, then generate notices instantly.
+          </p>
         </section>
       </main>
     </div>

@@ -57,7 +57,7 @@ describe("classification engine", () => {
     expect(r.confidence).toBeLessThanOrEqual(NEEDS_REVIEW_THRESHOLD);
   });
 
-  // First Light "Tenant Statement" ledgers — real-world descriptions.
+  // "Tenant Statement" ledgers — real-world descriptions.
   it("classifies a positive EFT fee as a non-rent admin fee, not a payment", () => {
     const r = classifyRow({ description: "EFT fee", amountCents: 129 });
     expect(r.category).toBe("admin_fee");

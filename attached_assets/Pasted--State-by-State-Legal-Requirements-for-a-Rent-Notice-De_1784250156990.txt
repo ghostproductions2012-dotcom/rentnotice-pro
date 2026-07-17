@@ -1,0 +1,669 @@
+# State-by-State Legal Requirements for a Rent-Notice Desktop App
+
+## Executive summary
+
+The most important engineering conclusion is that a single national “pay-or-quit” workflow is legally unsafe. States vary sharply on four high-risk dimensions: the pre-filing notice period, how days are counted, what service methods are valid, and whether a nonpayment notice may demand only base rent or may also include other charges. California, Alaska, and Massachusetts are especially clear that a rent-demand notice must not be inflated with non-rent charges; Florida is explicit about how partial rent affects a nonpayment notice; Maryland now requires a pre-filing notice-of-intent form for failure-to-pay-rent actions; Hawaii added a nonpayment mediation prerequisite effective February 5, 2026; and Oregon’s online ORS publication itself warns that the 2025 codification does not yet incorporate 2026 session changes, so any Oregon automation must ingest current-session laws rather than rely on the static ORS edition alone. citeturn17view2turn16view2turn14search0turn15view2turn26search8turn8search14turn38search7
+
+For app design, the safest default nationwide is a **rent-only engine** with state overrides. The engine should begin with periodic base rent, subtract verified payments and credits, and exclude late fees, utility charges, repair charges, legal fees, deposits, parking, pet charges, and other ancillary items unless a state-specific attorney-reviewed rule expressly authorizes inclusion. That conservative design matches the most compliance-sensitive states and reduces dismissal risk in states whose statutes speak in terms of “rent” rather than broader “amount due.” citeturn17view2turn16view1turn14search0turn15view2
+
+A production-ready desktop app should therefore ship with a **rule engine plus a source registry**, not just merge fields. Each state record should store: notice types; trigger conditions; day-count logic; allowed service methods; proof-of-service artifact requirements; mandatory language; filing prerequisites; holiday source; local exception registry; and a release status flag such as `draft`, `attorney_review_required`, or `approved`. For high-complexity jurisdictions such as California, New York, New Jersey, Connecticut, Washington, Maryland, Massachusetts, Oregon, and Hawaii, the initial release should be blocked until state templates and local overlays have had attorney review. The official and quasi-official sources reviewed here show why: local just-cause ordinances, mandatory informational forms, mediation programs, right-to-counsel overlays, and court form requirements frequently alter otherwise familiar eviction workflows. citeturn17view2turn12search2turn29search0turn39search7turn26search8turn14search7turn12search5turn8search14
+
+The desktop app should also distinguish three legal layers. First, **statewide substantive law** establishes notice periods, default service rules, cure rights, and termination grounds. Second, **statewide judicial procedures and forms** control the affidavit, complaint, summons, and execution stages. Third, **local overlays** may add just-cause, relocation, filing declarations, language access rules, court diversion, or government notices. Los Angeles City and Los Angeles County add notable eviction-control layers; New York City’s housing-court ecosystem is far more demanding than a bare RPAPL summary; Maryland has Baltimore City-specific post-judgment property rules; Kansas City runs a local Right to Counsel program; and Connecticut has a statewide eviction Right to Counsel system that should be represented as a statewide workflow flag. citeturn13search12turn21search1turn12search17turn12search21turn26search12turn28search13turn39search7
+
+What follows is organized for ingestion into template-generation software. Where a point could not be confidently confirmed from the sources reviewed in this session, it is labeled **unspecified** and paired with the best source bundle to verify before release.
+
+## Methodology and implementation architecture
+
+This report prioritizes primary and official sources where they were readily accessible in-session: state legislative code pages, state court self-help pages, attorney general handbooks, judiciary form packets, and official court instructions. Where an official source was unavailable or blocked, high-quality legal-aid or state-sponsored explanatory materials were used as secondary confirmation. In a few states, only a strong source bundle rather than an exact provision was confirmed during this session; those states are marked accordingly and should remain behind an “attorney review required” flag before any public rollout. citeturn15view2turn17view1turn17view2turn25search1turn30search0turn37search0turn29search0turn26search8
+
+From an engineering standpoint, the cleanest architecture is a four-layer model. The **ledger layer** produces a rent-only arrears table by month. The **notice rule layer** determines what notice exists, the minimum period, the day-count method, and the content requirements. The **service layer** determines who may serve, how service may be proved, when mailing/posting is allowed, and what affidavit text or checkbox flow is required. The **local overlay layer** injects city or county addenda, including just-cause statements, relocation notices, mediation notices, language access forms, or right-to-counsel materials. California’s eviction self-help materials, for example, explicitly warn that many cities or counties require more detail than the statewide minimum, which is exactly the kind of local override the app should model as `required_addenda[]`. citeturn17view2turn17view1turn13search12turn21search7
+
+The core validation philosophy should be conservative. A notice should be **blocked** whenever the notice amount includes anything other than rent in a state where the source reviewed clearly limits the demand to rent; when the app cannot determine that the service method selected is allowed; when a mandatory pre-filing form or information sheet is missing; when a mandatory cure-right statement is absent; or when the nonpayment deadline has been miscounted because weekends, business days, or court holidays were handled incorrectly. Other issues can be **warnings** rather than hard stops, such as ambiguous payment allocation, possible local just-cause overlay, possible federal CARES Act overlay, or uncertain lease-driven notice variation. citeturn17view2turn16view2turn15view2turn14search7turn37search0turn33search13
+
+The app should treat holidays as a dynamic data source, not static hard-coded text. California’s court self-help page moves deadlines that fall on a weekend or court holiday to the next court day, and Florida expressly excludes Saturday, Sunday, and court-observed holidays from its 3-day nonpayment count. Utah’s standard 3-day nonpayment form uses **three business days**. Those examples are enough to justify one shared date engine with state-specific parameters, plus annual holiday sync from each state judiciary or court-administration holiday page. citeturn17view1turn15view2turn33search13
+
+## Consolidated comparison matrix
+
+The comparison table below is deliberately conservative. “Unspecified” means the point was not confidently confirmed from the sources reviewed during this session and should stay behind a verification flag before shipping. “Deposit pre-eviction” should default to **No / do not auto-apply** unless a state-specific attorney-reviewed rule explicitly permits deposit application before judgment or before lease termination.
+
+| State | Nonpayment notice period | Allowed pre-suit service baseline | Weekends / holidays | Deposit pre-eviction | Statewide RTC identified in sources reviewed | Source signal |
+|---|---|---|---|---|---|---|
+| AL | 7 business days | Written notice; verify statutory service details before release | Business days | No default | Unspecified | Alabama URLTA package. citeturn4search3 |
+| AK | 7 days | Personal; posting if absent; registered/certified mail; retain proof | Add 3 days if mailed | No default | Unspecified | Alaska DOL handbook gives sample form and service proof boxes. citeturn16view2 |
+| AZ | Unspecified in this session | Use Arizona eviction act + court packet before release | Unspecified | No default | Unspecified | Arizona court/source pack. citeturn5search0 |
+| AR | Unspecified in this session | Use AG handbook + code before release | Unspecified | No default | Unspecified | Arkansas AG/source pack. citeturn4search2turn4search3 |
+| CA | 3 court days for pay-or-quit | Hand delivery; substitute service + mail; post + mail; declaration under penalty of perjury | Exclude weekends/court holidays for rent notice | No default | Unspecified statewide; strong local RTC ecosystems | California courts self-help. citeturn17view1turn17view2 |
+| CO | Source pack confirms official forms; verify exact day count from JDF before release | Judicial forms, mediation overlays, process server/sheriff for court papers | Use current JDF/statute | No default | Unspecified statewide | Colorado Judicial Branch. citeturn11view0 |
+| CT | 3 full days to quit after notice to quit | Notice to quit served formally by state marshal | “Three full days” | No default | Yes | CT marshal manual and CT RTC evaluation. citeturn39search0turn39search5turn39search7 |
+| DE | Source pack only in this session | Use JP Court landlord/tenant code before release | Unspecified | No default | Unspecified | Delaware JP Court package. citeturn7search13 |
+| FL | 3 days, excluding Saturday, Sunday, and court-observed holidays | Mail; hand delivery; leave at residence; email if agreed under statute | Court-observed holidays excluded | No default | Unspecified | Fla. Stat. 83.56. citeturn15view2 |
+| GA | No universal statewide pre-suit period confidently confirmed here; treat as lease/demand sensitive | Demand and dispossessory workflow; verify by lease and county practice | Unspecified | No default | Unspecified | Georgia courts + DCA handbook. citeturn8search13turn25search18 |
+| HI | 10 days written notice for nonpayment, plus mediation prerequisite for nonpayment cases filed on/after Feb. 5, 2026 | Written notice; verify service method from statute before release | Unspecified | No default | Unspecified | Hawaii Judiciary/DCCA. citeturn8search14turn8search20 |
+| ID | 3 days | Use Idaho court-assistance forms and service checklist | Unspecified | No default | Unspecified | Idaho Legal Aid / court help. citeturn23search0turn23search18 |
+| IL | 5 days is the common statewide nonpayment form period; use Illinois Supreme Court forms | Use approved statewide forms and retain service proof | Unspecified | No default | Unspecified statewide | Illinois courts and Eviction Help Illinois. citeturn9search1turn9search15 |
+| IN | 10 days unless parties agreed otherwise; tenant cures by full payment within period | Written notice; preserve proof | Count full notice period before filing | No default | Unspecified | Indiana Code § 32-31-1-6. citeturn24search0turn24search3 |
+| IA | 3 days | Written notice under Iowa Code 562A.27(2) | Unspecified | No default | Unspecified | Iowa Code / Legislative Guide. citeturn25search0turn25search12 |
+| KS | 3 days | In-person or mail delivery forms supplied by Judicial Council | Unspecified | No default | Unspecified | Kansas Judicial Council forms. citeturn10search5turn10search8 |
+| KY | 7 days | Written notice; verify service under statute/local practice | Unspecified | No default | Unspecified | KRS 383.660(2). citeturn10search2turn10search9 |
+| LA | 5 days to vacate after delivery of notice to vacate | Written notice to vacate; use CCP art. 4701 | Starts from delivery date | No default | Unspecified | La. Code Civ. Proc. art. 4701. citeturn25search1 |
+| ME | Usually 7-day or 30-day notice depending ground; attach court info sheet in residential cases | Serve Notice to Quit plus CV-256 information sheet | Driven by notice type | No default | Unspecified | Maine Judicial Branch. citeturn37search0turn37search8turn37search17 |
+| MD | 10-day Notice of Intent to File complaint for summary ejectment for nonpayment | Mail, posting, and agreed electronic channels may be used for notice-of-intent | Use form timing exactly | No default | Unspecified statewide in sources reviewed | Maryland courts / People’s Law / AG. citeturn26search8turn26search4turn26search17turn26search15 |
+| MA | 14-day notice to quit for nonpayment; first notice usually includes cure rights | Deliver notice plus required accompanying form for residential nonpayment | Cure rights can extend effect if form is defective | No default | Unspecified statewide | Mass.gov + MassLegalHelp. citeturn14search1turn14search4turn14search7turn14search18 |
+| MI | 7 days | Use SCAO Notice to Quit forms | Unspecified | No default | Unspecified | Michigan Legislature + court form. citeturn26search1turn26search22 |
+| MN | Do not hard-code a universal statewide pay-or-quit period from this session; treat as statute/lease/program sensitive | Use AG handbook and current statute before release | Unspecified | No default | Unspecified statewide | Minnesota AG handbook. citeturn27search0 |
+| MS | 3 days | Written notice; preserve proof of delivery | Start after receipt | No default | Unspecified | Mississippi legal services. citeturn41search0 |
+| MO | No single statewide pre-suit period confidently confirmed here for all residential nonpayment cases; treat as attorney-review state | Preserve written demand and filing proof; local practice varies | Unspecified | No default | No statewide program identified; local Kansas City RTC | Missouri AG + local RTC. citeturn28search2turn28search6turn28search13 |
+| MT | 10 days for past-due rent | Use Montana court forms and MLSA packets | Unspecified | No default | Unspecified | Montana legal aid and court forms. citeturn40search2turn40search7 |
+| NE | 3 days | Nebraska Judicial Branch renter/landlord materials | Unspecified | No default | Unspecified | Nebraska Judicial Branch. citeturn30search0turn30search4 |
+| NV | Use Nevada summary-eviction/self-help packet; period not confidently confirmed here | Summary-eviction notice system; county self-help variations matter | Judicial days likely matter; verify before release | No default | Unspecified | Nevada self-help / Clark County. citeturn29search2turn29search6turn29search10 |
+| NH | Demand for Rent and Eviction Notice supplied by NH Judicial Branch; exact statewide nonpayment count should be confirmed from form before release | Use official NH forms | Unspecified | No default | Unspecified | NH Judicial Branch. citeturn29search3turn29search7turn29search11 |
+| NJ | In most nonpayment cases, no notice to cease/quit is required before filing; notices are required for many other grounds | Follow NJ Anti-Eviction Act notice taxonomy and court process | Business-day concepts arise post-judgment | No default | No statewide program identified; strong local support systems | NJ Courts and LSNJ. citeturn29search0turn29search20turn29search8 |
+| NM | 3 days | Use official New Mexico court notice forms | Count from receipt/service | No default | Unspecified | NM Courts forms. citeturn29search1turn29search9turn29search21 |
+| NY | Use state-specific rent-demand / cure / termination packets; do not ship without attorney review | Housing-court notices vary by ground; holdover/nonpayment are distinct | Strong local and program overlays | No default | No statewide program identified in sources reviewed; NYC has strong local ecosystem | NY Courts / HCR. citeturn12search2turn12search17turn12search21 |
+| NC | Lease-driven and tenancy-type-dependent; Legal Aid source shows 10 days for nonpayment, while courts note landlords are not always required to send an eviction notice | Preserve lease copy and notice proof | Treat as lease-sensitive | No default | Unspecified | NC Courts + LawHelpNC. citeturn37search6turn37search14 |
+| ND | Use ND courts eviction packet; exact statewide nonpayment notice count not confidently confirmed here | Courts stress lawyers for legal entities and very fast hearing schedule | Hearing within 10 business days after filing | No default | Unspecified | ND Courts. citeturn31search2turn35search3 |
+| OH | 3 days, with mandatory statutory warning language | Statutory service rules apply; retain proof | App should print statutory warning exactly | No default | Unspecified | Ohio Rev. Code 1923.04. citeturn30search21turn30search2 |
+| OK | 5 days | Written notice; personal service generally used under statute | Starts after receipt | No default | Unspecified | Oklahoma statute / legal aid. citeturn31search1turn31search8turn31search21 |
+| OR | Do not hard-code from 2025 ORS alone because 2026 changes are not fully folded into the online 2025 edition | Use current ORS plus 2026 session update before release | State-specific counting must be verified from current law | No default | Unspecified statewide; important local overlays | Oregon Legislature warning. citeturn38search7 |
+| PA | 10 days by default for nonpayment, but lease terms can modify/waive defaults in some cases | Notice to Quit must be properly served | Lease-sensitive | No default | Unspecified statewide | PA legal aid / community legal services. citeturn40search4turn40search0turn40search8 |
+| RI | Nonpayment eviction available when tenant is 15 days or more in arrears; statutory form-driven | Use Rhode Island judiciary forms | Hearing 14–21 days after filing | No default | Unspecified | Rhode Island courts. citeturn32search1turn32search9turn32search5 |
+| SC | Use ejectment procedure; written notice to vacate required, but exact nonpayment waiting period should be confirmed from lease/statute package before release | Personal service or posting practices matter at sheriff stage | Unspecified | No default | Unspecified | SC Code / magistrate forms / county practice. citeturn32search6turn32search14turn32search18 |
+| SD | Use official UJS eviction notices and affidavits; exact nonpayment waiting period should be confirmed from SDCL/UJS forms before release | Forms include affidavits and checklists | Unspecified | No default | Unspecified | South Dakota UJS. citeturn32search3turn32search7 |
+| TN | Treat as attorney-review state because county coverage under Tennessee’s URLTA can change the rule set | Use Tennessee court resources plus county-specific act review | County-sensitive | No default | No statewide program identified; Nashville has local RTC-style services | Tennessee legal-aid / courts. citeturn33search21turn33search15turn33search18 |
+| TX | At least 3 days’ written notice to vacate unless lease changes it; nonpayment cases may use pay-or-vacate or vacate-only pathways | Personal delivery, posting, and mailing rules must be taken from current § 24.005 text before release | Count full contractual/statutory period | No default | Unspecified | Texas Property Code § 24.005. citeturn21search0turn21search2turn21search8 |
+| UT | 3 business days | Use official Utah court notice form | Business days | No default | Unspecified | Utah courts. citeturn33search13turn33search5 |
+| VT | 14 days for nonpayment; cure by paying during notice period | Use Vermont termination-notice rules | Count as stated in statute/notices | No default | Unspecified | Vermont Law Help. citeturn36search13turn36search16turn36search5 |
+| VA | Use Virginia Residential Landlord and Tenant Act source package before release; exact nonpayment notice count not confirmed here from primary text | Formal process only; preserve notice proof | Statute-sensitive | No default | Unspecified | Virginia AG / legal-aid sources. citeturn33search3turn33search7 |
+| WA | 14-day pay-or-vacate is the standard current signal; preserve official RCW source review before release | RCW-based service rules; capture affidavit and mailing details | Calendar/day-count must follow RCW | No default | Verify statewide appointed-counsel statute separately before public release | Washington RCW chapter + legal guidance. citeturn12search1turn12search5turn12search16 |
+| WV | Use wrongful-occupation workflow; exact private nonpayment pre-suit period not confidently confirmed here | Very fast hearings; preserve proof and filing chronology | Hearing no more than 10 business days after filing in many magistrate cases | No default | Unspecified | Legal Aid WV. citeturn35search0turn35search3 |
+| WI | Notice type depends on tenancy and breach history; do not hard-code one statewide number | Use Wis. Stat. 704.17 / court instructions | Statute-specific | No default | Unspecified | Wisconsin Legislative Council / Wicourts / Wislawhelp. citeturn34search1turn34search11turn34search9 |
+| WY | Use Wyoming court eviction packet; exact nonpayment pre-suit period not confidently confirmed here in this session | Court forms and legal aid should guide service workflow | Unspecified | No default | Unspecified | Wyoming courts / Legal Aid of Wyoming. citeturn36search4turn36search1 |
+
+### What the matrix means for software
+
+The table shows why the app should not store “notice period” as a single integer. You need at least these parameters: `days_count`, `day_type` (`calendar`, `business`, `court`), `exclude_weekends`, `exclude_state_holidays`, `exclude_court_holidays`, `mail_extension_days`, `requires_cure`, `requires_pre_filing_form`, `requires_notice_of_intent`, `requires_mediation`, `service_modes_allowed[]`, and `local_overlays_required[]`. That model is directly supported by California’s court-day counting and declaration language, Florida’s weekend-and-court-holiday exclusion plus email rule, Maryland’s notice-of-intent form and agreed e-service, Utah’s business-day form, and Alaska’s mail-extension/service-proof structure. citeturn17view1turn15view2turn26search17turn33search13turn16view2
+
+## State implementation notes
+
+The table above is the quickest ingestion format. For actual release planning, the states fall into four engineering cohorts.
+
+### Rent-only strict states
+
+California is the clearest example. Its 3-day notice to pay rent or quit must state the exact rent owed, how and where payment can be made, and it **cannot ask for late fees, utilities, or damages**. Its delivery proof should include the notice name, the delivery date, the delivery method, a California penalty-of-perjury statement, and the server’s signature. Alaska’s approved handbook likewise says the nonpayment form must state rent only and expressly says the amount does not include late fees; it also gives concrete proof-of-service options and a 3-day mail extension when registered or certified mail is used. Massachusetts likewise treats a Notice to Quit for nonpayment as a rent notice, not a fee notice; MassLegalHelp is explicit that a nonpayment notice cannot demand late fees, attorney’s fees, or constable fees, and Massachusetts now requires a form to accompany a residential notice to quit for nonpayment. These three states should be modeled as **hard blocks** against fee-inflated notices. citeturn17view2turn17view1turn16view2turn14search0turn14search7
+
+For this cohort, your UI should display a month-by-month rent ledger, a separate excluded-charges panel, and a visible “Rent-only notice amount” subtotal. The system should force a user acknowledgment if any excluded category exists. It should also refuse to finalize if the calculated notice amount differs from the rent-only subtotal. That is the safest behavior for California, Alaska, and Massachusetts, and it is a defensible national default elsewhere. citeturn17view2turn16view1turn14search0
+
+### States with unusual pre-filing prerequisites
+
+Maryland is no longer a simple “file when rent is due” state. Before a landlord can file a failure-to-pay-rent complaint, Maryland sources now require written notice of intent and use of form DC‑CV‑115, giving tenants 10 days to pay. The notice may be mailed, taped to the door, or, if the tenant agreed, delivered by email, text, or a tenant portal. Maine requires the residential Notice to Quit to be served with an **Eviction Information Sheet and Mediation Request** form CV‑256. Hawaii, starting February 5, 2026, requires a 10-day written notice and, if the tenant requests it, participation in pre-filing mediation before a residential nonpayment-of-rent case may be filed. Those states should be modeled as `pre_filing_prerequisites[]` rather than ordinary notice states. citeturn26search8turn26search4turn26search17turn37search0turn37search8turn8search14turn8search20
+
+Your app should therefore have a state-aware checklist engine. Before generating a filing packet, it should ask: “Was the required pre-filing form served?”, “Was mediation requested or completed if required?”, “Was the required notice-of-intent sent?”, and “Was the judicial information sheet attached?” If the answer is no in Maryland, Maine, or Hawaii, the app should block filing-packet generation outright. citeturn26search8turn37search0turn8search14
+
+### Lease-sensitive or locality-sensitive states
+
+Georgia, North Carolina, New Jersey, Missouri, Tennessee, Oregon, Wisconsin, and Minnesota should be handled as **attorney-review states** in a first commercial release unless your team completes a deeper state-pack review and local testing. New Jersey is the standout example: New Jersey courts and LSNJ are clear that, except for most nonpayment cases, the notice regime depends on the specific eviction ground and may require a notice to cease followed by a notice to quit. North Carolina is also tricky because Legal Aid publishes a common 10-day nonpayment notice framework while the North Carolina Judicial Branch says landlords are not always required to send an eviction notice. Oregon deserves a special engineer warning because the Oregon Legislature’s own ORS portal says the 2025 online edition does not yet incorporate all changes made in the 2025 special session and 2026 regular session. Wisconsin’s notice structure also varies with the tenancy and violation pattern. citeturn29search0turn29search20turn37search6turn37search14turn38search7turn34search1turn34search9
+
+In those states, the app should not “guess” a single definitive statewide notice. Instead, the UI should require the user to choose from a rule card such as “lease-controlled nonpayment,” “month-to-month nonrenewal,” “curable lease violation,” or “statutory just-cause ground,” and then surface the supporting citation and template version. If the operator cannot identify the correct card, the software should save a draft but block finalization. citeturn29search0turn37search14turn38search7
+
+### Local-overlay states
+
+California, New York, Connecticut, Maryland, Washington, and Missouri all require a local-exception registry even if the statewide core rule is understood. California courts themselves warn that many cities or counties require more details. Los Angeles City requires certain no-fault filings and declarations through LAHD; Los Angeles County publishes tenant-facing eviction guidance with 3-, 30-, 60-, and 90-day notice structures. Connecticut’s statewide eviction Right to Counsel program means operator screens should surface counsel/referral materials where required by deployment design. Maryland has Baltimore City-specific eviction execution/property-removal rules on the judiciary housing page. Kansas City, Missouri has a local Right to Counsel program that is not statewide but is significant enough to justify a municipal workflow entry. citeturn17view2turn13search12turn21search1turn39search7turn26search12turn28search13
+
+A local registry design should support `jurisdiction_key`, `effective_date`, `requires_registration`, `requires_declaration`, `requires_relocation_text`, `requires_counsel_notice`, `rent_control`, `just_cause_only`, and `additional_templates[]`. It should also support an annual review date because these local rules change faster than statewide code books. citeturn13search12turn21search1turn28search13turn39search7
+
+## Machine-readable artifacts for Replit ingestion
+
+The safest way to scaffold the app is to split the data model into a shared schema and per-state manifests.
+
+### Shared JSON schema example
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RentNoticeRuleSet",
+  "type": "object",
+  "required": [
+    "state",
+    "version_date",
+    "verification_status",
+    "templates",
+    "nonpayment_rule",
+    "service_rule",
+    "content_rule",
+    "date_count_rule",
+    "holiday_source",
+    "local_overlays"
+  ],
+  "properties": {
+    "state": { "type": "string", "pattern": "^[A-Z]{2}$" },
+    "version_date": { "type": "string", "format": "date" },
+    "verification_status": {
+      "type": "string",
+      "enum": ["draft", "source-pack-complete", "attorney-review-required", "approved"]
+    },
+    "templates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "pay_or_quit",
+          "cure_or_quit",
+          "unconditional_quit",
+          "termination_30",
+          "termination_60",
+          "rent_increase",
+          "entry_notice",
+          "vacate_notice",
+          "proof_of_service",
+          "posting_mailing_checklist",
+          "internal_review_sheet",
+          "right_to_counsel_addendum",
+          "mediation_notice",
+          "notice_of_intent_to_file"
+        ]
+      }
+    },
+    "nonpayment_rule": {
+      "type": "object",
+      "required": [
+        "period_length",
+        "period_unit",
+        "counting_basis",
+        "rent_only",
+        "requires_cure",
+        "prerequisites"
+      ],
+      "properties": {
+        "period_length": { "type": ["integer", "null"] },
+        "period_unit": { "type": "string", "enum": ["calendar_day", "business_day", "court_day", "unspecified"] },
+        "counting_basis": {
+          "type": "object",
+          "properties": {
+            "exclude_weekends": { "type": "boolean" },
+            "exclude_state_holidays": { "type": "boolean" },
+            "exclude_court_holidays": { "type": "boolean" },
+            "mail_extension_days": { "type": "integer" }
+          }
+        },
+        "rent_only": { "type": "boolean" },
+        "allowed_inclusions": { "type": "array", "items": { "type": "string" } },
+        "excluded_inclusions": { "type": "array", "items": { "type": "string" } },
+        "requires_cure": { "type": "boolean" },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "none",
+              "notice_of_intent",
+              "mediation_offer",
+              "mediation_if_requested",
+              "information_sheet",
+              "attorney_review"
+            ]
+          }
+        }
+      }
+    },
+    "service_rule": {
+      "type": "object",
+      "required": ["allowed_methods", "proof_required"],
+      "properties": {
+        "allowed_methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "substituted_and_mail",
+              "posting_and_mail",
+              "leave_at_residence",
+              "certified_mail",
+              "registered_mail",
+              "first_class_mail",
+              "email_if_agreed",
+              "text_if_agreed",
+              "portal_if_agreed",
+              "state_marshal",
+              "process_server",
+              "sheriff"
+            ]
+          }
+        },
+        "proof_required": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "server_name",
+              "server_age_18_plus",
+              "date_of_service",
+              "time_of_service",
+              "method_of_service",
+              "mailing_date",
+              "posting_date",
+              "recipient_name_or_description",
+              "penalty_of_perjury_statement",
+              "signature",
+              "tracking_number",
+              "attached_affidavit"
+            ]
+          }
+        }
+      }
+    },
+    "content_rule": {
+      "type": "object",
+      "required": ["required_fields"],
+      "properties": {
+        "required_fields": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "tenant_names",
+              "property_address",
+              "unit_number",
+              "landlord_name",
+              "agent_name",
+              "rent_periods",
+              "rent_amount_due",
+              "payment_address",
+              "payment_methods",
+              "office_days_hours",
+              "deadline_date",
+              "deadline_time_if_required",
+              "just_cause_statement",
+              "right_to_cure_statement",
+              "right_to_counsel_statement",
+              "mediation_statement",
+              "signature",
+              "date_signed"
+            ]
+          }
+        }
+      }
+    },
+    "date_count_rule": {
+      "type": "object",
+      "properties": {
+        "count_starts_day_after_service": { "type": "boolean" },
+        "moves_to_next_open_court_day_if_deadline_closed": { "type": "boolean" }
+      }
+    },
+    "holiday_source": {
+      "type": "object",
+      "properties": {
+        "strategy": { "type": "string", "enum": ["state_judiciary_calendar", "court_admin_calendar", "manual_annual_review"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "local_overlays": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["jurisdiction", "status"],
+        "properties": {
+          "jurisdiction": { "type": "string" },
+          "status": { "type": "string", "enum": ["none_identified", "review_required", "implemented"] },
+          "features": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}
+```
+
+### State override examples
+
+```json
+{
+  "CA": {
+    "version_date": "2026-07-16",
+    "verification_status": "attorney-review-required",
+    "templates": [
+      "pay_or_quit",
+      "cure_or_quit",
+      "unconditional_quit",
+      "termination_30",
+      "termination_60",
+      "proof_of_service",
+      "posting_mailing_checklist",
+      "internal_review_sheet",
+      "right_to_counsel_addendum"
+    ],
+    "nonpayment_rule": {
+      "period_length": 3,
+      "period_unit": "court_day",
+      "counting_basis": {
+        "exclude_weekends": true,
+        "exclude_state_holidays": false,
+        "exclude_court_holidays": true,
+        "mail_extension_days": 0
+      },
+      "rent_only": true,
+      "allowed_inclusions": ["base_rent_only"],
+      "excluded_inclusions": ["late_fees", "utilities", "damages", "legal_fees", "other_nonrent"],
+      "requires_cure": true,
+      "prerequisites": ["none"]
+    },
+    "service_rule": {
+      "allowed_methods": ["personal", "substituted_and_mail", "posting_and_mail", "process_server"],
+      "proof_required": [
+        "server_name",
+        "server_age_18_plus",
+        "date_of_service",
+        "method_of_service",
+        "mailing_date",
+        "recipient_name_or_description",
+        "penalty_of_perjury_statement",
+        "signature"
+      ]
+    },
+    "content_rule": {
+      "required_fields": [
+        "tenant_names",
+        "property_address",
+        "unit_number",
+        "rent_periods",
+        "rent_amount_due",
+        "payment_address",
+        "payment_methods",
+        "office_days_hours",
+        "deadline_date",
+        "signature",
+        "date_signed"
+      ]
+    },
+    "date_count_rule": {
+      "count_starts_day_after_service": true,
+      "moves_to_next_open_court_day_if_deadline_closed": true
+    },
+    "holiday_source": {
+      "strategy": "state_judiciary_calendar",
+      "notes": "Use California court holidays annually."
+    },
+    "local_overlays": [
+      {
+        "jurisdiction": "Los Angeles City",
+        "status": "review_required",
+        "features": ["just_cause", "no_fault_declaration", "relocation", "additional_forms"]
+      },
+      {
+        "jurisdiction": "Los Angeles County",
+        "status": "review_required",
+        "features": ["tenant_notice_guidance", "right_to_counsel_referral"]
+      }
+    ]
+  },
+  "FL": {
+    "version_date": "2026-07-16",
+    "verification_status": "source-pack-complete",
+    "templates": ["pay_or_quit", "cure_or_quit", "termination_30", "termination_60", "proof_of_service", "internal_review_sheet"],
+    "nonpayment_rule": {
+      "period_length": 3,
+      "period_unit": "court_day",
+      "counting_basis": {
+        "exclude_weekends": true,
+        "exclude_state_holidays": false,
+        "exclude_court_holidays": true,
+        "mail_extension_days": 0
+      },
+      "rent_only": true,
+      "allowed_inclusions": ["base_rent_only"],
+      "excluded_inclusions": ["waived_or_postdated_partial_rent_adjustments_only_after_new_notice"],
+      "requires_cure": true,
+      "prerequisites": ["none"]
+    },
+    "service_rule": {
+      "allowed_methods": ["personal", "leave_at_residence", "first_class_mail", "email_if_agreed"],
+      "proof_required": ["server_name", "date_of_service", "method_of_service", "signature"]
+    },
+    "content_rule": {
+      "required_fields": ["tenant_names", "property_address", "rent_amount_due", "payment_address", "deadline_date", "signature", "date_signed"]
+    },
+    "date_count_rule": {
+      "count_starts_day_after_service": false,
+      "moves_to_next_open_court_day_if_deadline_closed": true
+    },
+    "holiday_source": {
+      "strategy": "court_admin_calendar",
+      "notes": "Florida statute refers to court-observed holidays."
+    },
+    "local_overlays": []
+  },
+  "MD": {
+    "version_date": "2026-07-16",
+    "verification_status": "source-pack-complete",
+    "templates": ["notice_of_intent_to_file", "proof_of_service", "internal_review_sheet", "right_to_counsel_addendum"],
+    "nonpayment_rule": {
+      "period_length": 10,
+      "period_unit": "calendar_day",
+      "counting_basis": {
+        "exclude_weekends": false,
+        "exclude_state_holidays": false,
+        "exclude_court_holidays": false,
+        "mail_extension_days": 0
+      },
+      "rent_only": true,
+      "allowed_inclusions": ["base_rent_only"],
+      "excluded_inclusions": ["fees_without_statutory_basis"],
+      "requires_cure": true,
+      "prerequisites": ["notice_of_intent"]
+    },
+    "service_rule": {
+      "allowed_methods": ["first_class_mail", "posting_and_mail", "email_if_agreed", "text_if_agreed", "portal_if_agreed"],
+      "proof_required": ["date_of_service", "method_of_service", "signature"]
+    },
+    "content_rule": {
+      "required_fields": ["tenant_names", "property_address", "rent_amount_due", "deadline_date", "signature", "date_signed"]
+    },
+    "date_count_rule": {
+      "count_starts_day_after_service": true,
+      "moves_to_next_open_court_day_if_deadline_closed": false
+    },
+    "holiday_source": {
+      "strategy": "state_judiciary_calendar",
+      "notes": "Baltimore City execution/property rules should be handled in local overlays."
+    },
+    "local_overlays": [
+      {
+        "jurisdiction": "Baltimore City",
+        "status": "review_required",
+        "features": ["post_judgment_property_removal_rules"]
+      }
+    ]
+  },
+  "HI": {
+    "version_date": "2026-07-16",
+    "verification_status": "attorney-review-required",
+    "templates": ["pay_or_quit", "mediation_notice", "proof_of_service", "internal_review_sheet"],
+    "nonpayment_rule": {
+      "period_length": 10,
+      "period_unit": "calendar_day",
+      "counting_basis": {
+        "exclude_weekends": false,
+        "exclude_state_holidays": false,
+        "exclude_court_holidays": false,
+        "mail_extension_days": 0
+      },
+      "rent_only": true,
+      "allowed_inclusions": ["base_rent_only"],
+      "excluded_inclusions": ["nonrent"],
+      "requires_cure": true,
+      "prerequisites": ["mediation_if_requested"]
+    },
+    "service_rule": {
+      "allowed_methods": ["personal", "certified_mail", "first_class_mail"],
+      "proof_required": ["date_of_service", "method_of_service", "signature", "tracking_number"]
+    },
+    "content_rule": {
+      "required_fields": ["tenant_names", "property_address", "rent_amount_due", "deadline_date", "mediation_statement", "signature", "date_signed"]
+    },
+    "date_count_rule": {
+      "count_starts_day_after_service": true,
+      "moves_to_next_open_court_day_if_deadline_closed": false
+    },
+    "holiday_source": {
+      "strategy": "state_judiciary_calendar",
+      "notes": "Mediation prerequisite effective for nonpayment actions filed on or after 2026-02-05."
+    },
+    "local_overlays": []
+  }
+}
+```
+
+### Minimal 50-state manifest
+
+```json
+{
+  "AL": {"status":"attorney-review-required","nonpayment_notice":"7 business days","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "AK": {"status":"source-pack-complete","nonpayment_notice":"7 days","templates":["pay_or_quit","proof_of_service","termination"],"local_overlays":[]},
+  "AZ": {"status":"attorney-review-required","nonpayment_notice":"unspecified","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "AR": {"status":"attorney-review-required","nonpayment_notice":"unspecified","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "CA": {"status":"attorney-review-required","nonpayment_notice":"3 court days","templates":["pay_or_quit","cure_or_quit","unconditional_quit","termination_30","termination_60","proof_of_service","right_to_counsel_addendum"],"local_overlays":["Los Angeles City","Los Angeles County","other local just-cause jurisdictions"]},
+  "CO": {"status":"attorney-review-required","nonpayment_notice":"verify current JDF/statute","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":["Denver/Boulder review"]},
+  "CT": {"status":"attorney-review-required","nonpayment_notice":"3 full days to quit","templates":["pay_or_quit","cure_or_quit","termination","right_to_counsel_addendum"],"local_overlays":[]},
+  "DE": {"status":"attorney-review-required","nonpayment_notice":"unspecified","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "FL": {"status":"source-pack-complete","nonpayment_notice":"3 court days excluding weekends and court holidays","templates":["pay_or_quit","cure_or_quit","termination_30","termination_60","proof_of_service"],"local_overlays":[]},
+  "GA": {"status":"attorney-review-required","nonpayment_notice":"lease/demand-sensitive","templates":["demand_for_possession","termination","proof_of_service"],"local_overlays":[]},
+  "HI": {"status":"attorney-review-required","nonpayment_notice":"10 days plus mediation prerequisite","templates":["pay_or_quit","mediation_notice","proof_of_service"],"local_overlays":[]},
+  "ID": {"status":"attorney-review-required","nonpayment_notice":"3 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "IL": {"status":"attorney-review-required","nonpayment_notice":"5 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":["Chicago-area ordinance review"]},
+  "IN": {"status":"source-pack-complete","nonpayment_notice":"10 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "IA": {"status":"source-pack-complete","nonpayment_notice":"3 days","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "KS": {"status":"source-pack-complete","nonpayment_notice":"3 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "KY": {"status":"attorney-review-required","nonpayment_notice":"7 days","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "LA": {"status":"source-pack-complete","nonpayment_notice":"5 days to vacate","templates":["notice_to_vacate","proof_of_service","termination"],"local_overlays":[]},
+  "ME": {"status":"source-pack-complete","nonpayment_notice":"7-day or 30-day depending ground","templates":["notice_to_quit","information_sheet","proof_of_service","termination"],"local_overlays":[]},
+  "MD": {"status":"source-pack-complete","nonpayment_notice":"10-day notice of intent","templates":["notice_of_intent_to_file","proof_of_service","right_to_counsel_addendum"],"local_overlays":["Baltimore City"]},
+  "MA": {"status":"attorney-review-required","nonpayment_notice":"14 days with cure rights","templates":["pay_or_quit","accompanying_form","termination_30","proof_of_service"],"local_overlays":[]},
+  "MI": {"status":"source-pack-complete","nonpayment_notice":"7 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "MN": {"status":"attorney-review-required","nonpayment_notice":"do not hard-code statewide","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":["Minneapolis","St. Paul review"]},
+  "MS": {"status":"attorney-review-required","nonpayment_notice":"3 days","templates":["pay_or_quit","cure_or_quit","termination"],"local_overlays":[]},
+  "MO": {"status":"attorney-review-required","nonpayment_notice":"no single statewide rule confirmed here","templates":["demand_for_rent","termination","proof_of_service"],"local_overlays":["Kansas City RTC"]},
+  "MT": {"status":"attorney-review-required","nonpayment_notice":"10 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "NE": {"status":"source-pack-complete","nonpayment_notice":"3 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "NV": {"status":"attorney-review-required","nonpayment_notice":"verify summary-eviction packet","templates":["pay_or_quit","summary_eviction_notice","proof_of_service"],"local_overlays":["Clark County","Washoe County"]},
+  "NH": {"status":"attorney-review-required","nonpayment_notice":"verify official demand-for-rent form","templates":["demand_for_rent","eviction_notice","proof_of_service"],"local_overlays":[]},
+  "NJ": {"status":"attorney-review-required","nonpayment_notice":"most nonpayment cases do not require cease/quit notice","templates":["notice_to_cease","notice_to_quit","proof_of_service"],"local_overlays":["municipal rent control review"]},
+  "NM": {"status":"source-pack-complete","nonpayment_notice":"3 days","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "NY": {"status":"attorney-review-required","nonpayment_notice":"state-specific rent demand workflow required","templates":["rent_demand","notice_to_cure","notice_of_termination","proof_of_service","right_to_counsel_addendum"],"local_overlays":["New York City","other ETPA/local stabilization jurisdictions"]},
+  "NC": {"status":"attorney-review-required","nonpayment_notice":"lease-sensitive; 10 days common signal","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "ND": {"status":"attorney-review-required","nonpayment_notice":"verify official packet","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "OH": {"status":"source-pack-complete","nonpayment_notice":"3 days","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "OK": {"status":"source-pack-complete","nonpayment_notice":"5 days","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "OR": {"status":"attorney-review-required","nonpayment_notice":"use current ORS plus 2026 updates","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":["Portland","other local just-cause/rent-control review"]},
+  "PA": {"status":"attorney-review-required","nonpayment_notice":"10 days default, lease-sensitive","templates":["notice_to_quit","proof_of_service","termination"],"local_overlays":["Philadelphia and local rental licensing review"]},
+  "RI": {"status":"source-pack-complete","nonpayment_notice":"15 days in arrears before nonpayment eviction filing","templates":["nonpayment_eviction_notice","termination_notice","proof_of_service"],"local_overlays":[]},
+  "SC": {"status":"attorney-review-required","nonpayment_notice":"verify from lease/statute package","templates":["notice_to_vacate","application_for_ejectment","proof_of_service"],"local_overlays":[]},
+  "SD": {"status":"attorney-review-required","nonpayment_notice":"verify official UJS forms","templates":["notice_to_quit","eviction_affidavit","proof_of_service"],"local_overlays":[]},
+  "TN": {"status":"attorney-review-required","nonpayment_notice":"county/URLTA-sensitive","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":["Nashville RTC ecosystem"]},
+  "TX": {"status":"source-pack-complete","nonpayment_notice":"3 days unless lease changes","templates":["pay_or_vacate","notice_to_vacate","proof_of_service"],"local_overlays":[]},
+  "UT": {"status":"source-pack-complete","nonpayment_notice":"3 business days","templates":["pay_or_vacate","termination_15","proof_of_service"],"local_overlays":[]},
+  "VT": {"status":"attorney-review-required","nonpayment_notice":"14 days with cure","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "VA": {"status":"attorney-review-required","nonpayment_notice":"verify from current VRLTA text","templates":["pay_or_quit","cure_or_quit","termination","proof_of_service"],"local_overlays":[]},
+  "WA": {"status":"attorney-review-required","nonpayment_notice":"14 days","templates":["pay_or_vacate","termination","proof_of_service","right_to_counsel_addendum"],"local_overlays":["Seattle and other local overlays review"]},
+  "WV": {"status":"attorney-review-required","nonpayment_notice":"verify private-tenancy notice from current code","templates":["wrongful_occupation_notice","proof_of_service","termination"],"local_overlays":[]},
+  "WI": {"status":"attorney-review-required","nonpayment_notice":"depends on tenancy and breach history","templates":["five_day_notice","fourteen_day_notice","thirty_day_notice","proof_of_service"],"local_overlays":[]},
+  "WY": {"status":"attorney-review-required","nonpayment_notice":"verify official court packet","templates":["pay_or_quit","termination","proof_of_service"],"local_overlays":[]}
+}
+```
+
+### Sample merge-field template text
+
+```text
+{{NOTICE_TITLE}}
+
+To: {{TENANT_FULL_NAMES}}
+Premises: {{PROPERTY_ADDRESS}}{{#UNIT_NUMBER}}, Unit {{UNIT_NUMBER}}{{/UNIT_NUMBER}}
+
+You are hereby notified that rent for the following rental period(s) is due and unpaid:
+
+{{#RENT_PERIOD_ROWS}}
+- {{PERIOD_LABEL}}: ${{RENT_CHARGED}} charged, ${{PAYMENTS_APPLIED}} paid, ${{CREDITS_APPLIED}} credits, ${{BALANCE_DUE}} due
+{{/RENT_PERIOD_ROWS}}
+
+Total RENT ONLY amount demanded: ${{TOTAL_RENT_ONLY_DUE}}
+
+This notice does not include late fees, utility charges, damages, legal fees, deposits, or any other non-rent charges.
+
+You must, on or before {{DEADLINE_DATE}}{{#DEADLINE_TIME}} at {{DEADLINE_TIME}}{{/DEADLINE_TIME}},
+{{NOTICE_COMMAND}}.
+
+Payment may be made to:
+{{PAYMENT_RECIPIENT}}
+{{PAYMENT_ADDRESS}}
+Accepted methods: {{ACCEPTED_PAYMENT_METHODS}}
+{{#OFFICE_DAYS_HOURS}}In-person payment hours: {{OFFICE_DAYS_HOURS}}{{/OFFICE_DAYS_HOURS}}
+
+{{#STATE_REQUIRED_LANGUAGE}}
+{{STATE_REQUIRED_LANGUAGE}}
+{{/STATE_REQUIRED_LANGUAGE}}
+
+Dated: {{DATE_SIGNED}}
+{{LANDLORD_OR_AGENT_NAME}}
+{{LANDLORD_OR_AGENT_TITLE}}
+```
+
+## Suggested UI rules, blocking logic, and test cases
+
+The app should separate **blocking rules** from **warning rules**.
+
+Blocking rules should include: non-rent amounts in a rent-demand notice where the state pack is rent-only; missing tenant names, property address, or payment instructions; missing service details required for proof; generation of a nonpayment notice in Maryland without DC‑CV‑115 content; generation of a Maine residential notice without the information sheet; generation of a Hawaii nonpayment workflow without the mediation branch; generation of a California notice with an incorrectly counted 3-day deadline; and generation in Oregon from a stale 2025-only rule pack that ignores 2026 updates. citeturn17view2turn17view1turn26search8turn37search0turn8search14turn38search7
+
+Warning rules should include: ambiguous payment allocation across months; lease-driven states where the selected state card may not match the lease form; possible federal overlay such as CARES Act or subsidized housing; possible local overlay such as Los Angeles, New York City, Baltimore City, Kansas City, or Connecticut RTC; and use of electronic service in a state where the reviewed source only authorizes it when the tenant agreed. citeturn15view2turn26search17turn13search12turn26search12turn28search13turn39search7
+
+Recommended minimum regression scenarios are:
+
+| Scenario | Why it matters | States to test |
+|---|---|---|
+| Ledger contains rent, utilities, late fees, pet fee, parking fee | Ensures rent-only exclusion engine works | CA, AK, MA, FL citeturn17view2turn16view2turn14search0turn15view2 |
+| Partial payment accepted after notice | Requires new balance handling and sometimes a new notice | FL, AK citeturn15view2turn16view0 |
+| Notice served by posting + mail | Requires proof-of-service and date logic | CA, AK, TX/WA review states citeturn17view1turn16view2turn21search0turn12search16 |
+| Deadline lands on weekend or court holiday | Must move or count correctly | CA, FL, UT citeturn17view1turn15view2turn33search13 |
+| Residential nonpayment in Maine | Must attach court information sheet | ME citeturn37search0turn37search8 |
+| Residential nonpayment in Maryland | Must use notice-of-intent pathway | MD citeturn26search8turn26search4 |
+| Residential nonpayment in Hawaii after Feb. 5, 2026 | Must show mediation branch | HI citeturn8search14turn8search20 |
+| NJ nonpayment vs. NJ lease-violation workflow | Ensures notice-to-cease/quit distinctions | NJ citeturn29search0turn29search20 |
+| NC lease with its own notice clause | Ensures lease-sensitive branch | NC citeturn37search6turn37search14 |
+| California local no-fault notice in Los Angeles | Ensures local overlay registry works | CA local overlay citeturn13search12turn21search1 |
+
+### Generic lifecycle flowchart
+
+```mermaid
+flowchart TD
+    A[Import ledger or enter manually] --> B[Normalize charges and payments]
+    B --> C[Tag charges as rent or non-rent]
+    C --> D{State requires rent-only?}
+    D -->|Yes| E[Exclude non-rent from notice amount]
+    D -->|No or unspecified| F[Apply attorney-reviewed state rule]
+    E --> G[Compute rent owed by month]
+    F --> G
+    G --> H[Select state rule pack]
+    H --> I{Local overlay exists?}
+    I -->|Yes| J[Load city/county addenda and validations]
+    I -->|No| K[Use statewide defaults]
+    J --> L[Generate notice draft]
+    K --> L
+    L --> M[Validate content fields]
+    M --> N[Validate date counting and court holidays]
+    N --> O[Validate service options and proof fields]
+    O --> P{Pre-filing prerequisite?}
+    P -->|Notice of intent| Q[Generate intent form]
+    P -->|Mediation| R[Generate mediation branch]
+    P -->|Info sheet| S[Attach judicial information sheet]
+    P -->|None| T[Ready for service]
+    Q --> T
+    R --> T
+    S --> T
+    T --> U[Capture service and affidavit]
+    U --> V[Lock final notice and version]
+    V --> W[Optional filing packet generation]
+```
+
+## Final deployment guidance
+
+A rent-notice desktop app can be safely scaffolded statewide, but it should not present itself as a “50-state definitive legal engine” on day one. The sources reviewed here show that a defensible release path is: first, ship a strong rent-only ledger and notice-drafting core; second, ship state packs with verification tiers; third, require attorney review for complex states and local overlays; fourth, sync judicial holidays and session-law changes annually; and fifth, log every operator choice and version every template. That approach is especially important in states where the official materials themselves emphasize form precision, service precision, or rapidly changing law. citeturn17view1turn14search7turn26search8turn37search0turn38search7
+
+If you ingest this into Replit, the most valuable immediate result will be a rule-driven scaffold that blocks obviously defective notices before they are ever printed. The most valuable medium-term result will be a state/local registry that lets you add attorney-approved template packs over time without rewriting the entire application. The high-risk categories to prioritize first for attorney review are California, New York, New Jersey, Connecticut, Maryland, Massachusetts, Washington, Oregon, Hawaii, Tennessee, and any locality with just-cause or right-to-counsel overlays. citeturn17view2turn12search2turn29search0turn39search7turn26search8turn14search7turn12search5turn38search7turn8search14turn33search15

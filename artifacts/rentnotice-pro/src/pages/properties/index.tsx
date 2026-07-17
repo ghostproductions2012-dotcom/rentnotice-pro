@@ -1,17 +1,25 @@
-import { usePermissions, useProperties } from "@/lib/api/hooks";
+import { usePermissions, useProperties, useSettings, useWorkspaceState } from "@/lib/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building, MapPin, Search, Plus } from "lucide-react";
+import { Building, MapPin, Search, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
 import { useState } from "react";
 import { PropertyFormDialog } from "@/components/property-form-dialog";
+import { BuildiumImportDialog } from "@/components/buildium-import-dialog";
 
 export default function PropertiesList() {
   const [search, setSearch] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const { data: properties, isLoading } = useProperties(search);
+  const { data: settings } = useSettings();
+  const { data: workspace } = useWorkspaceState();
   const { can } = usePermissions();
+
+  const buildiumReady =
+    workspace?.mode === "activated" &&
+    Boolean(settings?.buildiumClientId && settings?.buildiumClientSecret);
 
   return (
     <div className="space-y-6">
@@ -20,14 +28,27 @@ export default function PropertiesList() {
           <h1 className="text-3xl font-serif font-bold tracking-tight">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage real estate assets and payment profiles.</p>
         </div>
-        <Button
-          onClick={() => setAddOpen(true)}
-          disabled={!can("property.manage")}
-          data-testid="button-add-property"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Add Property
-        </Button>
+        <div className="flex items-center gap-3">
+          {buildiumReady && (
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+              disabled={!can("property.manage")}
+              data-testid="button-buildium-import"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Import from Buildium
+            </Button>
+          )}
+          <Button
+            onClick={() => setAddOpen(true)}
+            disabled={!can("property.manage")}
+            data-testid="button-add-property"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Property
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-4">
@@ -101,6 +122,7 @@ export default function PropertiesList() {
       )}
 
       <PropertyFormDialog open={addOpen} onOpenChange={setAddOpen} />
+      <BuildiumImportDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

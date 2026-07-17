@@ -90,13 +90,13 @@ export const BUILTIN_PRESETS: MappingPreset[] = [
     createdAt: PRESET_EPOCH,
   },
   {
-    // First Light Property Management, Inc. "Tenant Statement" export. A single
-    // signed Amount column (charges positive, payments negative), a free-text
-    // Description ("Rent", "EFT fee", "by <tenant>", "Security deposit", …) and
-    // a running Balance. Matches the ledgers used by the first customer.
-    id: "preset-first-light",
-    name: "First Light PM — Tenant Statement",
-    vendor: "first_light",
+    // Generic "Tenant Statement" export used by many property managers. A
+    // single signed Amount column (charges positive, payments negative), a
+    // free-text Description ("Rent", "EFT fee", "by <tenant>", "Security
+    // deposit", …) and a running Balance.
+    id: "preset-tenant-statement",
+    name: "Tenant Statement (PDF)",
+    vendor: "tenant_statement",
     mapping: mk({
       date: "Date",
       description: "Description",

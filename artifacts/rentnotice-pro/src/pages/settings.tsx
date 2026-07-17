@@ -8,16 +8,29 @@ import {
   usePermissions,
   useSession,
   useChangeMyPassword,
+  useHolidays,
+  useAddHoliday,
+  useDeleteHoliday,
 } from "@/lib/api/hooks";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ActivationWizard } from "@/components/first-run";
-import { KeyRound } from "lucide-react";
+import { BuildiumIntegrationCard } from "@/components/buildium-integration-card";
+import { KeyRound, CalendarPlus, Trash2 } from "lucide-react";
 import type { User } from "@/lib/types";
+import { ALL_RULE_PACKS } from "@/lib/engine/rulepacks";
+import { STATE_HOLIDAY_STATES, stateHolidaySource } from "@/lib/engine/stateHolidays";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -168,6 +181,151 @@ function MyAccountCard({ user }: { user: User }) {
             {changePassword.isPending ? "Changing…" : "Change Password"}
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HolidaysCard({ canManage }: { canManage: boolean }) {
+  const { data: holidays } = useHolidays();
+  const addHoliday = useAddHoliday();
+  const deleteHoliday = useDeleteHoliday();
+  const { toast } = useToast();
+  const [date, setDate] = useState("");
+  const [name, setName] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("US");
+
+  const custom = (holidays ?? []).filter((h) => !h.builtIn).sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!date || !name.trim()) return;
+    addHoliday.mutate(
+      { date, name: name.trim(), jurisdiction, courtHoliday: true },
+      {
+        onSuccess: () => {
+          setDate("");
+          setName("");
+          toast({
+            title: "Holiday added",
+            description: "Deadline calculations will now treat this date as a court closure.",
+          });
+        },
+        onError: (err: unknown) =>
+          toast({
+            title: "Could not add holiday",
+            description: err instanceof Error ? err.message : String(err),
+            variant: "destructive",
+          }),
+      },
+    );
+  };
+
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader>
+        <CardTitle>Court & State Holidays</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="text-sm text-muted-foreground space-y-2">
+          <p>
+            Deadline calculations use bundled holiday calendars for California and the states
+            below. Other states fall back to the federal holiday set with a warning. Add custom
+            closures for other states, office-specific closure days, or newly announced court
+            holidays — pick "All states" for nationwide closures.
+          </p>
+          <ul className="list-disc pl-5">
+            {STATE_HOLIDAY_STATES.map((s) => (
+              <li key={s}>{stateHolidaySource(s)}</li>
+            ))}
+          </ul>
+        </div>
+        {canManage && (
+          <form onSubmit={handleAdd} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div className="space-y-2">
+              <Label htmlFor="holiday-date">Date</Label>
+              <Input
+                id="holiday-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                data-testid="input-holiday-date"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="holiday-name">Name</Label>
+              <Input
+                id="holiday-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. County court closure"
+                required
+                data-testid="input-holiday-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Applies to</Label>
+              <Select value={jurisdiction} onValueChange={setJurisdiction}>
+                <SelectTrigger data-testid="select-holiday-jurisdiction">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="US">All states</SelectItem>
+                  {ALL_RULE_PACKS.map((p) => (
+                    <SelectItem key={p.state} value={p.state}>
+                      {p.stateName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" disabled={addHoliday.isPending} data-testid="button-add-holiday">
+              <CalendarPlus className="h-4 w-4 mr-2" />
+              {addHoliday.isPending ? "Adding…" : "Add Holiday"}
+            </Button>
+          </form>
+        )}
+        {custom.length > 0 ? (
+          <div className="border rounded-md divide-y">
+            {custom.map((h) => (
+              <div
+                key={h.id}
+                className="flex items-center justify-between px-3 py-2 text-sm"
+                data-testid={`row-holiday-${h.id}`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-mono">{h.date}</span>
+                  <span>{h.name}</span>
+                  <span className="text-muted-foreground text-xs uppercase">
+                    {h.jurisdiction === "US" || !h.jurisdiction ? "All states" : h.jurisdiction}
+                  </span>
+                </div>
+                {canManage && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      deleteHoliday.mutate(h.id, {
+                        onError: (err: unknown) =>
+                          toast({
+                            title: "Could not remove holiday",
+                            description: err instanceof Error ? err.message : String(err),
+                            variant: "destructive",
+                          }),
+                      })
+                    }
+                    data-testid={`button-delete-holiday-${h.id}`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">No custom holidays added.</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -381,6 +539,10 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <BuildiumIntegrationCard />
+
+        <HolidaysCard canManage={canManageSettings} />
 
         <Card className="md:col-span-2">
           <CardHeader>

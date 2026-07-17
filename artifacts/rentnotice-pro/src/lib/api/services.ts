@@ -16,6 +16,8 @@ import type {
   DashboardData,
   DeadlineResult,
   DuplicateCheckResult,
+  ExternalPropertyUpsert,
+  ExternalTenantUpsert,
   FieldAssignment,
   FieldEvidence,
   GenerateDocumentsInput,
@@ -38,8 +40,10 @@ import type {
   RentClass,
   ReportKind,
   ReportResult,
+  ServiceMethod,
   ServiceRecord,
   SessionInfo,
+  StateRuleReview,
   StateRuleSummary,
   TemplateUpdateInput,
   Tenant,
@@ -51,11 +55,22 @@ import type {
 import type { LicenseSummary } from "../licensing/types";
 
 export interface DeadlineContext {
+  /** Service method used — enables rule-pack mail extensions in other states. */
+  serviceMethod?: ServiceMethod;
   /** Rent-increase amount context — enables the 90-day rule under §827(b)(2). */
   rentIncrease?: {
     newRentCents: number | null;
     currentRentCents: number | null;
   };
+}
+
+export interface SetStateRuleReviewInput {
+  /** 2-letter state code (case-insensitive). */
+  state: string;
+  reviewerName: string;
+  /** ISO date (YYYY-MM-DD) the attorney completed the review. */
+  reviewedAt: string;
+  notes?: string;
 }
 
 export interface CreatePropertyInput {
@@ -224,6 +239,8 @@ export interface AppServices {
   createProperty(input: CreatePropertyInput): Promise<Property>;
   updateProperty(id: Id, patch: Partial<Omit<Property, "id" | "createdAt">>): Promise<Property>;
   deleteProperty(id: Id): Promise<void>;
+  /** Create-or-update a property imported from an external system (matched by external ids). */
+  upsertExternalProperty(input: ExternalPropertyUpsert): Promise<{ property: Property; created: boolean }>;
 
   // --- tenants ---
   listTenants(search?: string, propertyId?: Id): Promise<Tenant[]>;
@@ -231,6 +248,8 @@ export interface AppServices {
   createTenant(input: CreateTenantInput): Promise<Tenant>;
   updateTenant(id: Id, patch: Partial<Omit<Tenant, "id" | "createdAt">>): Promise<Tenant>;
   deleteTenant(id: Id): Promise<void>;
+  /** Create-or-update a tenant imported from an external system (matched by external ids). */
+  upsertExternalTenant(input: ExternalTenantUpsert): Promise<{ tenant: Tenant; created: boolean }>;
 
   // --- ledgers & import ---
   listLedgers(tenantId?: Id): Promise<Ledger[]>;
@@ -271,7 +290,7 @@ export interface AppServices {
   recordService(
     id: Id,
     service: ServiceRecord,
-    options?: { source?: "field_sync" },
+    options?: { source?: "field_sync"; electronicConsent?: boolean },
   ): Promise<Notice>;
 
   // --- documents ---
@@ -330,6 +349,11 @@ export interface AppServices {
 
   // --- state rules (50-state reference) ---
   listStateRules(): Promise<StateRuleSummary[]>;
+
+  // --- state rule attorney reviews ---
+  listStateRuleReviews(): Promise<StateRuleReview[]>;
+  setStateRuleReview(input: SetStateRuleReviewInput): Promise<StateRuleReview>;
+  clearStateRuleReview(state: string): Promise<void>;
 
   // --- backup / restore ---
   exportBackup(): Promise<Blob>;

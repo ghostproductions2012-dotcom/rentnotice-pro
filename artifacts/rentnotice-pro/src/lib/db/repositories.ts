@@ -50,6 +50,7 @@ import type {
   Property,
   RentClass,
   ServiceMethod,
+  StateRuleReview,
   StatusHistoryEntry,
   Tenant,
   TemplateVersion,
@@ -326,6 +327,10 @@ function rowToSettings(r: Row): AppSettings {
     syncEndpoint: asStr(r.sync_endpoint),
     disclaimerAcknowledgedAt: strOrNull(r.disclaimer_acknowledged_at),
     onboardingCompleted: toBool(r.onboarding_completed),
+    buildiumClientId: asStr(r.buildium_client_id),
+    buildiumClientSecret: asStr(r.buildium_client_secret),
+    buildiumConnectedAt: strOrNull(r.buildium_connected_at),
+    buildiumLastSyncAt: strOrNull(r.buildium_last_sync_at),
     updatedAt: asStr(r.updated_at),
   };
 }
@@ -345,6 +350,10 @@ function settingsRow(s: AppSettings): Row {
     sync_endpoint: s.syncEndpoint,
     disclaimer_acknowledged_at: s.disclaimerAcknowledgedAt,
     onboarding_completed: fromBool(s.onboardingCompleted),
+    buildium_client_id: s.buildiumClientId,
+    buildium_client_secret: s.buildiumClientSecret,
+    buildium_connected_at: s.buildiumConnectedAt,
+    buildium_last_sync_at: s.buildiumLastSyncAt,
     updated_at: s.updatedAt,
   };
 }
@@ -389,6 +398,8 @@ function rowToProperty(r: Row): Property {
     payment: { ...emptyPayment(), ...parseJson<Partial<PaymentProfile>>(r.payment, {}) },
     isLosAngelesCity: toBool(r.is_los_angeles_city),
     notes: asStr(r.notes),
+    externalSource: strOrNull(r.external_source),
+    externalId: strOrNull(r.external_id),
     createdAt: asStr(r.created_at),
     updatedAt: asStr(r.updated_at),
   };
@@ -412,6 +423,8 @@ function propertyRow(p: Property): Row {
     payment: toJson(p.payment),
     is_los_angeles_city: fromBool(p.isLosAngelesCity),
     notes: p.notes,
+    external_source: p.externalSource,
+    external_id: p.externalId,
     created_at: p.createdAt,
     updated_at: p.updatedAt,
   };
@@ -434,6 +447,13 @@ export const propertiesRepo = {
   },
   get(db: AppDatabase, id: Id): Property | null {
     const r = db.get("SELECT * FROM properties WHERE id = ?", [id]);
+    return r ? rowToProperty(r) : null;
+  },
+  findByExternal(db: AppDatabase, source: string, externalId: string): Property | null {
+    const r = db.get("SELECT * FROM properties WHERE external_source = ? AND external_id = ?", [
+      source,
+      externalId,
+    ]);
     return r ? rowToProperty(r) : null;
   },
   create(db: AppDatabase, property: Property): Property {
@@ -473,6 +493,8 @@ function rowToTenant(r: Row): Tenant {
     moveOutDate: strOrNull(r.move_out_date),
     notes: asStr(r.notes),
     archived: toBool(r.archived),
+    externalSource: strOrNull(r.external_source),
+    externalId: strOrNull(r.external_id),
     createdAt: asStr(r.created_at),
     updatedAt: asStr(r.updated_at),
   };
@@ -491,6 +513,8 @@ function tenantRow(t: Tenant): Row {
     move_out_date: t.moveOutDate,
     notes: t.notes,
     archived: fromBool(t.archived),
+    external_source: t.externalSource,
+    external_id: t.externalId,
     created_at: t.createdAt,
     updated_at: t.updatedAt,
   };
@@ -511,6 +535,13 @@ export const tenantsRepo = {
   },
   get(db: AppDatabase, id: Id): Tenant | null {
     const r = db.get("SELECT * FROM tenants WHERE id = ?", [id]);
+    return r ? rowToTenant(r) : null;
+  },
+  findByExternal(db: AppDatabase, source: string, externalId: string): Tenant | null {
+    const r = db.get("SELECT * FROM tenants WHERE external_source = ? AND external_id = ?", [
+      source,
+      externalId,
+    ]);
     return r ? rowToTenant(r) : null;
   },
   create(db: AppDatabase, tenant: Tenant): Tenant {
@@ -820,6 +851,9 @@ function rowToNotice(r: Row): Notice {
     rentOnlyAttestedBy: strOrNull(r.rent_only_attested_by),
     rentOnlyAttestedAt: strOrNull(r.rent_only_attested_at),
     attorneyExportFlag: toBool(r.attorney_export_flag),
+    prereqCompleted: parseJson<Record<string, boolean>>(r.prereq_completed, {}),
+    ruleCardKey: strOrNull(r.rule_card_key),
+    electronicServiceConsent: toBool(r.electronic_service_consent),
     service: {
       dateServed: strOrNull(r.service_date_served),
       timeServed: strOrNull(r.service_time_served),
@@ -870,6 +904,9 @@ function noticeRow(n: Notice): Row {
     rent_only_attested_by: n.rentOnlyAttestedBy,
     rent_only_attested_at: n.rentOnlyAttestedAt,
     attorney_export_flag: fromBool(n.attorneyExportFlag),
+    prereq_completed: toJson(n.prereqCompleted),
+    rule_card_key: n.ruleCardKey,
+    electronic_service_consent: fromBool(n.electronicServiceConsent),
     service_date_served: n.service.dateServed,
     service_time_served: n.service.timeServed,
     service_method: n.service.method,
@@ -1256,6 +1293,54 @@ export const holidaysRepo = {
   },
   remove(db: AppDatabase, id: Id): void {
     db.run("DELETE FROM holidays WHERE id = ?", [id]);
+  },
+};
+
+// =====================================================================
+// State rule attorney reviews
+// =====================================================================
+
+function rowToStateRuleReview(r: Row): StateRuleReview {
+  return {
+    state: asStr(r.state),
+    reviewerName: asStr(r.reviewer_name),
+    reviewedAt: asStr(r.reviewed_at),
+    notes: asStr(r.notes),
+    recordedBy: strOrNull(r.recorded_by),
+    createdAt: asStr(r.created_at),
+    updatedAt: asStr(r.updated_at),
+  };
+}
+
+function stateRuleReviewRow(review: StateRuleReview): Row {
+  return {
+    state: review.state,
+    reviewer_name: review.reviewerName,
+    reviewed_at: review.reviewedAt,
+    notes: review.notes,
+    recorded_by: review.recordedBy,
+    created_at: review.createdAt,
+    updated_at: review.updatedAt,
+  };
+}
+
+export const stateRuleReviewsRepo = {
+  list(db: AppDatabase): StateRuleReview[] {
+    return db.all("SELECT * FROM state_rule_reviews ORDER BY state").map(rowToStateRuleReview);
+  },
+  get(db: AppDatabase, state: string): StateRuleReview | null {
+    const r = db.get("SELECT * FROM state_rule_reviews WHERE state = ?", [
+      state.toUpperCase(),
+    ]);
+    return r ? rowToStateRuleReview(r) : null;
+  },
+  upsert(db: AppDatabase, review: StateRuleReview): StateRuleReview {
+    const normalized = { ...review, state: review.state.toUpperCase() };
+    upsertRow(db, "state_rule_reviews", stateRuleReviewRow(normalized));
+    return normalized;
+  },
+  remove(db: AppDatabase, state: string): void {
+    db.run("DELETE FROM state_rule_reviews WHERE state = ?", [state.toUpperCase()]);
   },
 };
 

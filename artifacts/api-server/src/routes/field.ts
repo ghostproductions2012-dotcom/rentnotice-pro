@@ -58,6 +58,7 @@ function toSync(
     noticeType: row.noticeType,
     deadlineDate: row.deadlineDate,
     totalAmountCents: row.totalAmountCents,
+    source: row.source,
     evidence: evidence.map((e) => ({
       id: e.id,
       photoDataUrl: e.photoDataUrl,
@@ -155,6 +156,7 @@ router.put("/field/assignments", async (req, res) => {
       deadlineDate: typeof a["deadlineDate"] === "string" ? a["deadlineDate"] : null,
       totalAmountCents:
         typeof a["totalAmountCents"] === "number" ? Math.round(a["totalAmountCents"]) : null,
+      source: typeof a["source"] === "string" && a["source"] ? a["source"] : null,
       createdAt: a["createdAt"],
       updatedAt: a["updatedAt"],
     };
@@ -181,6 +183,7 @@ router.put("/field/assignments", async (req, res) => {
           noticeType: incoming.noticeType,
           deadlineDate: incoming.deadlineDate,
           totalAmountCents: incoming.totalAmountCents,
+          source: incoming.source,
         })
         .where(eq(fieldAssignmentsTable.id, id));
     } else {

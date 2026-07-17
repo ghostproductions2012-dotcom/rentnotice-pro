@@ -22,9 +22,16 @@ import type {
   ValidationLevel,
   ValidationResult,
 } from "../types";
-import { formatCents } from "../types";
+import { ELECTRONIC_SERVICE_METHODS, SERVICE_METHOD_LABELS, formatCents } from "../types";
 import { monthBounds } from "./dateUtils";
 import { getNoticeTypeRule, isLargeRentIncrease } from "./noticeRules";
+import {
+  HI_MEDIATION_EFFECTIVE_DATE,
+  PREREQUISITE_LABELS,
+  getRulePack,
+  matchLocalOverlays,
+} from "./rulepacks";
+import type { RulePackServiceMethod, StateRulePack } from "./rulepacks";
 
 export interface ValidationContext {
   notice: Notice;
@@ -46,6 +53,21 @@ export interface ValidationContext {
   };
   /** Current user's role (enables admin template override). */
   currentUserRole?: string;
+  /**
+   * Recorded attorney approval of the notice's jurisdiction rule pack
+   * (persisted in the local db; see state_rule_reviews). When present,
+   * unverified-rule issues reference the approval and downgrade accordingly.
+   */
+  stateRuleReview?: {
+    reviewerName: string;
+    reviewedAt: string;
+    notes?: string;
+  } | null;
+  /**
+   * Today's date (ISO, YYYY-MM-DD) for date-conditioned rules such as the
+   * Hawaii mediation prerequisite. Defaults to the current date.
+   */
+  today?: string;
 }
 
 function effectiveClass(txn: LedgerTransaction): RentClass {
@@ -142,8 +164,21 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
     const nonRentIncluded = txns.some(
       (x) => x.includedInNotice && effectiveClass(x) !== "rent",
     );
-    if (nonRentIncluded)
-      add("non_rent_included", "blocker", "The notice amount includes charges classified as non-rent.", null);
+    if (nonRentIncluded) {
+      // Hard block only in the rent-only strict states (CA, AK, MA, FL per
+      // the research pack); elsewhere the rent-only default remains and the
+      // user can acknowledge (attest) after review.
+      const strictRentOnly =
+        getRulePack(notice.jurisdiction)?.nonpayment.rentOnlyEnforcement === "hard_block";
+      add(
+        "non_rent_included",
+        strictRentOnly ? "blocker" : "warning",
+        strictRentOnly
+          ? "The notice amount includes charges classified as non-rent."
+          : "The notice amount includes charges classified as non-rent. This state is not marked rent-only strict — review the classification and acknowledge only if the demand is legally permitted.",
+        null,
+      );
+    }
 
     const depositApplied = txns.some(
       (x) => effectiveClass(x) === "deposit" && x.includedInNotice,
@@ -210,13 +245,23 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
   if (isPayOrQuit && notice.totalAmountCents <= 0)
     add("zero_amount", "blocker", "Total demanded amount must be greater than zero.", "months");
 
-  if (notice.jurisdiction && notice.jurisdiction.toUpperCase() !== "CA")
-    add(
-      "jurisdiction_not_reviewed",
-      "warning",
-      `Templates and rules for ${notice.jurisdiction} require attorney review before use.`,
-      "jurisdiction",
-    );
+  if (notice.jurisdiction && notice.jurisdiction.toUpperCase() !== "CA") {
+    if (ctx.stateRuleReview) {
+      add(
+        "jurisdiction_attorney_approved",
+        "warning",
+        `The ${notice.jurisdiction} rules were attorney-approved by ${ctx.stateRuleReview.reviewerName} on ${ctx.stateRuleReview.reviewedAt}. Confirm the approval is still current before serving.`,
+        "jurisdiction",
+      );
+    } else {
+      add(
+        "jurisdiction_not_reviewed",
+        "warning",
+        `Templates and rules for ${notice.jurisdiction} require attorney review before use. No attorney approval is recorded for this state — record one on the State Rules page once reviewed.`,
+        "jurisdiction",
+      );
+    }
+  }
 
   // Civ. Code §827(b)(2): a cumulative rent increase greater than 10% within
   // 12 months requires at least 90 days' notice (the deadline calculator
@@ -235,11 +280,14 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
       "rentIncreaseNewAmountCents",
     );
 
+  // ----------------------- 50-state rule-pack checks -----------------------
+  validateRulePack(ctx, add);
+
   // ----------------- notice-type-specific required fields ------------------
   validateTypeSpecificFields(notice, rule.requiredFields, add);
 
   // ------------------------- service completeness --------------------------
-  validateServiceInfo(notice, add);
+  validateServiceInfo(notice, ctx, add);
 
   const blockers = issues.filter((i) => i.level === "blocker").length;
   const warnings = issues.filter((i) => i.level === "warning").length;
@@ -247,6 +295,244 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
 }
 
 type AddIssue = (code: string, level: ValidationLevel, message: string, field?: string | null) => void;
+
+/**
+ * State-pack-driven required content-field checks (research document content
+ * rules). Fields that map onto structured notice data raise blockers when
+ * missing; document-embedded statements (right-to-cure, mediation) raise
+ * warnings to confirm the template carries the language, since the data model
+ * cannot observe the rendered text.
+ */
+function validateRequiredContentFields(
+  ctx: ValidationContext,
+  pack: StateRulePack,
+  add: AddIssue,
+): void {
+  const { notice } = ctx;
+  const missing = (code: string, message: string, field: string | null) =>
+    add(code, "blocker", `${pack.stateName} requires this on the notice: ${message}`, field);
+
+  for (const field of pack.requiredContentFields) {
+    switch (field) {
+      case "tenant_names":
+        if (!notice.tenantNames.some((n) => n.trim()))
+          missing("content_tenant_names_missing", "all tenant names.", "tenantNames");
+        break;
+      case "property_address":
+        if (!notice.propertyAddress.trim())
+          missing("content_property_address_missing", "the property address.", "propertyAddress");
+        break;
+      case "unit_number":
+        // Unit may legitimately be absent (single-family) — warning only.
+        if (!notice.unit.trim())
+          add(
+            "content_unit_number_missing",
+            "warning",
+            `${pack.stateName} notices normally identify the unit — confirm the premises description is complete without one.`,
+            "unit",
+          );
+        break;
+      case "landlord_name":
+        if (!ctx.property || !ctx.property.ownerName.trim())
+          missing("content_landlord_name_missing", "the landlord/owner name.", "ownerName");
+        break;
+      case "rent_periods":
+        if (notice.months.length === 0)
+          missing("content_rent_periods_missing", "the rent period(s) demanded.", "months");
+        break;
+      case "rent_amount_due":
+        if (!(notice.totalAmountCents > 0))
+          missing("content_rent_amount_missing", "the rent amount due.", "totalAmountCents");
+        break;
+      case "payment_address":
+        if (!notice.payment.paymentAddress.trim())
+          missing("content_payment_address_missing", "the address where rent can be paid.", "payment.paymentAddress");
+        break;
+      case "payment_methods":
+        if (notice.payment.acceptedMethods.length === 0)
+          missing("content_payment_methods_missing", "the accepted payment methods.", "payment.acceptedMethods");
+        break;
+      case "office_days_hours":
+        if (notice.payment.inPersonAllowed && !notice.payment.officeHours.trim())
+          missing("content_office_hours_missing", "the days/hours payment can be made in person.", "payment.officeHours");
+        break;
+      case "deadline_date":
+        // The deadline is derived from the service date; it can only be
+        // required once service has been recorded.
+        if (notice.service.dateServed && !notice.deadlineDate)
+          missing("content_deadline_date_missing", "the computed pay-or-vacate deadline date.", "deadlineDate");
+        break;
+      case "right_to_cure_statement":
+        add(
+          "content_right_to_cure_statement",
+          "warning",
+          `${pack.stateName} requires a right-to-cure statement on the notice — confirm the selected template includes it.`,
+          "templateId",
+        );
+        break;
+      case "mediation_statement":
+        add(
+          "content_mediation_statement",
+          "warning",
+          `${pack.stateName} requires mediation-related language on the notice — confirm the selected template includes it.`,
+          "templateId",
+        );
+        break;
+      case "signature":
+      case "date_signed":
+        // Rendered on the generated document itself; nothing to check in data.
+        break;
+    }
+  }
+}
+
+/** Map an app ServiceMethod onto the rule-pack service vocabulary. */
+function toPackServiceMethod(method: string): RulePackServiceMethod {
+  if (method === "substitute") return "substituted_and_mail";
+  if (method === "post_and_mail") return "posting_and_mail";
+  return method as RulePackServiceMethod;
+}
+
+/**
+ * State rule-pack validation (50-state engine). All non-CA-specific issue
+ * codes are new — existing California behavior is unchanged except that CA's
+ * own pack now also drives local-overlay warnings.
+ */
+function validateRulePack(ctx: ValidationContext, add: AddIssue): void {
+  const { notice } = ctx;
+  const pack = getRulePack(notice.jurisdiction);
+  const isMoneyNotice = notice.noticeType === "pay_or_quit_3day";
+
+  if (!pack) {
+    if (notice.jurisdiction)
+      add(
+        "rule_pack_missing",
+        "blocker",
+        `No rule pack exists for jurisdiction "${notice.jurisdiction}". Choose a valid US state or DC.`,
+        "jurisdiction",
+      );
+    return;
+  }
+
+  // ---- unspecified nonpayment period (never guess) -------------------------
+  if (isMoneyNotice && !pack.leaseSensitive && pack.nonpayment.periodLength == null)
+    add(
+      "state_period_unspecified",
+      "blocker",
+      `The ${pack.stateName} rule pack does not carry a verified nonpayment notice period. ${pack.nonpayment.summary} This notice cannot be finalized until the pack is verified by an attorney.${
+        ctx.stateRuleReview
+          ? ` An attorney approval is recorded for ${pack.state} (${ctx.stateRuleReview.reviewerName}, ${ctx.stateRuleReview.reviewedAt}), but the pack still has no notice period on file — the engine never guesses a number.`
+          : ""
+      }`,
+      "jurisdiction",
+    );
+
+  // ---- lease-sensitive states: a rule card must be chosen ------------------
+  if (isMoneyNotice && pack.leaseSensitive) {
+    if (!notice.ruleCardKey) {
+      add(
+        "rule_card_required",
+        "blocker",
+        `${pack.stateName} is a lease/ground-sensitive state — there is no single statewide notice period. Select the rule card that matches this tenancy (and verify it against the lease) before finalizing.`,
+        "ruleCardKey",
+      );
+    } else if (!pack.ruleCards.some((c) => c.key === notice.ruleCardKey)) {
+      add(
+        "rule_card_invalid",
+        "blocker",
+        `The selected rule card "${notice.ruleCardKey}" is not defined for ${pack.stateName}.`,
+        "ruleCardKey",
+      );
+    } else {
+      add(
+        "rule_card_verify_lease",
+        "warning",
+        `${pack.stateName} rule card "${pack.ruleCards.find((c) => c.key === notice.ruleCardKey)?.label}" selected — confirm it matches the lease and the specific eviction ground.`,
+        "ruleCardKey",
+      );
+    }
+  }
+
+  // ---- rent-only strict states ---------------------------------------------
+  // non_rent_included is a blocker only in these strict states; here we also
+  // surface the state-specific statute context as an explicit blocker.
+  if (isMoneyNotice && pack.nonpayment.rentOnlyEnforcement === "hard_block") {
+    const txns = ctx.transactions ?? [];
+    const nonRentIncluded = txns.some(
+      (x) => x.includedInNotice && effectiveClass(x) !== "rent",
+    );
+    if (nonRentIncluded)
+      add(
+        "rent_only_strict_state",
+        "blocker",
+        `${pack.stateName} is a rent-only strict state: the demanded amount cannot include late fees, utilities, damages, or other non-rent charges.`,
+        null,
+      );
+  }
+
+  // ---- state-required content fields ----------------------------------------
+  if (isMoneyNotice) validateRequiredContentFields(ctx, pack, add);
+
+  // ---- unverified service rules block finalization ---------------------------
+  // The research is conservative: when a state's pre-suit service rules could
+  // not be verified, the notice cannot be finalized (the existing admin
+  // attorney-review override downgrades this to a warning).
+  if (isMoneyNotice && !pack.service.verified) {
+    if (ctx.stateRuleReview) {
+      // A licensed attorney's approval is on record for this jurisdiction —
+      // the research-pack caution downgrades to an acknowledgeable warning
+      // that cites the recorded review.
+      add(
+        "service_rule_unverified",
+        "warning",
+        `The research pack could not verify ${pack.stateName}'s pre-suit service rules, but an attorney approval is recorded for ${pack.state}: reviewed by ${ctx.stateRuleReview.reviewerName} on ${ctx.stateRuleReview.reviewedAt}. Confirm the approval covers the service method used.`,
+        "service.method",
+      );
+    } else {
+      const adminOverride =
+        !!ctx.settings?.allowAdminTemplateOverride && ctx.currentUserRole === "admin";
+      add(
+        "service_rule_unverified",
+        adminOverride ? "warning" : "blocker",
+        `The pre-suit service rules for ${pack.stateName} have not been verified. An attorney must confirm the permitted service methods before this notice is finalized${adminOverride ? " (admin override enabled)" : ""}.`,
+        "service.method",
+      );
+    }
+  }
+
+  // ---- pre-filing prerequisites ---------------------------------------------
+  if (isMoneyNotice) {
+    for (const prereq of pack.nonpayment.prerequisites) {
+      // Hawaii's mediation branch only applies to cases filed on/after the
+      // effective date.
+      if (prereq === "mediation_if_requested") {
+        const today = ctx.today ?? new Date().toISOString().slice(0, 10);
+        if (today < HI_MEDIATION_EFFECTIVE_DATE) continue;
+      }
+      if (!notice.prereqCompleted?.[prereq])
+        add(
+          `prereq_${prereq}_missing`,
+          "blocker",
+          `${pack.stateName} pre-filing prerequisite not completed: ${PREREQUISITE_LABELS[prereq]}.`,
+          "prereqCompleted",
+        );
+    }
+  }
+
+  // ---- stale-statute warning (Oregon) ---------------------------------------
+  if (pack.staleStatuteWarning)
+    add("stale_statute_source", "warning", pack.staleStatuteWarning, "jurisdiction");
+
+  // ---- local overlays --------------------------------------------------------
+  for (const overlay of matchLocalOverlays(pack, ctx.property)) {
+    add(
+      "local_overlay",
+      "warning",
+      `Possible local overlay: ${overlay.jurisdiction} (${overlay.features.map((f) => f.replace(/_/g, " ")).join(", ")}). Local ordinances may add forms, longer periods, or just-cause requirements — verify before serving.`,
+      null,
+    );
+  }
+}
 
 function validateTypeSpecificFields(
   notice: Notice,
@@ -294,7 +580,7 @@ function validateTypeSpecificFields(
     add("no_months_selected", "blocker", "At least one rent month must be selected.", "months");
 }
 
-function validateServiceInfo(notice: Notice, add: AddIssue): void {
+function validateServiceInfo(notice: Notice, ctx: ValidationContext, add: AddIssue): void {
   const service = notice.service;
   const servedStatuses = ["served", "mailed", "expired", "paid"];
   const requiresService = servedStatuses.includes(notice.status);
@@ -311,6 +597,58 @@ function validateServiceInfo(notice: Notice, add: AddIssue): void {
     if (service.method === "post_and_mail" && !service.mailedDate)
       add("mailing_date_missing", "warning", "A mailing date is required for post-and-mail service.", "service.mailedDate");
   }
+
+  const method = service.method;
+  if (!method) return;
+  const pack = getRulePack(notice.jurisdiction);
+
+  // ---- state service-method allow list ------------------------------------
+  if (pack && method !== "other") {
+    // Unverified service rules are already a pack-level finalization blocker
+    // (see validateRulePack); here we only police the verified allow list.
+    if (pack.service.verified && !pack.service.allowedMethods.includes(toPackServiceMethod(method))) {
+      add(
+        "service_method_not_allowed",
+        "blocker",
+        `${SERVICE_METHOD_LABELS[method]} is not a verified service method for ${pack.stateName}. Allowed: ${pack.service.allowedMethods.map((m) => m.replace(/_/g, " ")).join(", ")}.`,
+        "service.method",
+      );
+    }
+  }
+  if (method === "other")
+    add(
+      "service_method_other",
+      "warning",
+      "An 'Other attorney-approved method' was used — attach the attorney's approval to the file.",
+      "service.method",
+    );
+
+  // ---- electronic service requires documented tenant agreement --------------
+  if ((ELECTRONIC_SERVICE_METHODS as string[]).includes(method)) {
+    if (!notice.electronicServiceConsent) {
+      add(
+        "electronic_service_consent_missing",
+        "blocker",
+        `${SERVICE_METHOD_LABELS[method]} is only valid when the tenant agreed to electronic service. Confirm and record the tenant's agreement before serving electronically.`,
+        "electronicServiceConsent",
+      );
+    } else {
+      add(
+        "electronic_service_agreed",
+        "warning",
+        `Electronic service (${SERVICE_METHOD_LABELS[method]}) is being used based on a recorded tenant agreement. Keep a copy of the agreement — electronic service is only authorized where the tenant consented.`,
+        "service.method",
+      );
+    }
+  }
+
+  // ---- mail methods should carry a mailing date -----------------------------
+  if (
+    ["certified_mail", "registered_mail", "first_class_mail"].includes(method) &&
+    !service.mailedDate &&
+    !service.dateServed
+  )
+    add("mailing_date_missing", "warning", "A mailing date is required for mail service.", "service.mailedDate");
 }
 
 // ---------------------------------------------------------------------------

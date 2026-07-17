@@ -13,6 +13,12 @@ import {
 } from "@/lib/api/hooks";
 import { isLargeRentIncrease } from "@/lib/engine/noticeRules";
 import {
+  PREREQUISITE_LABELS,
+  PERIOD_UNIT_LABELS,
+  VERIFICATION_STATUS_LABELS,
+  getRulePack,
+} from "@/lib/engine/rulepacks";
+import {
   NOTICE_TYPE_LABELS,
   formatCents,
   type MonthCalculation,
@@ -121,6 +127,7 @@ export default function NoticeNew() {
 
   const activeTenants = useMemo(() => (tenants ?? []).filter((t) => !t.archived), [tenants]);
   const jurisdiction = property?.state || "CA";
+  const rulePack = useMemo(() => getRulePack(jurisdiction), [jurisdiction]);
 
   // Rent-increase notice-period preview: >10% over scheduled rent triggers the
   // 90-day period under Cal. Civ. Code §827(b)(2) instead of the standard 30.
@@ -350,6 +357,57 @@ export default function NoticeNew() {
                 </p>
               )}
             </div>
+            {property && rulePack && (
+              <div
+                className="rounded-md border p-3 space-y-2 text-sm"
+                data-testid="card-state-compliance"
+              >
+                <div className="flex items-center gap-2 font-medium">
+                  <Scale className="w-4 h-4 text-primary" />
+                  {rulePack.stateName} compliance snapshot
+                  <span className="ml-auto text-xs font-normal text-muted-foreground">
+                    {VERIFICATION_STATUS_LABELS[rulePack.verificationStatus]} · rules dated{" "}
+                    {rulePack.versionDate}
+                  </span>
+                </div>
+                <p className="text-muted-foreground">
+                  Nonpayment notice period:{" "}
+                  <span className="text-foreground font-medium">
+                    {rulePack.nonpayment.periodLength != null && rulePack.nonpayment.periodUnit
+                      ? `${rulePack.nonpayment.periodLength} ${PERIOD_UNIT_LABELS[rulePack.nonpayment.periodUnit]}`
+                      : "not specified — attorney verification required"}
+                  </span>
+                  {" — "}
+                  {rulePack.nonpayment.summary}
+                </p>
+                {rulePack.leaseSensitive && (
+                  <p className="text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded px-2 py-1">
+                    {rulePack.stateName} is lease-sensitive: no single statewide period applies.
+                    You will need to pick a rule card in the notice workroom before finalizing.
+                  </p>
+                )}
+                {rulePack.nonpayment.prerequisites.length > 0 && (
+                  <div>
+                    <p className="font-medium">Pre-filing prerequisites:</p>
+                    <ul className="list-disc pl-5 text-muted-foreground">
+                      {rulePack.nonpayment.prerequisites.map((p) => (
+                        <li key={p}>{PREREQUISITE_LABELS[p]}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {rulePack.staleStatuteWarning && (
+                  <p className="text-destructive">{rulePack.staleStatuteWarning}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Reference only — validation runs the full state checks on the draft. See the{" "}
+                  <Link href="/state-rules" className="text-primary underline">
+                    state rules reference
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
             {monetary && (
               <div className="space-y-2">
                 <Label>Ledger *</Label>

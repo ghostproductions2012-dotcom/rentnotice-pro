@@ -127,8 +127,30 @@ export interface Property {
   payment: PaymentProfile;
   isLosAngelesCity: boolean; // triggers LAHD letter option
   notes: string;
+  /** Where this record was synced from (e.g. "buildium"), null if created by hand. */
+  externalSource: string | null;
+  /** Stable id in the external system (Buildium rental property id). */
+  externalId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Property fields imported from an external system (e.g. Buildium). Upserts
+ * match on (externalSource, externalId); imported fields are refreshed while
+ * user-entered fields (payment profile, notes, LA-city flag) are preserved.
+ */
+export interface ExternalPropertyUpsert {
+  externalSource: string;
+  externalId: string;
+  nickname: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  state: string;
+  zip: string;
+  units: string[];
+  ownerName: string;
 }
 
 // ----------------------------- Tenants -------------------------------------
@@ -145,13 +167,33 @@ export interface Tenant {
   moveOutDate: string | null;
   notes: string;
   archived: boolean;
+  /** Where this record was synced from (e.g. "buildium"), null if created by hand. */
+  externalSource: string | null;
+  /** Stable id in the external system (Buildium lease id). */
+  externalId: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
+/**
+ * Tenant fields imported from an external system (e.g. a Buildium lease).
+ * Upserts match on (externalSource, externalId); notes stay untouched.
+ */
+export interface ExternalTenantUpsert {
+  externalSource: string;
+  externalId: string;
+  names: string[];
+  propertyId: Id | null;
+  unit: string;
+  email: string;
+  phone: string;
+  monthlyRentCents: number | null;
+  leaseStart: string | null;
+}
+
 // ----------------------------- Ledgers & transactions ----------------------
 
-export type LedgerSourceType = "csv" | "excel" | "pdf" | "pdf_ocr" | "manual";
+export type LedgerSourceType = "csv" | "excel" | "pdf" | "pdf_ocr" | "manual" | "api";
 
 export interface ColumnMapping {
   // maps a logical field -> source column header (or null if absent)
@@ -175,7 +217,7 @@ export type PmVendor =
   | "yardi"
   | "propertyware"
   | "rent_manager"
-  | "first_light"
+  | "tenant_statement"
   | "generic";
 
 export interface MappingPreset {
@@ -264,7 +306,7 @@ export interface LedgerTransaction {
 
 // ----------------------------- Import (wizard) -----------------------------
 
-/** Header details extracted from a recognized tenant statement (e.g. First Light). */
+/** Header details extracted from a recognized "Tenant Statement" PDF. */
 export interface StatementInfo {
   vendor: PmVendor;
   tenantName: string | null;
@@ -377,7 +419,41 @@ export type ServiceMethod =
   | "personal"
   | "substitute"
   | "post_and_mail"
+  | "leave_at_residence"
+  | "certified_mail"
+  | "registered_mail"
+  | "first_class_mail"
+  | "email_if_agreed"
+  | "text_if_agreed"
+  | "portal_if_agreed"
+  | "state_marshal"
+  | "process_server"
+  | "sheriff"
   | "other";
+
+export const SERVICE_METHOD_LABELS: Record<ServiceMethod, string> = {
+  personal: "Personal service",
+  substitute: "Substituted service + mail",
+  post_and_mail: "Post & mail",
+  leave_at_residence: "Left at residence",
+  certified_mail: "Certified mail",
+  registered_mail: "Registered mail",
+  first_class_mail: "First-class mail",
+  email_if_agreed: "Email (tenant agreed)",
+  text_if_agreed: "Text message (tenant agreed)",
+  portal_if_agreed: "Tenant portal (tenant agreed)",
+  state_marshal: "State marshal",
+  process_server: "Process server",
+  sheriff: "Sheriff",
+  other: "Other attorney-approved method",
+};
+
+/** Electronic methods valid only when the tenant agreed to electronic service. */
+export const ELECTRONIC_SERVICE_METHODS: ServiceMethod[] = [
+  "email_if_agreed",
+  "text_if_agreed",
+  "portal_if_agreed",
+];
 
 export interface ServiceRecord {
   dateServed: string | null;
@@ -426,6 +502,13 @@ export interface Notice {
   rentOnlyAttestedBy: Id | null;
   rentOnlyAttestedAt: string | null;
   attorneyExportFlag: boolean;
+  // 50-state rule-pack fields
+  /** Pre-filing prerequisite checklist (e.g. {"notice_of_intent": true}). */
+  prereqCompleted: Record<string, boolean>;
+  /** Rule card chosen for lease-sensitive states (GA/NC/NJ/MO/TN/OR/WI/MN). */
+  ruleCardKey: string | null;
+  /** Tenant agreed in writing to electronic service (email/text/portal). */
+  electronicServiceConsent: boolean;
   service: ServiceRecord;
   deadlineDate: string | null; // computed expiration
   internalNotes: string;
@@ -454,6 +537,9 @@ export interface NoticeInput {
   rentIncreaseEffectiveDate?: string | null;
   internalNotes?: string;
   duplicateOverrideReason?: string | null;
+  ruleCardKey?: string | null;
+  prereqCompleted?: Record<string, boolean>;
+  electronicServiceConsent?: boolean;
 }
 
 export interface NoticeFilters {
@@ -508,7 +594,8 @@ export type DocumentKind =
   | "excluded_summary"
   | "audit_summary"
   | "ledger_backup"
-  | "lahd_letter";
+  | "lahd_letter"
+  | "state_prereq";
 
 export type PacketKind = "draft" | "final" | "internal_packet" | "attorney_packet";
 
@@ -638,6 +725,7 @@ export type AuditAction =
   | "user_created"
   | "user_updated"
   | "holiday_changed"
+  | "state_rule_review_changed"
   | "backup_exported"
   | "backup_restored"
   | "login"
@@ -773,6 +861,11 @@ export interface AppSettings {
   syncEndpoint: string;
   disclaimerAcknowledgedAt: string | null;
   onboardingCompleted: boolean;
+  /** Buildium API credentials, stored locally only (never on our servers). */
+  buildiumClientId: string;
+  buildiumClientSecret: string;
+  buildiumConnectedAt: string | null; // set when a connection test succeeds
+  buildiumLastSyncAt: string | null;
   updatedAt: string;
 }
 
@@ -832,6 +925,22 @@ export interface StateRuleSummary {
   notes: string;
 }
 
+/**
+ * A recorded attorney review of a state's rule pack. Keyed by 2-letter state
+ * code; at most one active approval per jurisdiction (upsert semantics).
+ */
+export interface StateRuleReview {
+  state: string;
+  reviewerName: string;
+  /** ISO date (YYYY-MM-DD) the attorney completed the review. */
+  reviewedAt: string;
+  notes: string;
+  /** Name of the app user who recorded the approval. */
+  recordedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ----------------------------- Backup ------------------------------------------
 
 export interface BackupMeta {
@@ -887,6 +996,7 @@ export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   excluded_summary: "Excluded Charge Summary",
   audit_summary: "Audit Log Summary",
   ledger_backup: "Ledger Backup",
+  state_prereq: "State Pre-Filing Prerequisites",
   lahd_letter: "LAHD Right to Counsel Letter",
 };
 

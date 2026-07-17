@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// End-to-end pipeline test against the real First Light sample statement PDF:
+// End-to-end pipeline test against the real sample tenant-statement PDF:
 //   parse PDF → detect vendor + statement header → normalize → classify →
 //   rent-only calculation → the demand must be exactly $5,395.00 (July 2026
 //   rent only; EFT fees excluded; prior balance paid off by the EFT payment).
@@ -42,14 +42,14 @@ function loadSampleFile(): File {
   return new File([new Uint8Array(buf)], "tenant_statement.pdf", { type: "application/pdf" });
 }
 
-describe("sample First Light tenant statement (full pipeline)", () => {
+describe("sample tenant statement (full pipeline)", () => {
   it("yields a $5,395.00 rent-only demand for July 2026", async () => {
     const parsed = await parseFile(loadSampleFile());
     expect(parsed.sourceType).toBe("pdf");
     expect(parsed.ocrUsed).toBe(false);
 
     const plf = toParsedLedgerFile("tenant_statement.pdf", parsed);
-    expect(plf.detectedVendor).toBe("first_light");
+    expect(plf.detectedVendor).toBe("tenant_statement");
 
     // ---- statement header auto-detection ----
     expect(plf.statement).not.toBeNull();

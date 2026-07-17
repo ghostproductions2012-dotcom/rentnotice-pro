@@ -32,6 +32,14 @@ import type {
   AdminSessionInfo,
   AdminUpdateKeyInput,
   AdminUpdateUserInput,
+  BuildiumListLeaseTransactionsParams,
+  BuildiumListLeasesParams,
+  BuildiumListOutstandingBalancesParams,
+  BuildiumListRentalsParams,
+  BuildiumListUnitsParams,
+  BuildiumPingResult,
+  BuildiumProxyError,
+  BuildiumRecord,
   ChangeCloudPasswordInput,
   CheckoutCompleteInput,
   CheckoutSession,
@@ -331,8 +339,8 @@ export const getDownloadAssetUrl = (assetId: number,) => {
 }
 
 /**
- * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to the latest release are served.
- * @summary Download an installer asset from the latest release (public)
+ * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to a recent published release are served (a platform's installer may come from an older release than the latest while newer builds are still in CI).
+ * @summary Download an installer asset from a recent release (public)
  */
 export const downloadAsset = async (assetId: number, options?: RequestInit): Promise<unknown> => {
 
@@ -379,7 +387,7 @@ export type DownloadAssetQueryError = ErrorType<void | ErrorResponse>
 
 
 /**
- * @summary Download an installer asset from the latest release (public)
+ * @summary Download an installer asset from a recent release (public)
  */
 
 export function useDownloadAsset<TData = Awaited<ReturnType<typeof downloadAsset>>, TError = ErrorType<void | ErrorResponse>>(
@@ -1848,6 +1856,525 @@ export const useAddFieldEvidence = <TError = ErrorType<ErrorMessage>,
       > => {
       return useMutation(getAddFieldEvidenceMutationOptions(options));
     }
+
+export const getBuildiumPingUrl = () => {
+
+
+
+
+  return `/api/buildium/ping`
+}
+
+/**
+ * Verifies the supplied Buildium API key by requesting a single rental property from the Buildium Open API. Requires a valid RentNotice Pro license key. Buildium credentials are forwarded per-request and never stored.
+ * @summary Test a Buildium API connection
+ */
+export const buildiumPing = async ( options?: RequestInit): Promise<BuildiumPingResult> => {
+
+  return customFetch<BuildiumPingResult>(getBuildiumPingUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumPingQueryKey = () => {
+    return [
+    `/api/buildium/ping`
+    ] as const;
+    }
+
+
+export const getBuildiumPingQueryOptions = <TData = Awaited<ReturnType<typeof buildiumPing>>, TError = ErrorType<BuildiumProxyError>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumPing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumPingQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumPing>>> = ({ signal }) => buildiumPing({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumPing>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumPingQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumPing>>>
+export type BuildiumPingQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary Test a Buildium API connection
+ */
+
+export function useBuildiumPing<TData = Awaited<ReturnType<typeof buildiumPing>>, TError = ErrorType<BuildiumProxyError>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumPing>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumPingQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBuildiumListRentalsUrl = (params?: BuildiumListRentalsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/buildium/rentals?${stringifiedParams}` : `/api/buildium/rentals`
+}
+
+/**
+ * @summary List rental properties from Buildium
+ */
+export const buildiumListRentals = async (params?: BuildiumListRentalsParams, options?: RequestInit): Promise<BuildiumRecord[]> => {
+
+  return customFetch<BuildiumRecord[]>(getBuildiumListRentalsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumListRentalsQueryKey = (params?: BuildiumListRentalsParams,) => {
+    return [
+    `/api/buildium/rentals`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBuildiumListRentalsQueryOptions = <TData = Awaited<ReturnType<typeof buildiumListRentals>>, TError = ErrorType<BuildiumProxyError>>(params?: BuildiumListRentalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListRentals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumListRentalsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumListRentals>>> = ({ signal }) => buildiumListRentals(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumListRentals>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumListRentalsQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumListRentals>>>
+export type BuildiumListRentalsQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary List rental properties from Buildium
+ */
+
+export function useBuildiumListRentals<TData = Awaited<ReturnType<typeof buildiumListRentals>>, TError = ErrorType<BuildiumProxyError>>(
+ params?: BuildiumListRentalsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListRentals>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumListRentalsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBuildiumListUnitsUrl = (params?: BuildiumListUnitsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["propertyids"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/buildium/units?${stringifiedParams}` : `/api/buildium/units`
+}
+
+/**
+ * @summary List rental units from Buildium
+ */
+export const buildiumListUnits = async (params?: BuildiumListUnitsParams, options?: RequestInit): Promise<BuildiumRecord[]> => {
+
+  return customFetch<BuildiumRecord[]>(getBuildiumListUnitsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumListUnitsQueryKey = (params?: BuildiumListUnitsParams,) => {
+    return [
+    `/api/buildium/units`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBuildiumListUnitsQueryOptions = <TData = Awaited<ReturnType<typeof buildiumListUnits>>, TError = ErrorType<BuildiumProxyError>>(params?: BuildiumListUnitsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListUnits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumListUnitsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumListUnits>>> = ({ signal }) => buildiumListUnits(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumListUnits>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumListUnitsQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumListUnits>>>
+export type BuildiumListUnitsQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary List rental units from Buildium
+ */
+
+export function useBuildiumListUnits<TData = Awaited<ReturnType<typeof buildiumListUnits>>, TError = ErrorType<BuildiumProxyError>>(
+ params?: BuildiumListUnitsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListUnits>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumListUnitsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBuildiumListLeasesUrl = (params?: BuildiumListLeasesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    const explodeParameters = ["leasestatuses","propertyids"];
+
+    if (Array.isArray(value) && explodeParameters.includes(key)) {
+      value.forEach((v) => {
+        normalizedParams.append(key, v === null ? 'null' : String(v));
+      });
+      return;
+    }
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/buildium/leases?${stringifiedParams}` : `/api/buildium/leases`
+}
+
+/**
+ * @summary List leases (with tenants) from Buildium
+ */
+export const buildiumListLeases = async (params?: BuildiumListLeasesParams, options?: RequestInit): Promise<BuildiumRecord[]> => {
+
+  return customFetch<BuildiumRecord[]>(getBuildiumListLeasesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumListLeasesQueryKey = (params?: BuildiumListLeasesParams,) => {
+    return [
+    `/api/buildium/leases`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBuildiumListLeasesQueryOptions = <TData = Awaited<ReturnType<typeof buildiumListLeases>>, TError = ErrorType<BuildiumProxyError>>(params?: BuildiumListLeasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumListLeasesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumListLeases>>> = ({ signal }) => buildiumListLeases(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeases>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumListLeasesQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumListLeases>>>
+export type BuildiumListLeasesQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary List leases (with tenants) from Buildium
+ */
+
+export function useBuildiumListLeases<TData = Awaited<ReturnType<typeof buildiumListLeases>>, TError = ErrorType<BuildiumProxyError>>(
+ params?: BuildiumListLeasesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeases>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumListLeasesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBuildiumListOutstandingBalancesUrl = (params?: BuildiumListOutstandingBalancesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/buildium/leases/outstandingbalances?${stringifiedParams}` : `/api/buildium/leases/outstandingbalances`
+}
+
+/**
+ * @summary List lease outstanding balances from Buildium
+ */
+export const buildiumListOutstandingBalances = async (params?: BuildiumListOutstandingBalancesParams, options?: RequestInit): Promise<BuildiumRecord[]> => {
+
+  return customFetch<BuildiumRecord[]>(getBuildiumListOutstandingBalancesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumListOutstandingBalancesQueryKey = (params?: BuildiumListOutstandingBalancesParams,) => {
+    return [
+    `/api/buildium/leases/outstandingbalances`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBuildiumListOutstandingBalancesQueryOptions = <TData = Awaited<ReturnType<typeof buildiumListOutstandingBalances>>, TError = ErrorType<BuildiumProxyError>>(params?: BuildiumListOutstandingBalancesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListOutstandingBalances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumListOutstandingBalancesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumListOutstandingBalances>>> = ({ signal }) => buildiumListOutstandingBalances(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumListOutstandingBalances>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumListOutstandingBalancesQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumListOutstandingBalances>>>
+export type BuildiumListOutstandingBalancesQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary List lease outstanding balances from Buildium
+ */
+
+export function useBuildiumListOutstandingBalances<TData = Awaited<ReturnType<typeof buildiumListOutstandingBalances>>, TError = ErrorType<BuildiumProxyError>>(
+ params?: BuildiumListOutstandingBalancesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListOutstandingBalances>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumListOutstandingBalancesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getBuildiumListLeaseTransactionsUrl = (leaseId: number,
+    params?: BuildiumListLeaseTransactionsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/buildium/leases/${leaseId}/transactions?${stringifiedParams}` : `/api/buildium/leases/${leaseId}/transactions`
+}
+
+/**
+ * @summary List ledger transactions for a Buildium lease
+ */
+export const buildiumListLeaseTransactions = async (leaseId: number,
+    params?: BuildiumListLeaseTransactionsParams, options?: RequestInit): Promise<BuildiumRecord[]> => {
+
+  return customFetch<BuildiumRecord[]>(getBuildiumListLeaseTransactionsUrl(leaseId,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getBuildiumListLeaseTransactionsQueryKey = (leaseId: number,
+    params?: BuildiumListLeaseTransactionsParams,) => {
+    return [
+    `/api/buildium/leases/${leaseId}/transactions`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBuildiumListLeaseTransactionsQueryOptions = <TData = Awaited<ReturnType<typeof buildiumListLeaseTransactions>>, TError = ErrorType<BuildiumProxyError>>(leaseId: number,
+    params?: BuildiumListLeaseTransactionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeaseTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBuildiumListLeaseTransactionsQueryKey(leaseId,params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof buildiumListLeaseTransactions>>> = ({ signal }) => buildiumListLeaseTransactions(leaseId,params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: leaseId !== null && leaseId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeaseTransactions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type BuildiumListLeaseTransactionsQueryResult = NonNullable<Awaited<ReturnType<typeof buildiumListLeaseTransactions>>>
+export type BuildiumListLeaseTransactionsQueryError = ErrorType<BuildiumProxyError>
+
+
+/**
+ * @summary List ledger transactions for a Buildium lease
+ */
+
+export function useBuildiumListLeaseTransactions<TData = Awaited<ReturnType<typeof buildiumListLeaseTransactions>>, TError = ErrorType<BuildiumProxyError>>(
+ leaseId: number,
+    params?: BuildiumListLeaseTransactionsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof buildiumListLeaseTransactions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getBuildiumListLeaseTransactionsQueryOptions(leaseId,params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
 
 export const getAdminLoginUrl = () => {
 

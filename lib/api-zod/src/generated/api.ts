@@ -42,13 +42,14 @@ export const GetLatestDownloadsResponse = zod.object({
   "windowsExe": zod.string().nullable().describe('Proxy download URL for the Windows NSIS installer'),
   "windowsMsi": zod.string().nullable().describe('Proxy download URL for the Windows MSI package'),
   "macAppleSilicon": zod.string().nullable().describe('Proxy download URL for the Apple Silicon .dmg'),
-  "macIntel": zod.string().nullable().describe('Proxy download URL for the Intel Mac .dmg')
+  "macIntel": zod.string().nullable().describe('Proxy download URL for the Intel .dmg'),
+  "macVersion": zod.string().nullish().describe('Release tag the Mac installers come from when it differs from the latest release (e.g. Mac builds still in CI); null when Mac installers match the latest version')
 })
 
 
 /**
- * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to the latest release are served.
- * @summary Download an installer asset from the latest release (public)
+ * Redirects to a short-lived signed URL for the requested release asset. Only assets belonging to a recent published release are served (a platform's installer may come from an older release than the latest while newer builds are still in CI).
+ * @summary Download an installer asset from a recent release (public)
  */
 export const DownloadAssetParams = zod.object({
   "assetId": zod.coerce.number()
@@ -434,6 +435,7 @@ export const ListFieldAssignmentsResponseItem = zod.object({
   "noticeType": zod.string(),
   "deadlineDate": zod.string().nullable(),
   "totalAmountCents": zod.number().nullable(),
+  "source": zod.string().nullish().describe('Origin of the underlying tenant\/ledger data (e.g. \"buildium\"). Omitted or null for manually entered data.'),
   "evidence": zod.array(zod.object({
   "id": zod.string(),
   "photoDataUrl": zod.string(),
@@ -469,6 +471,7 @@ export const PushFieldAssignmentsBody = zod.object({
   "noticeType": zod.string(),
   "deadlineDate": zod.string().nullable(),
   "totalAmountCents": zod.number().nullable(),
+  "source": zod.string().nullish().describe('Origin of the underlying tenant\/ledger data (e.g. \"buildium\"). Omitted or null for manually entered data.'),
   "evidence": zod.array(zod.object({
   "id": zod.string(),
   "photoDataUrl": zod.string(),
@@ -519,6 +522,7 @@ export const UpdateFieldAssignmentResponse = zod.object({
   "noticeType": zod.string(),
   "deadlineDate": zod.string().nullable(),
   "totalAmountCents": zod.number().nullable(),
+  "source": zod.string().nullish().describe('Origin of the underlying tenant\/ledger data (e.g. \"buildium\"). Omitted or null for manually entered data.'),
   "evidence": zod.array(zod.object({
   "id": zod.string(),
   "photoDataUrl": zod.string(),
@@ -566,6 +570,7 @@ export const AddFieldEvidenceResponse = zod.object({
   "noticeType": zod.string(),
   "deadlineDate": zod.string().nullable(),
   "totalAmountCents": zod.number().nullable(),
+  "source": zod.string().nullish().describe('Origin of the underlying tenant\/ledger data (e.g. \"buildium\"). Omitted or null for manually entered data.'),
   "evidence": zod.array(zod.object({
   "id": zod.string(),
   "photoDataUrl": zod.string(),
@@ -578,6 +583,119 @@ export const AddFieldEvidenceResponse = zod.object({
   "createdAt": zod.string(),
   "updatedAt": zod.string()
 })
+
+
+/**
+ * Verifies the supplied Buildium API key by requesting a single rental property from the Buildium Open API. Requires a valid RentNotice Pro license key. Buildium credentials are forwarded per-request and never stored.
+ * @summary Test a Buildium API connection
+ */
+export const BuildiumPingHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumPingResponse = zod.object({
+  "ok": zod.boolean(),
+  "propertyCount": zod.number().nullish().describe('Total rental property count reported by Buildium (when available)')
+})
+
+
+/**
+ * @summary List rental properties from Buildium
+ */
+export const BuildiumListRentalsQueryParams = zod.object({
+  "limit": zod.coerce.number().optional().describe('Page size (Buildium max 1000)'),
+  "offset": zod.coerce.number().optional().describe('Number of records to skip')
+})
+
+export const BuildiumListRentalsHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumListRentalsResponseItem = zod.record(zod.string(), zod.unknown()).describe('A Buildium Open API record, passed through unmodified')
+export const BuildiumListRentalsResponse = zod.array(BuildiumListRentalsResponseItem)
+
+
+/**
+ * @summary List rental units from Buildium
+ */
+export const BuildiumListUnitsQueryParams = zod.object({
+  "limit": zod.coerce.number().optional().describe('Page size (Buildium max 1000)'),
+  "offset": zod.coerce.number().optional().describe('Number of records to skip'),
+  "propertyids": zod.array(zod.coerce.number()).optional().describe('Restrict to specific Buildium rental property ids')
+})
+
+export const BuildiumListUnitsHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumListUnitsResponseItem = zod.record(zod.string(), zod.unknown()).describe('A Buildium Open API record, passed through unmodified')
+export const BuildiumListUnitsResponse = zod.array(BuildiumListUnitsResponseItem)
+
+
+/**
+ * @summary List leases (with tenants) from Buildium
+ */
+export const BuildiumListLeasesQueryParams = zod.object({
+  "limit": zod.coerce.number().optional().describe('Page size (Buildium max 1000)'),
+  "offset": zod.coerce.number().optional().describe('Number of records to skip'),
+  "leasestatuses": zod.array(zod.coerce.string()).optional().describe('Filter by lease status (e.g. Active, Past)'),
+  "propertyids": zod.array(zod.coerce.number()).optional().describe('Restrict to specific Buildium rental property ids')
+})
+
+export const BuildiumListLeasesHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumListLeasesResponseItem = zod.record(zod.string(), zod.unknown()).describe('A Buildium Open API record, passed through unmodified')
+export const BuildiumListLeasesResponse = zod.array(BuildiumListLeasesResponseItem)
+
+
+/**
+ * @summary List lease outstanding balances from Buildium
+ */
+export const BuildiumListOutstandingBalancesQueryParams = zod.object({
+  "limit": zod.coerce.number().optional().describe('Page size (Buildium max 1000)'),
+  "offset": zod.coerce.number().optional().describe('Number of records to skip')
+})
+
+export const BuildiumListOutstandingBalancesHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumListOutstandingBalancesResponseItem = zod.record(zod.string(), zod.unknown()).describe('A Buildium Open API record, passed through unmodified')
+export const BuildiumListOutstandingBalancesResponse = zod.array(BuildiumListOutstandingBalancesResponseItem)
+
+
+/**
+ * @summary List ledger transactions for a Buildium lease
+ */
+export const BuildiumListLeaseTransactionsParams = zod.object({
+  "leaseId": zod.coerce.number()
+})
+
+export const BuildiumListLeaseTransactionsQueryParams = zod.object({
+  "limit": zod.coerce.number().optional().describe('Page size (Buildium max 1000)'),
+  "offset": zod.coerce.number().optional().describe('Number of records to skip')
+})
+
+export const BuildiumListLeaseTransactionsHeader = zod.object({
+  "x-license-key": zod.string().describe('RentNotice Pro license key of the calling workspace'),
+  "x-buildium-client-id": zod.string().describe('Buildium API key client id (forwarded, never stored)'),
+  "x-buildium-client-secret": zod.string().describe('Buildium API key secret (forwarded, never stored)')
+})
+
+export const BuildiumListLeaseTransactionsResponseItem = zod.record(zod.string(), zod.unknown()).describe('A Buildium Open API record, passed through unmodified')
+export const BuildiumListLeaseTransactionsResponse = zod.array(BuildiumListLeaseTransactionsResponseItem)
 
 
 /**

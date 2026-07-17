@@ -11,16 +11,20 @@ import {
   useRecordService,
   useReviseNotice,
   usePermissions,
+  useUpdateNotice,
   useValidation,
 } from "@/lib/api/hooks";
 import {
   DOCUMENT_KIND_LABELS,
   NOTICE_STATUS_LABELS,
+  ELECTRONIC_SERVICE_METHODS,
   NOTICE_TYPE_LABELS,
+  SERVICE_METHOD_LABELS,
   formatCents,
   type FieldAssignmentStatus,
   type ServiceMethod,
 } from "@/lib/types";
+import { PREREQUISITE_LABELS, getRulePack } from "@/lib/engine/rulepacks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
@@ -63,17 +67,33 @@ import {
   FileText,
   Loader2,
   Lock,
+  Scale,
   Send,
   Stamp,
   Truck,
 } from "lucide-react";
 
-const SERVICE_METHOD_LABELS: Record<ServiceMethod, string> = {
-  personal: "Personal service",
-  substitute: "Substituted service",
-  post_and_mail: "Post & mail",
-  other: "Other",
-};
+
+function isElectronicMethod(method: ServiceMethod): boolean {
+  return (ELECTRONIC_SERVICE_METHODS as readonly ServiceMethod[]).includes(method);
+}
+
+/** Map an app ServiceMethod onto the rule-pack service vocabulary. */
+function toPackMethod(method: ServiceMethod): string {
+  if (method === "substitute") return "substituted_and_mail";
+  if (method === "post_and_mail") return "posting_and_mail";
+  return method;
+}
+
+/** Service methods offered for a jurisdiction (verified allow list + Other). */
+function allowedServiceMethods(jurisdiction: string): ServiceMethod[] {
+  const all = Object.keys(SERVICE_METHOD_LABELS) as ServiceMethod[];
+  const pack = getRulePack(jurisdiction);
+  if (!pack || !pack.service.verified) return all;
+  return all.filter(
+    (m) => m === "other" || pack.service.allowedMethods.includes(toPackMethod(m) as never),
+  );
+}
 
 const FIELD_STATUS_LABELS: Record<FieldAssignmentStatus, string> = {
   assigned: "Assigned",
@@ -106,6 +126,7 @@ export default function NoticeView() {
   const revise = useReviseNotice();
   const recordService = useRecordService();
   const generateDocs = useGenerateDocuments();
+  const updateNotice = useUpdateNotice();
   const { can } = usePermissions();
 
   const [finalizeOpen, setFinalizeOpen] = useState(false);
@@ -123,6 +144,7 @@ export default function NoticeView() {
     servedBy: "",
     serverNotes: "",
     mailedDate: "",
+    electronicConsent: false,
   });
 
   const warnings = useMemo(
@@ -211,6 +233,7 @@ export default function NoticeView() {
     recordService.mutate(
       {
         id: notice.id,
+        electronicConsent: isElectronicMethod(svc.method) ? svc.electronicConsent : undefined,
         service: {
           dateServed: svc.dateServed || null,
           timeServed: svc.timeServed || null,
@@ -372,6 +395,99 @@ export default function NoticeView() {
               </CardContent>
             </Card>
           )}
+
+          {(() => {
+            const pack = getRulePack(notice.jurisdiction);
+            if (!pack || notice.noticeType !== "pay_or_quit_3day") return null;
+            const prereqs = pack.nonpayment.prerequisites;
+            const showPrereqs = prereqs.length > 0;
+            const showRuleCards = pack.leaseSensitive && pack.ruleCards.length > 0;
+            if (!showPrereqs && !showRuleCards) return null;
+            const editable = notice.status === "draft" || notice.status === "needs_review" || notice.status === "reviewed";
+            return (
+              <Card data-testid="card-state-requirements">
+                <CardHeader className="border-b pb-4">
+                  <CardTitle className="flex items-center gap-2">
+                    <Scale className="w-5 h-5 text-primary" />
+                    {pack.stateName} State Requirements
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-6 space-y-6">
+                  {showPrereqs && (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Pre-filing prerequisites</p>
+                      {prereqs.map((p) => (
+                        <div key={p} className="flex items-start gap-3">
+                          <Checkbox
+                            id={`prereq-${p}`}
+                            checked={notice.prereqCompleted[p] === true}
+                            disabled={!editable || updateNotice.isPending}
+                            onCheckedChange={(v) =>
+                              updateNotice.mutate(
+                                {
+                                  id: notice.id,
+                                  patch: {
+                                    prereqCompleted: {
+                                      ...notice.prereqCompleted,
+                                      [p]: v === true,
+                                    },
+                                  },
+                                },
+                                { onError: fail("Could not update prerequisite") },
+                              )
+                            }
+                            data-testid={`checkbox-prereq-${p}`}
+                          />
+                          <Label
+                            htmlFor={`prereq-${p}`}
+                            className="text-sm font-normal leading-snug"
+                          >
+                            {PREREQUISITE_LABELS[p]}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {showRuleCards && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Rule card</p>
+                      <p className="text-xs text-muted-foreground">
+                        {pack.stateName} has no single statewide nonpayment period — pick the
+                        rule card that matches this tenancy, then verify the lease/statute with
+                        counsel.
+                      </p>
+                      <Select
+                        value={notice.ruleCardKey ?? ""}
+                        disabled={!editable || updateNotice.isPending}
+                        onValueChange={(v) =>
+                          updateNotice.mutate(
+                            { id: notice.id, patch: { ruleCardKey: v || null } },
+                            { onError: fail("Could not set rule card") },
+                          )
+                        }
+                      >
+                        <SelectTrigger data-testid="select-rule-card">
+                          <SelectValue placeholder="Select the applicable rule card" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pack.ruleCards.map((rc) => (
+                            <SelectItem key={rc.key} value={rc.key}>
+                              {rc.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {notice.ruleCardKey && (
+                        <p className="text-xs text-muted-foreground">
+                          {pack.ruleCards.find((rc) => rc.key === notice.ruleCardKey)?.description}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
 
           {validation && (
             <Card className={validation.passed ? "border-primary/20" : "border-destructive/30"}>
@@ -841,7 +957,7 @@ export default function NoticeView() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(SERVICE_METHOD_LABELS) as ServiceMethod[]).map((m) => (
+                  {allowedServiceMethods(notice.jurisdiction).map((m) => (
                     <SelectItem key={m} value={m}>
                       {SERVICE_METHOD_LABELS[m]}
                     </SelectItem>
@@ -887,6 +1003,23 @@ export default function NoticeView() {
                 />
               </div>
             )}
+            {isElectronicMethod(svc.method) && (
+              <div className="col-span-2 flex items-start gap-3 rounded-md border border-accent/50 bg-accent/10 p-3">
+                <Checkbox
+                  id="electronic-consent"
+                  checked={svc.electronicConsent}
+                  onCheckedChange={(v) =>
+                    setSvc((s) => ({ ...s, electronicConsent: v === true }))
+                  }
+                  data-testid="checkbox-electronic-consent"
+                />
+                <Label htmlFor="electronic-consent" className="text-sm font-normal leading-snug">
+                  The tenant agreed (in the lease or in writing) to receive notices
+                  electronically by this method. Keep a copy of that agreement — electronic
+                  service is only valid where the tenant consented.
+                </Label>
+              </div>
+            )}
             <div className="space-y-2 col-span-2">
               <Label>Server notes</Label>
               <Textarea
@@ -906,6 +1039,7 @@ export default function NoticeView() {
                 !svc.dateServed ||
                 svc.servedBy.trim().length === 0 ||
                 (svc.method === "post_and_mail" && !svc.mailedDate) ||
+                (isElectronicMethod(svc.method) && !svc.electronicConsent) ||
                 recordService.isPending
               }
               onClick={doRecordService}

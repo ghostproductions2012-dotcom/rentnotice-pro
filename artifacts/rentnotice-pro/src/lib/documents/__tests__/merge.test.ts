@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildMergeFields, renderTemplate } from "../merge";
+import {
+  KNOWN_MERGE_FIELDS,
+  buildMergeFields,
+  renderTemplate,
+  replaceMergeField,
+  suggestMergeField,
+  unknownMergeFields,
+  MERGE_FIELD_DESCRIPTIONS,
+} from "../merge";
 import { PAY_OR_QUIT_BODY } from "../../templates-data/ca";
 import type { DocumentContext } from "../context";
 import type { CompanyProfile, Notice, PaymentProfile, ServiceRecord } from "../../types";
@@ -101,6 +109,29 @@ function ctxWith(overrides: Partial<DocumentContext>): DocumentContext {
   };
 }
 
+describe("KNOWN_MERGE_FIELDS", () => {
+  it("stays in sync with the keys buildMergeFields actually produces", () => {
+    const produced = Object.keys(buildMergeFields(ctxWith({}))).sort();
+    expect([...KNOWN_MERGE_FIELDS].sort()).toEqual(produced);
+  });
+
+  it("has a picker description for every known field, and no extras", () => {
+    expect(Object.keys(MERGE_FIELD_DESCRIPTIONS).sort()).toEqual([...KNOWN_MERGE_FIELDS].sort());
+    for (const desc of Object.values(MERGE_FIELD_DESCRIPTIONS)) {
+      expect(desc.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("flags unknown fields in a body but not known ones", () => {
+    expect(
+      unknownMergeFields("To {{tenant_names}} at {{property_address}}: pay {{total_amount}}."),
+    ).toEqual([]);
+    expect(
+      unknownMergeFields("To {{tenant_name}}: pay {{total_amount}} by {{due_date}}."),
+    ).toEqual(["tenant_name", "due_date"]);
+  });
+});
+
 describe("pay-or-quit template rendering (placeholder leakage)", () => {
   it("never leaks raw [token] placeholders, even with a minimal property-less draft", () => {
     const rendered = renderTemplate(PAY_OR_QUIT_BODY, buildMergeFields(ctxWith({})));
@@ -162,5 +193,48 @@ describe("pay-or-quit template rendering (placeholder leakage)", () => {
       "Person to whom rent is to be paid (name of individual): Alex Rivera",
     );
     expect(rendered).toContain("Total Rent Owing: $5,395.00");
+  });
+});
+
+describe("suggestMergeField", () => {
+  it("suggests the closest known field for a near-miss typo", () => {
+    expect(suggestMergeField("tenant_name")).toBe("tenant_names");
+    expect(suggestMergeField("propert_address")).toBe("property_address");
+    expect(suggestMergeField("total_amout")).toBe("total_amount");
+  });
+
+  it("is case-insensitive", () => {
+    expect(suggestMergeField("Tenant_Names")).toBe("tenant_names");
+  });
+
+  it("returns null when nothing is similar", () => {
+    expect(suggestMergeField("frobnicator")).toBeNull();
+    expect(suggestMergeField("xyz")).toBeNull();
+  });
+
+  it("never suggests for an already-known field's distant cousin", () => {
+    expect(suggestMergeField("company")).toBeNull();
+  });
+});
+
+describe("replaceMergeField", () => {
+  it("replaces all occurrences of the typo'd token", () => {
+    const body = "To {{tenant_name}}: rent due. Signed for {{tenant_name}}.";
+    expect(replaceMergeField(body, "tenant_name", "tenant_names")).toBe(
+      "To {{tenant_names}}: rent due. Signed for {{tenant_names}}.",
+    );
+  });
+
+  it("handles tokens with inner whitespace", () => {
+    expect(replaceMergeField("Hi {{ tenant_name }}", "tenant_name", "tenant_names")).toBe(
+      "Hi {{tenant_names}}",
+    );
+  });
+
+  it("does not touch other tokens", () => {
+    const body = "{{tenant_name}} at {{property_address}}";
+    expect(replaceMergeField(body, "tenant_name", "tenant_names")).toBe(
+      "{{tenant_names}} at {{property_address}}",
+    );
   });
 });

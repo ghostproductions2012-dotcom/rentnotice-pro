@@ -7,6 +7,7 @@ import adminRouter from "./admin";
 import portalRouter from "./portal";
 import licenseRouter from "./license";
 import fieldRouter from "./field";
+import buildiumRouter from "./buildium";
 import downloadsRouter from "./downloads";
 
 const router: IRouter = Router();
@@ -19,6 +20,7 @@ router.use(adminRouter);
 router.use(portalRouter);
 router.use(licenseRouter);
 router.use(fieldRouter);
+router.use(buildiumRouter);
 router.use(downloadsRouter);
 
 export default router;

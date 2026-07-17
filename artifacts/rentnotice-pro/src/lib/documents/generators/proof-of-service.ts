@@ -7,18 +7,13 @@
 // fill-in fields for completion at the time of service.
 // ---------------------------------------------------------------------------
 
-import { NOTICE_TYPE_LABELS } from "../../types";
-import type { ServiceMethod } from "../../types";
+import { NOTICE_TYPE_LABELS, SERVICE_METHOD_LABELS } from "../../types";
+import { PROOF_FIELD_LABELS, getRulePack } from "../../engine/rulepacks";
 import { formatLongDate, premisesAddress } from "../merge";
 import type { DocumentContext, GeneratedDocument, GenerateOptions } from "../context";
 import { fileName, finalize, newBuilder } from "./common";
 
-const METHOD_LABEL: Record<ServiceMethod, string> = {
-  personal: "Personal service",
-  substitute: "Substituted service and mailing",
-  post_and_mail: "Posting and mailing",
-  other: "Other attorney-approved method",
-};
+const METHOD_LABEL = SERVICE_METHOD_LABELS;
 
 export async function generateProofOfService(
   ctx: DocumentContext,
@@ -88,10 +83,25 @@ export async function generateProofOfService(
     b.fillLine("Notes / description of other method:");
   }
 
+  // ---- state-required proof elements (rule-pack driven, non-CA) ----
+  const pack = getRulePack(notice.jurisdiction);
+  const isCA = (notice.jurisdiction || "CA").toUpperCase() === "CA";
+  if (!isCA && pack) {
+    b.heading(`Proof Elements Required (${pack.stateName})`);
+    b.paragraph(
+      `${pack.stateName} proof of service should document the following. Confirm each item is completed:`,
+      { gapAfter: 6 },
+    );
+    for (const field of pack.service.proofRequired) {
+      b.checkbox(PROOF_FIELD_LABELS[field], { checked: false });
+    }
+  }
+
   // ---- penalty of perjury ----
+  const stateName = isCA ? "California" : pack?.stateName ?? "the state where the premises are located";
   b.heading("Declaration Under Penalty of Perjury");
   b.paragraph(
-    "I declare under penalty of perjury under the laws of the State of California that the foregoing is true and correct.",
+    `I declare under penalty of perjury under the laws of the State of ${stateName} that the foregoing is true and correct.`,
     { gapAfter: 14 },
   );
   b.fillLinePair("Executed on (date):", "At (city, state):");
@@ -99,9 +109,15 @@ export async function generateProofOfService(
   b.signatureBlock(["Signature of person serving", "Print name"], { gapBefore: 22, width: 280 });
 
   b.moveDown(6);
-  b.note(
-    "The manner of service must comply with California law. This form does not constitute legal advice; consult a qualified California attorney regarding the appropriate method of service.",
-  );
+  if (isCA) {
+    b.note(
+      "The manner of service must comply with California law. This form does not constitute legal advice; consult a qualified California attorney regarding the appropriate method of service.",
+    );
+  } else {
+    b.note(
+      `The manner of service must comply with ${stateName} law${pack && !pack.service.verified ? " — the pre-suit service rules for this state have not been verified in this app" : ""}. This form does not constitute legal advice; consult a qualified ${stateName} attorney regarding the appropriate method of service.`,
+    );
+  }
 
   return finalize(b, fileName(ctx, "proof_of_service", options));
 }

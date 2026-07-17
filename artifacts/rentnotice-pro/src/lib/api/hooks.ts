@@ -27,6 +27,7 @@ import type {
   CreateUserInput,
   DeadlineContext,
   FinalizeAttestation,
+  SetStateRuleReviewInput,
 } from "./services";
 import type {
   AppSettings,
@@ -92,6 +93,7 @@ export const qk = {
   dashboard: ["dashboard"] as const,
   report: (kind: ReportKind) => ["report", kind] as const,
   stateRules: ["stateRules"] as const,
+  stateRuleReviews: ["stateRuleReviews"] as const,
 };
 
 function invalidate(qc: QueryClient, roots: string[]) {
@@ -558,11 +560,20 @@ export function useRecordService() {
       id,
       service,
       source,
+      electronicConsent,
     }: {
       id: Id;
       service: ServiceRecord;
       source?: "field_sync";
-    }) => getServices().recordService(id, service, source ? { source } : undefined),
+      electronicConsent?: boolean;
+    }) =>
+      getServices().recordService(
+        id,
+        service,
+        source !== undefined || electronicConsent !== undefined
+          ? { source, electronicConsent }
+          : undefined,
+      ),
     onSuccess: () => invalidate(qc, NOTICE_ROOTS),
   });
 }
@@ -793,6 +804,29 @@ export function useExportNoticesCsv() {
 
 export function useStateRules() {
   return useQuery({ queryKey: qk.stateRules, queryFn: () => getServices().listStateRules() });
+}
+
+export function useStateRuleReviews() {
+  return useQuery({
+    queryKey: qk.stateRuleReviews,
+    queryFn: () => getServices().listStateRuleReviews(),
+  });
+}
+
+export function useSetStateRuleReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SetStateRuleReviewInput) => getServices().setStateRuleReview(input),
+    onSuccess: () => invalidate(qc, ["stateRuleReviews", "validation", "audit"]),
+  });
+}
+
+export function useClearStateRuleReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (state: string) => getServices().clearStateRuleReview(state),
+    onSuccess: () => invalidate(qc, ["stateRuleReviews", "validation", "audit"]),
+  });
 }
 
 // ------------------------------ backup --------------------------------------

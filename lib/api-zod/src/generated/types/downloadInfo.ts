@@ -25,8 +25,13 @@ export interface DownloadInfo {
      */
   macAppleSilicon: string | null;
   /**
-     * Proxy download URL for the Intel Mac .dmg
+     * Proxy download URL for the Intel .dmg
      * @nullable
      */
   macIntel: string | null;
+  /**
+     * Release tag the Mac installers come from when it differs from the latest release (e.g. Mac builds still in CI); null when Mac installers match the latest version
+     * @nullable
+     */
+  macVersion?: string | null;
 }

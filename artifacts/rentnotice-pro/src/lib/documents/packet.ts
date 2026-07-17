@@ -26,12 +26,20 @@ export interface KindedDocument {
  */
 const PACKET_ORDER: Record<PacketKind, DocumentKind[]> = {
   // A single draft export — just the notice (watermarked upstream).
-  draft: ["notice", "proof_of_service", "service_evidence", "lahd_letter"],
+  draft: ["notice", "state_prereq", "proof_of_service", "service_evidence", "lahd_letter"],
   // Final serve-ready set given to the field/office.
-  final: ["notice", "proof_of_service", "service_evidence", "posting_checklist", "lahd_letter"],
+  final: [
+    "notice",
+    "state_prereq",
+    "proof_of_service",
+    "service_evidence",
+    "posting_checklist",
+    "lahd_letter",
+  ],
   // Internal file: everything that supports and documents the demand.
   internal_packet: [
     "notice",
+    "state_prereq",
     "proof_of_service",
     "service_evidence",
     "posting_checklist",
@@ -44,6 +52,7 @@ const PACKET_ORDER: Record<PacketKind, DocumentKind[]> = {
   // Attorney handoff: the notice plus the full supporting record.
   attorney_packet: [
     "notice",
+    "state_prereq",
     "proof_of_service",
     "service_evidence",
     "posting_checklist",

@@ -132,7 +132,7 @@ export const MIGRATIONS: Migration[] = [
           changedBy: null,
           changedAt: nowIso(),
           changeNote:
-            "Upgraded to the First Light PM reference notice format (CCP §1161(2)).",
+            "Upgraded to the California reference notice format (CCP §1161(2)).",
         });
         db.run(
           "UPDATE templates SET versions = ?, current_version = ?, merge_fields = ?, updated_at = ? WHERE id = 'tpl-ca-3day-pay'",
@@ -144,6 +144,106 @@ export const MIGRATIONS: Migration[] = [
           ],
         );
       }
+    },
+  },
+  {
+    version: 7,
+    name: "vendor_relabel_tenant_statement",
+    up: (db) => {
+      // The "first_light" vendor label referenced a specific customer's
+      // property-management company; relabel it to the neutral
+      // "tenant_statement" everywhere it was stored.
+      db.run("UPDATE ledgers SET vendor = 'tenant_statement' WHERE vendor = 'first_light'");
+      db.run(
+        "UPDATE mapping_presets SET vendor = 'tenant_statement' WHERE vendor = 'first_light'",
+      );
+      db.run("UPDATE mapping_presets SET name = REPLACE(name, 'First Light PM — Tenant Statement', 'Tenant Statement (PDF)')");
+      db.run("UPDATE mapping_presets SET name = REPLACE(name, 'First Light', 'Tenant Statement')");
+      // Template version history notes stored the old wording — rewrite them.
+      const templates = db.all<{ id: string; versions: string }>(
+        "SELECT id, versions FROM templates WHERE versions LIKE '%First Light%'",
+      );
+      for (const tpl of templates) {
+        try {
+          const versions = JSON.parse(tpl.versions) as TemplateVersion[];
+          for (const v of versions) {
+            if (v.changeNote) {
+              v.changeNote = v.changeNote.replace(
+                /the First Light PM reference notice format/g,
+                "the California reference notice format",
+              );
+            }
+          }
+          db.run("UPDATE templates SET versions = ? WHERE id = ?", [
+            JSON.stringify(versions),
+            tpl.id,
+          ]);
+        } catch {
+          // Unparseable versions JSON — leave untouched.
+        }
+      }
+    },
+  },
+  {
+    version: 8,
+    name: "buildium_integration",
+    up: (db) => {
+      // Fresh databases already get these columns from SCHEMA_SQL (migration 1).
+      const addColumnIfMissing = (table: string, column: string, ddl: string) => {
+        const exists = db
+          .all<{ name: string }>(`PRAGMA table_info(${table})`)
+          .some((c) => c.name === column);
+        if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl};`);
+      };
+      addColumnIfMissing("properties", "external_source", "TEXT");
+      addColumnIfMissing("properties", "external_id", "TEXT");
+      addColumnIfMissing("tenants", "external_source", "TEXT");
+      addColumnIfMissing("tenants", "external_id", "TEXT");
+      addColumnIfMissing("settings", "buildium_client_id", "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing("settings", "buildium_client_secret", "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing("settings", "buildium_connected_at", "TEXT");
+      addColumnIfMissing("settings", "buildium_last_sync_at", "TEXT");
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_properties_external ON properties (external_source, external_id);",
+      );
+      db.exec(
+        "CREATE INDEX IF NOT EXISTS idx_tenants_external ON tenants (external_source, external_id);",
+      );
+    },
+  },
+  {
+    version: 9,
+    name: "state_rule_engine_fields",
+    up: (db) => {
+      const addColumnIfMissing = (table: string, column: string, ddl: string) => {
+        const exists = db
+          .all<{ name: string }>(`PRAGMA table_info(${table})`)
+          .some((c) => c.name === column);
+        if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl};`);
+      };
+      // Pre-filing prerequisite checklist (JSON map, e.g. {"notice_of_intent":true}).
+      addColumnIfMissing("notices", "prereq_completed", "TEXT NOT NULL DEFAULT '{}'");
+      // Rule card chosen for lease-sensitive states.
+      addColumnIfMissing("notices", "rule_card_key", "TEXT");
+      // Tenant agreed in writing to electronic service (email/text/portal).
+      addColumnIfMissing("notices", "electronic_service_consent", "INTEGER NOT NULL DEFAULT 0");
+    },
+  },
+  {
+    version: 10,
+    name: "state_rule_attorney_reviews",
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS state_rule_reviews (
+          state TEXT PRIMARY KEY,
+          reviewer_name TEXT NOT NULL,
+          reviewed_at TEXT NOT NULL,
+          notes TEXT NOT NULL DEFAULT '',
+          recorded_by TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+      `);
     },
   },
 ];

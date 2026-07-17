@@ -4,9 +4,9 @@ import { isPriorBalanceDescription, normalizeRecords } from "../normalize";
 import { extractStatementInfo } from "../statement";
 import type { ColumnMapping } from "../../types";
 
-// Header lines as reconstructed from the First Light "Tenant Statement" PDF.
-const FIRST_LIGHT_HEADER = [
-  "First Light Property Management, Inc.",
+// Header lines as reconstructed from a real-world "Tenant Statement" PDF.
+const STATEMENT_HEADER = [
+  "Golden Gate Property Management, Inc.",
   "1600 S Pacific Coast Hwy, Suite 100",
   "Redondo Beach, CA 90277",
   "Tenant Statement",
@@ -19,10 +19,10 @@ const FIRST_LIGHT_HEADER = [
 ];
 
 describe("tenant statement header extraction", () => {
-  it("extracts the full header from a First Light tenant statement", () => {
-    const info = extractStatementInfo(FIRST_LIGHT_HEADER);
+  it("extracts the full header from a tenant statement", () => {
+    const info = extractStatementInfo(STATEMENT_HEADER);
     expect(info).not.toBeNull();
-    expect(info!.vendor).toBe("first_light");
+    expect(info!.vendor).toBe("tenant_statement");
     expect(info!.tenantName).toBe("Stan Francois");
     expect(info!.street).toBe("2021 Carnegie Lane");
     expect(info!.unit).toBe("5");
@@ -35,7 +35,7 @@ describe("tenant statement header extraction", () => {
   });
 
   it("prefers the premises city/state/zip over the company letterhead", () => {
-    const info = extractStatementInfo(FIRST_LIGHT_HEADER);
+    const info = extractStatementInfo(STATEMENT_HEADER);
     expect(info!.zip).toBe("90278"); // premises, not the 90277 letterhead
   });
 
@@ -44,7 +44,7 @@ describe("tenant statement header extraction", () => {
     expect(extractStatementInfo([])).toBeNull();
   });
 
-  it("strips First Light listing-index suffixes from the property label line", () => {
+  it("strips listing-index suffixes from the property label line", () => {
     const info = extractStatementInfo([
       "Tenant Statement",
       "Stan Francois",

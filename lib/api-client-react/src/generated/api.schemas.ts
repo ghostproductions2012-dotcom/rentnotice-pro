@@ -34,10 +34,15 @@ export interface DownloadInfo {
      */
   macAppleSilicon: string | null;
   /**
-     * Proxy download URL for the Intel Mac .dmg
+     * Proxy download URL for the Intel .dmg
      * @nullable
      */
   macIntel: string | null;
+  /**
+     * Release tag the Mac installers come from when it differs from the latest release (e.g. Mac builds still in CI); null when Mac installers match the latest version
+     * @nullable
+     */
+  macVersion?: string | null;
 }
 
 export interface Plan {
@@ -382,6 +387,26 @@ export interface ErrorMessage {
   message: string;
 }
 
+/**
+ * A Buildium Open API record, passed through unmodified
+ */
+export interface BuildiumRecord { [key: string]: unknown }
+
+export interface BuildiumPingResult {
+  ok: boolean;
+  /** Total rental property count reported by Buildium (when available) */
+  propertyCount?: number | null;
+}
+
+export interface BuildiumProxyError {
+  /** Human-readable message safe to show in the desktop app */
+  error: string;
+  /** Machine code: invalid_license, missing_credentials, buildium_auth, buildium_rate_limited, buildium_unreachable, buildium_error */
+  code: string;
+  /** HTTP status returned by Buildium, when the upstream responded */
+  buildiumStatus?: number | null;
+}
+
 export interface FieldEvidenceSync {
   id: string;
   photoDataUrl: string;
@@ -437,6 +462,11 @@ export interface FieldAssignmentSync {
   deadlineDate: string | null;
   /** @nullable */
   totalAmountCents: number | null;
+  /**
+     * Origin of the underlying tenant/ledger data (e.g. "buildium"). Omitted or null for manually entered data.
+     * @nullable
+     */
+  source?: string | null;
   evidence: FieldEvidenceSync[];
   createdAt: string;
   updatedAt: string;
@@ -711,6 +741,31 @@ export interface AdminPendingSignup {
   createdAt: string;
 }
 
+/**
+ * RentNotice Pro license key of the calling workspace
+ */
+export type LicenseKeyHeaderParameter = string;
+
+/**
+ * Buildium API key client id (forwarded, never stored)
+ */
+export type BuildiumClientIdHeaderParameter = string;
+
+/**
+ * Buildium API key secret (forwarded, never stored)
+ */
+export type BuildiumClientSecretHeaderParameter = string;
+
+/**
+ * Page size (Buildium max 1000)
+ */
+export type BuildiumLimitParameter = number;
+
+/**
+ * Number of records to skip
+ */
+export type BuildiumOffsetParameter = number;
+
 export type ListFieldAssignmentsParams = {
 status?: ListFieldAssignmentsStatus;
 };
@@ -724,4 +779,71 @@ export const ListFieldAssignmentsStatus = {
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;
+
+export type BuildiumListRentalsParams = {
+/**
+ * Page size (Buildium max 1000)
+ */
+limit?: BuildiumLimitParameter;
+/**
+ * Number of records to skip
+ */
+offset?: BuildiumOffsetParameter;
+};
+
+export type BuildiumListUnitsParams = {
+/**
+ * Page size (Buildium max 1000)
+ */
+limit?: BuildiumLimitParameter;
+/**
+ * Number of records to skip
+ */
+offset?: BuildiumOffsetParameter;
+/**
+ * Restrict to specific Buildium rental property ids
+ */
+propertyids?: number[];
+};
+
+export type BuildiumListLeasesParams = {
+/**
+ * Page size (Buildium max 1000)
+ */
+limit?: BuildiumLimitParameter;
+/**
+ * Number of records to skip
+ */
+offset?: BuildiumOffsetParameter;
+/**
+ * Filter by lease status (e.g. Active, Past)
+ */
+leasestatuses?: string[];
+/**
+ * Restrict to specific Buildium rental property ids
+ */
+propertyids?: number[];
+};
+
+export type BuildiumListOutstandingBalancesParams = {
+/**
+ * Page size (Buildium max 1000)
+ */
+limit?: BuildiumLimitParameter;
+/**
+ * Number of records to skip
+ */
+offset?: BuildiumOffsetParameter;
+};
+
+export type BuildiumListLeaseTransactionsParams = {
+/**
+ * Page size (Buildium max 1000)
+ */
+limit?: BuildiumLimitParameter;
+/**
+ * Number of records to skip
+ */
+offset?: BuildiumOffsetParameter;
+};
 

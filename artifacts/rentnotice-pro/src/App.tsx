@@ -8,7 +8,7 @@ import { StartupErrorScreen } from "@/components/startup-error";
 import { computeRouterBase } from "@/lib/router-base";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { evaluateGraceWarning } from "@/lib/licensing/gate";
-import { Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, X } from "lucide-react";
+import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -30,6 +30,7 @@ import TemplateView from "@/pages/templates/view";
 import ReportsPage from "@/pages/reports";
 import AuditPage from "@/pages/audit";
 import SettingsPage from "@/pages/settings";
+import StateRulesPage from "@/pages/state-rules";
 import FieldAssignmentsPage from "@/pages/field";
 import { useEffect, useRef, useState } from "react";
 
@@ -178,6 +179,7 @@ function Sidebar() {
         { icon: Building, label: "Properties", href: "/properties" },
         { icon: Users, label: "Tenants", href: "/tenants" },
         { icon: Scale, label: "Templates", href: "/templates" },
+        { icon: BookOpen, label: "State Rules", href: "/state-rules" },
       ]
     },
     {
@@ -416,6 +418,7 @@ function Router() {
         <Route path="/field-service" component={FieldAssignmentsPage} />
         <Route path="/templates" component={TemplatesList} />
         <Route path="/templates/:id" component={TemplateView} />
+        <Route path="/state-rules" component={StateRulesPage} />
         <Route path="/reports" component={ReportsPage} />
         <Route path="/audit" component={AuditPage} />
         <Route path="/settings" component={SettingsPage} />

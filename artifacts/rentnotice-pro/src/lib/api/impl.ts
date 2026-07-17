@@ -19,6 +19,8 @@ import type {
   DashboardData,
   DeadlineResult,
   DuplicateCheckResult,
+  ExternalPropertyUpsert,
+  ExternalTenantUpsert,
   FieldAssignment,
   FieldEvidence,
   GenerateDocumentsInput,
@@ -82,6 +84,7 @@ import {
   seedReferenceData,
   setWorkspaceMode,
   settingsRepo,
+  stateRuleReviewsRepo,
   sha256Hex,
   statusHistoryRepo,
   templatesRepo,
@@ -115,6 +118,7 @@ import {
   classifyRow,
   computeDeadline as computeDeadlineEngine,
   confidenceToUnit,
+  getRulePack,
   unacknowledgedWarnings,
   validateNotice as validateNoticeEngine,
 } from "../engine";
@@ -349,6 +353,9 @@ function runValidation(db: AppDatabase, notice: Notice): ValidationResult {
         }
       : undefined,
     currentUserRole: session.user?.role,
+    stateRuleReview: notice.jurisdiction
+      ? stateRuleReviewsRepo.get(db, notice.jurisdiction)
+      : null,
   });
   validationResultsRepo.upsert(db, result);
   return result;
@@ -450,6 +457,10 @@ async function provisionActivatedWorkspace(opts: {
       syncEndpoint: "",
       disclaimerAcknowledgedAt: null,
       onboardingCompleted: false,
+      buildiumClientId: "",
+      buildiumClientSecret: "",
+      buildiumConnectedAt: null,
+      buildiumLastSyncAt: null,
       updatedAt: now,
     });
     seedReferenceData(db);
@@ -881,6 +892,8 @@ function createServices(): AppServices {
         payment: { ...defaultPayment(companyRepo.get(db)), ...(input.payment ?? {}) },
         isLosAngelesCity: input.isLosAngelesCity ?? false,
         notes: input.notes ?? "",
+        externalSource: null,
+        externalId: null,
         createdAt: t,
         updatedAt: t,
       };
@@ -901,6 +914,69 @@ function createServices(): AppServices {
       const property = propertiesRepo.get(db, id);
       propertiesRepo.remove(db, id);
       logAudit(db, "property_deleted", "property", id, `Deleted property ${property?.nickname ?? id}`);
+    },
+    async upsertExternalProperty(
+      input: ExternalPropertyUpsert,
+    ): Promise<{ property: Property; created: boolean }> {
+      requirePermission("property.manage");
+      const db = await getDb();
+      const existing = propertiesRepo.findByExternal(db, input.externalSource, input.externalId);
+      if (existing) {
+        // Refresh imported fields; keep user-entered data (payment profile,
+        // notes, LA-city flag, county, manager contacts) untouched.
+        const next = propertiesRepo.update(db, existing.id, {
+          nickname: input.nickname,
+          addressLine1: input.addressLine1,
+          addressLine2: input.addressLine2,
+          city: input.city,
+          state: input.state,
+          zip: input.zip,
+          units: input.units,
+          // Buildium doesn't expose the owner name on rentals; never blank
+          // out a value the user typed in by hand.
+          ...(input.ownerName ? { ownerName: input.ownerName } : {}),
+        });
+        logAudit(
+          db,
+          "property_updated",
+          "property",
+          next.id,
+          `Refreshed property ${next.nickname} from ${input.externalSource}`,
+        );
+        return { property: next, created: false };
+      }
+      const t = nowIso();
+      const property: Property = {
+        id: uid("prop"),
+        nickname: input.nickname,
+        addressLine1: input.addressLine1,
+        addressLine2: input.addressLine2,
+        city: input.city,
+        state: input.state,
+        zip: input.zip,
+        county: "",
+        bedrooms: null,
+        units: input.units,
+        ownerName: input.ownerName,
+        managementCompany: "",
+        managerContact: "",
+        payment: defaultPayment(companyRepo.get(db)),
+        isLosAngelesCity: false,
+        notes: "",
+        externalSource: input.externalSource,
+        externalId: input.externalId,
+        createdAt: t,
+        updatedAt: t,
+      };
+      propertiesRepo.create(db, property);
+      logAudit(
+        db,
+        "property_created",
+        "property",
+        property.id,
+        `Imported property ${property.nickname} from ${input.externalSource}`,
+      );
+      return { property, created: true };
     },
 
     // --- tenants ---
@@ -928,12 +1004,68 @@ function createServices(): AppServices {
         moveOutDate: null,
         notes: input.notes ?? "",
         archived: false,
+        externalSource: null,
+        externalId: null,
         createdAt: t,
         updatedAt: t,
       };
       tenantsRepo.create(db, tenant);
       logAudit(db, "tenant_created", "tenant", tenant.id, `Added tenant ${tenant.names.join(", ")}`);
       return tenant;
+    },
+    async upsertExternalTenant(
+      input: ExternalTenantUpsert,
+    ): Promise<{ tenant: Tenant; created: boolean }> {
+      requirePermission("tenant.manage");
+      const db = await getDb();
+      const existing = tenantsRepo.findByExternal(db, input.externalSource, input.externalId);
+      if (existing) {
+        // Refresh imported fields; keep notes/archived state untouched.
+        const next = tenantsRepo.update(db, existing.id, {
+          names: input.names,
+          propertyId: input.propertyId,
+          unit: input.unit,
+          email: input.email,
+          phone: input.phone,
+          monthlyRentCents: input.monthlyRentCents,
+          leaseStart: input.leaseStart,
+        });
+        logAudit(
+          db,
+          "tenant_updated",
+          "tenant",
+          next.id,
+          `Refreshed tenant ${next.names.join(", ")} from ${input.externalSource}`,
+        );
+        return { tenant: next, created: false };
+      }
+      const t = nowIso();
+      const tenant: Tenant = {
+        id: uid("tenant"),
+        names: input.names,
+        propertyId: input.propertyId,
+        unit: input.unit,
+        email: input.email,
+        phone: input.phone,
+        monthlyRentCents: input.monthlyRentCents,
+        leaseStart: input.leaseStart,
+        moveOutDate: null,
+        notes: "",
+        archived: false,
+        externalSource: input.externalSource,
+        externalId: input.externalId,
+        createdAt: t,
+        updatedAt: t,
+      };
+      tenantsRepo.create(db, tenant);
+      logAudit(
+        db,
+        "tenant_created",
+        "tenant",
+        tenant.id,
+        `Imported tenant ${tenant.names.join(", ")} from ${input.externalSource}`,
+      );
+      return { tenant, created: true };
     },
     async updateTenant(id, patch): Promise<Tenant> {
       requirePermission("tenant.manage");
@@ -1204,6 +1336,9 @@ function createServices(): AppServices {
         rentOnlyAttestedBy: null,
         rentOnlyAttestedAt: null,
         attorneyExportFlag: false,
+        prereqCompleted: input.prereqCompleted ?? {},
+        ruleCardKey: input.ruleCardKey ?? null,
+        electronicServiceConsent: input.electronicServiceConsent ?? false,
         service: emptyService(),
         deadlineDate: null,
         internalNotes: input.internalNotes ?? "",
@@ -1262,6 +1397,10 @@ function createServices(): AppServices {
       if (patch.rentIncreaseEffectiveDate !== undefined)
         p.rentIncreaseEffectiveDate = patch.rentIncreaseEffectiveDate ?? null;
       if (patch.internalNotes !== undefined) p.internalNotes = patch.internalNotes;
+      if (patch.prereqCompleted !== undefined) p.prereqCompleted = patch.prereqCompleted ?? {};
+      if (patch.ruleCardKey !== undefined) p.ruleCardKey = patch.ruleCardKey ?? null;
+      if (patch.electronicServiceConsent !== undefined)
+        p.electronicServiceConsent = patch.electronicServiceConsent ?? false;
       const next = noticesRepo.update(db, id, p);
       logAudit(db, "notice_updated", "notice", id, "Updated notice draft");
       return next;
@@ -1397,14 +1536,19 @@ function createServices(): AppServices {
     async recordService(
       id,
       service: ServiceRecord,
-      options?: { source?: "field_sync" },
+      options?: { source?: "field_sync"; electronicConsent?: boolean },
     ): Promise<Notice> {
       requirePermission("notice.status");
       const db = await getDb();
       const n = noticesRepo.get(db, id);
       if (!n) throw new Error("Notice not found");
       const fromFieldSync = options?.source === "field_sync";
-      let next = noticesRepo.update(db, id, { service });
+      let next = noticesRepo.update(db, id, {
+        service,
+        ...(options?.electronicConsent !== undefined
+          ? { electronicServiceConsent: options.electronicConsent }
+          : {}),
+      });
       logAudit(
         db,
         "service_recorded",
@@ -1419,6 +1563,7 @@ function createServices(): AppServices {
         const tenant = n.noticeType === "rent_increase" ? tenantsRepo.get(db, n.tenantId) : null;
         const deadline = computeDeadlineEngine(service.dateServed, n.noticeType, n.jurisdiction, {
           holidays: customHolidays(db),
+          serviceMethod: service.method ?? undefined,
           rentIncrease:
             n.noticeType === "rent_increase"
               ? {
@@ -1478,10 +1623,14 @@ function createServices(): AppServices {
       }
 
       const hasFieldEvidence = fieldAssignments.some((a) => a.evidence.length > 0);
+      const hasPrereqs =
+        (getRulePack(notice.jurisdiction)?.nonpayment.prerequisites.length ?? 0) > 0 &&
+        notice.noticeType === "pay_or_quit_3day";
       const kinds = packetContents(input.packetKind).filter(
         (k) =>
           (k !== "lahd_letter" || notice.includeLahdLetter) &&
-          (k !== "service_evidence" || hasFieldEvidence),
+          (k !== "service_evidence" || hasFieldEvidence) &&
+          (k !== "state_prereq" || hasPrereqs),
       );
       const generated: KindedDocument[] = [];
       for (const kind of kinds) {
@@ -1929,6 +2078,61 @@ function createServices(): AppServices {
     async listStateRules() {
       await getDb();
       return [...STATE_RULES];
+    },
+
+    // --- state rule attorney reviews ---
+    async listStateRuleReviews() {
+      const db = await getDb();
+      return stateRuleReviewsRepo.list(db);
+    },
+    async setStateRuleReview(input) {
+      requirePermission("settings.manage");
+      const db = await getDb();
+      const state = input.state.trim().toUpperCase();
+      if (!getRulePack(state)) throw new Error(`Unknown jurisdiction "${input.state}".`);
+      const reviewerName = input.reviewerName.trim();
+      if (!reviewerName) throw new Error("Reviewer name is required.");
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(input.reviewedAt))
+        throw new Error("Review date must be a valid date (YYYY-MM-DD).");
+      const existing = stateRuleReviewsRepo.get(db, state);
+      const now = nowIso();
+      const review = stateRuleReviewsRepo.upsert(db, {
+        state,
+        reviewerName,
+        reviewedAt: input.reviewedAt,
+        notes: (input.notes ?? "").trim(),
+        recordedBy: session.user?.name ?? null,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      });
+      logAudit(
+        db,
+        "state_rule_review_changed",
+        "state_rule_review",
+        state,
+        `${existing ? "Updated" : "Recorded"} attorney approval for ${state}: reviewed by ${reviewerName} on ${input.reviewedAt}`,
+        {
+          previousValue: existing ? JSON.stringify(existing) : null,
+          newValue: JSON.stringify(review),
+        },
+      );
+      return review;
+    },
+    async clearStateRuleReview(state) {
+      requirePermission("settings.manage");
+      const db = await getDb();
+      const code = state.trim().toUpperCase();
+      const existing = stateRuleReviewsRepo.get(db, code);
+      if (!existing) return;
+      stateRuleReviewsRepo.remove(db, code);
+      logAudit(
+        db,
+        "state_rule_review_changed",
+        "state_rule_review",
+        code,
+        `Removed attorney approval for ${code} (was: ${existing.reviewerName}, ${existing.reviewedAt})`,
+        { previousValue: JSON.stringify(existing) },
+      );
     },
 
     // --- backup / restore ---

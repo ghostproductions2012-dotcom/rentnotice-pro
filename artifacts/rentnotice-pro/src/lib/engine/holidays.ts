@@ -111,6 +111,54 @@ function indexHolidays(custom?: Holiday[]): Map<string, Holiday> {
   return map;
 }
 
+// ------------------------- Non-CA (federal) holidays -------------------------
+//
+// For non-California jurisdictions the engine does not ship a per-state court
+// calendar. When a state's counting basis excludes holidays, the standard
+// federal holiday set is used as a conservative approximation and a warning is
+// surfaced telling the operator to verify against the state's official court
+// calendar.
+
+/** Compute the standard federal holidays (observed dates) for one year. */
+export function generateFederalHolidays(year: number): Holiday[] {
+  const raw: RawHoliday[] = [
+    { date: observedFixed(year, 1, 1), name: "New Year's Day" },
+    { date: nthWeekdayOfMonth(year, 1, MON, 3), name: "Martin Luther King Jr. Day" },
+    { date: nthWeekdayOfMonth(year, 2, MON, 3), name: "Washington's Birthday (Presidents' Day)" },
+    { date: lastWeekdayOfMonth(year, 5, MON), name: "Memorial Day" },
+    { date: observedFixed(year, 6, 19), name: "Juneteenth" },
+    { date: observedFixed(year, 7, 4), name: "Independence Day" },
+    { date: nthWeekdayOfMonth(year, 9, MON, 1), name: "Labor Day" },
+    { date: nthWeekdayOfMonth(year, 10, MON, 2), name: "Columbus Day / Indigenous Peoples' Day" },
+    { date: observedFixed(year, 11, 11), name: "Veterans Day" },
+    { date: nthWeekdayOfMonth(year, 11, THU, 4), name: "Thanksgiving Day" },
+    { date: observedFixed(year, 12, 25), name: "Christmas Day" },
+  ];
+  return raw.map((h, i) => ({
+    id: `fed-${year}-${i}`,
+    date: h.date,
+    name: h.name,
+    jurisdiction: "US",
+    courtHoliday: true,
+    builtIn: true,
+  }));
+}
+
+/** Federal holiday lookup for a set of years (plus optional custom holidays). */
+export function getFederalHoliday(
+  dateIso: string,
+  customHolidays?: Holiday[],
+): Holiday | null {
+  const year = Number(dateIso.slice(0, 4));
+  for (const h of generateFederalHolidays(year)) {
+    if (h.date === dateIso) return h;
+  }
+  for (const h of customHolidays ?? []) {
+    if (h.courtHoliday && h.date === dateIso) return h;
+  }
+  return null;
+}
+
 /** True when the ISO date is a CA court holiday (optionally incl. custom ones). */
 export function isCourtHoliday(dateIso: string, customHolidays?: Holiday[]): boolean {
   return indexHolidays(customHolidays).has(dateIso);

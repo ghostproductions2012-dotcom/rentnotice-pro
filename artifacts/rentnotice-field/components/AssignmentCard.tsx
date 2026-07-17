@@ -45,6 +45,26 @@ export function AssignmentCard({
         >
           {tenants}
         </Text>
+        {assignment.source === "buildium" ? (
+          <View
+            testID={`source-badge-${assignment.id}`}
+            style={[
+              styles.sourceBadge,
+              {
+                backgroundColor: colors.muted,
+                borderColor: colors.border,
+                borderRadius: colors.radius,
+              },
+            ]}
+          >
+            <Feather name="refresh-cw" size={10} color={colors.mutedForeground} />
+            <Text
+              style={[styles.sourceBadgeText, { color: colors.mutedForeground }]}
+            >
+              Buildium
+            </Text>
+          </View>
+        ) : null}
         <StatusBadge status={assignment.status} size="sm" />
       </View>
 
@@ -131,6 +151,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
+  },
+  sourceBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  sourceBadgeText: {
+    fontFamily: fonts.medium,
+    fontSize: 11,
   },
   footerText: {
     fontFamily: fonts.medium,

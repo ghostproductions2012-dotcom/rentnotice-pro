@@ -15,22 +15,34 @@
 // breakdown. Pure and deterministic; custom holidays may be supplied.
 // ---------------------------------------------------------------------------
 
-import type { DeadlineResult, Holiday, NoticeType } from "../types";
+import type { DeadlineResult, Holiday, NoticeType, ServiceMethod } from "../types";
 import { addDays, isWeekend } from "./dateUtils";
 import {
   CA_HOLIDAY_END_YEAR,
   CA_HOLIDAY_START_YEAR,
   generateCaHolidays,
   getCourtHoliday,
+  getFederalHoliday,
 } from "./holidays";
 import {
   RENT_INCREASE_LARGE_PERIOD_DAYS,
   getNoticeTypeRule,
   isLargeRentIncrease,
 } from "./noticeRules";
+import {
+  customHolidayApplies,
+  getStateHoliday,
+  hasStateHolidayCalendar,
+  stateHolidayCoverageWarning,
+  stateHolidaySource,
+} from "./stateHolidays";
+import { getRulePack, PERIOD_UNIT_LABELS, type StateRulePack } from "./rulepacks";
 
 const DISCLAIMER =
   "This calculator is informational only and is not legal advice. Deadlines must be confirmed by a qualified California attorney.";
+
+const GENERIC_DISCLAIMER =
+  "This calculator is informational only and is not legal advice. Deadlines must be confirmed by a qualified attorney licensed in the notice's jurisdiction.";
 
 export interface RentIncreaseContext {
   /** Proposed new monthly rent, in cents. */
@@ -48,6 +60,11 @@ export interface DeadlineOptions {
    * requires 90 days' notice instead of the standard 30.
    */
   rentIncrease?: RentIncreaseContext;
+  /**
+   * Service method used (or planned). Enables state mail-extension rules
+   * (e.g. Alaska adds 3 days for certified/registered mail).
+   */
+  serviceMethod?: ServiceMethod | null;
 }
 
 /**
@@ -61,6 +78,26 @@ export function computeDeadline(
 ): DeadlineResult {
   const rule = getNoticeTypeRule(noticeType);
   const warnings: string[] = [];
+
+  // ---- Non-CA pay-or-quit notices: use the state rule pack when it carries a
+  // verified nonpayment period. California keeps the original engine path
+  // below (byte-identical output).
+  const jurisdictionCode = jurisdiction.toUpperCase();
+  if (jurisdictionCode !== "CA" && noticeType === "pay_or_quit_3day") {
+    const pack = getRulePack(jurisdictionCode);
+    if (pack && pack.nonpayment.periodLength != null && pack.nonpayment.periodUnit != null) {
+      return computePackDeadline(serviceDate, noticeType, jurisdictionCode, pack, options);
+    }
+    warnings.push(
+      pack
+        ? `The ${pack.stateName} rule pack does not specify a verified nonpayment notice period (${pack.leaseSensitive ? "lease/ground-sensitive state" : "verification required"}). The deadline below uses California counting rules as a placeholder and must NOT be relied on.`
+        : `No rule pack exists for jurisdiction "${jurisdiction}". The deadline below uses California counting rules as a placeholder and must NOT be relied on.`,
+    );
+  } else if (jurisdictionCode !== "CA") {
+    warnings.push(
+      `Deadlines for ${jurisdictionCode} ${rule.label.toLowerCase()} notices are computed with California counting rules as a placeholder. Attorney review is required before relying on this date.`,
+    );
+  }
 
   // Cal. Civ. Code §827(b)(2): rent increases over 10% of scheduled rent
   // require 90 days' notice instead of the standard 30.
@@ -165,5 +202,194 @@ export function computeDeadline(
     explanation,
     warnings,
     disclaimer: DISCLAIMER,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Rule-pack-driven deadline (non-CA pay-or-quit notices).
+//
+// Counting behavior comes from the state's rule pack:
+//  - court_day / business_day units: skip weekends (and holidays where the
+//    pack excludes them) while counting — the deadline lands on an open day.
+//  - calendar_day units: count straight days, then roll forward off weekends /
+//    holidays only when the pack says the deadline moves when courts are
+//    closed.
+//  - Mail extensions (e.g. AK +3 for certified/registered mail) are applied
+//    when the service method matches the pack's extension list.
+//  - Non-CA holiday exclusions use the standard federal holiday set as a
+//    conservative approximation, with a warning to verify the state calendar.
+// ---------------------------------------------------------------------------
+
+/** Map an app ServiceMethod onto the rule-pack service vocabulary. */
+function toPackMethod(method: ServiceMethod): string {
+  switch (method) {
+    case "substitute":
+      return "substituted_and_mail";
+    case "post_and_mail":
+      return "posting_and_mail";
+    default:
+      return method;
+  }
+}
+
+function computePackDeadline(
+  serviceDate: string,
+  noticeType: NoticeType,
+  jurisdiction: string,
+  pack: StateRulePack,
+  options: DeadlineOptions,
+): DeadlineResult {
+  const np = pack.nonpayment;
+  const basis = np.countingBasis;
+  const unit = np.periodUnit!;
+  const warnings: string[] = [];
+  const excludedDates: DeadlineResult["excludedDates"] = [];
+  const startsDayAfter = pack.dateCount.countStartsDayAfterService;
+  const explanation: string[] = [
+    `Jurisdiction: ${pack.stateName} (rule pack v${pack.versionDate}).`,
+    startsDayAfter
+      ? `Service date: ${serviceDate} (day 0 — not counted).`
+      : `Service date: ${serviceDate} (counting starts on the service day in ${pack.stateName}).`,
+    `Statutory period: ${np.periodLength} ${PERIOD_UNIT_LABELS[unit]}. ${np.summary}`,
+  ];
+
+  if (pack.verificationStatus !== "approved") {
+    warnings.push(
+      `The ${pack.stateName} rule pack is marked "${pack.verificationStatus.replace(/_/g, " ")}" — this deadline must be verified by a licensed attorney before it is relied on.`,
+    );
+  }
+
+  let periodDays = np.periodLength!;
+  const method = options.serviceMethod ?? null;
+  if (
+    method &&
+    basis.mailExtensionDays > 0 &&
+    basis.mailExtensionMethods.includes(toPackMethod(method) as never)
+  ) {
+    periodDays += basis.mailExtensionDays;
+    explanation.push(
+      `Service by ${method.replace(/_/g, " ")} adds ${basis.mailExtensionDays} day(s) (mail extension) — total ${periodDays} days.`,
+    );
+  }
+
+  const excludeHolidays = basis.excludeStateHolidays || basis.excludeCourtHolidays;
+  const needsHolidayLookup =
+    excludeHolidays || pack.dateCount.movesToNextOpenCourtDayIfDeadlineClosed;
+  const bundledCalendar = hasStateHolidayCalendar(jurisdiction);
+  const stateCustom = (options.holidays ?? []).filter((h) =>
+    customHolidayApplies(jurisdiction, h),
+  );
+  const holidayFor = (dateIso: string) => {
+    if (!needsHolidayLookup) return null;
+    return bundledCalendar
+      ? getStateHoliday(jurisdiction, dateIso, stateCustom)
+      : getFederalHoliday(dateIso, stateCustom);
+  };
+  if (needsHolidayLookup && bundledCalendar) {
+    explanation.push(
+      `Holidays checked against the bundled ${pack.stateName} calendar: ${stateHolidaySource(jurisdiction)}.`,
+    );
+    const serviceYear = Number(serviceDate.slice(0, 4));
+    const coverage = stateHolidayCoverageWarning(jurisdiction, [serviceYear, serviceYear + 1]);
+    if (coverage) warnings.push(coverage);
+  } else if (excludeHolidays) {
+    warnings.push(
+      `${pack.stateName} holiday exclusions were approximated with the standard federal holiday set. Verify the state's official court calendar (${pack.holidaySource.notes}).`,
+    );
+  }
+
+  let expirationDate: string;
+
+  if (unit === "court_day" || unit === "business_day") {
+    let cursor = serviceDate;
+    let counted = 0;
+    if (!startsDayAfter) {
+      // Counting starts on the service day itself (if it is a countable day).
+      const weekendOnService = basis.excludeWeekends && isWeekend(cursor);
+      const holidayOnService = excludeHolidays ? holidayFor(cursor) : null;
+      if (weekendOnService) {
+        excludedDates.push({ date: cursor, reason: "weekend" });
+        explanation.push(`${cursor}: weekend — not counted.`);
+      } else if (holidayOnService) {
+        excludedDates.push({ date: cursor, reason: "holiday", name: holidayOnService.name });
+        explanation.push(`${cursor}: holiday (${holidayOnService.name}) — not counted.`);
+      } else {
+        counted = 1;
+        explanation.push(`${cursor}: service day counted as day 1 of ${periodDays}.`);
+      }
+    }
+    while (counted < periodDays) {
+      cursor = addDays(cursor, 1);
+      if (basis.excludeWeekends && isWeekend(cursor)) {
+        excludedDates.push({ date: cursor, reason: "weekend" });
+        explanation.push(`${cursor}: weekend — not counted.`);
+        continue;
+      }
+      const holiday = excludeHolidays ? holidayFor(cursor) : null;
+      if (holiday) {
+        excludedDates.push({ date: cursor, reason: "holiday", name: holiday.name });
+        explanation.push(`${cursor}: holiday (${holiday.name}) — not counted.`);
+        continue;
+      }
+      counted += 1;
+      explanation.push(`${cursor}: counted as day ${counted} of ${periodDays}.`);
+    }
+    expirationDate = cursor;
+  } else {
+    // calendar_day
+    let cursor = addDays(serviceDate, startsDayAfter ? periodDays : periodDays - 1);
+    explanation.push(
+      startsDayAfter
+        ? `${cursor}: ${periodDays} calendar days after service (day after service is day 1).`
+        : `${cursor}: ${periodDays} calendar days counting the service day as day 1.`,
+    );
+    if (pack.dateCount.movesToNextOpenCourtDayIfDeadlineClosed) {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (isWeekend(cursor)) {
+          excludedDates.push({ date: cursor, reason: "weekend" });
+          explanation.push(`${cursor}: weekend — deadline rolls forward.`);
+          cursor = addDays(cursor, 1);
+          continue;
+        }
+        const holiday = holidayFor(cursor);
+        if (holiday) {
+          excludedDates.push({ date: cursor, reason: "holiday", name: holiday.name });
+          explanation.push(`${cursor}: holiday (${holiday.name}) — deadline rolls forward.`);
+          cursor = addDays(cursor, 1);
+          continue;
+        }
+        break;
+      }
+    } else if (
+      isWeekend(cursor) ||
+      (bundledCalendar
+        ? getStateHoliday(jurisdiction, cursor, stateCustom)
+        : getFederalHoliday(cursor, stateCustom))
+    ) {
+      warnings.push(
+        `The deadline (${cursor}) lands on a weekend or holiday and the ${pack.stateName} rule pack does not confirm whether it moves to the next open day. Verify with the statute or a licensed attorney.`,
+      );
+    }
+    expirationDate = cursor;
+  }
+
+  explanation.push(`Deadline: end of day ${expirationDate}.`);
+  if (np.prerequisites.length > 0) {
+    explanation.push(
+      `Pre-filing prerequisites apply in ${pack.stateName}: ${np.prerequisites.map((p) => p.replace(/_/g, " ")).join("; ")}.`,
+    );
+  }
+
+  return {
+    serviceDate,
+    noticeType,
+    jurisdiction,
+    countedDays: periodDays,
+    excludedDates,
+    expirationDate,
+    explanation,
+    warnings,
+    disclaimer: GENERIC_DISCLAIMER,
   };
 }

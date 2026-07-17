@@ -23,6 +23,10 @@ tags:
     description: License verification API used by the desktop app
   - name: field
     description: Field assignment sync relay for the mobile companion
+  - name: buildium
+    description: >-
+      Buildium Open API proxy used by the desktop app. Credentials are forwarded
+      per-request via headers and never stored server-side.
   - name: admin
     description: Platform owner admin panel (separate from the company portal)
 paths:
@@ -79,10 +83,12 @@ paths:
       operationId: downloadAsset
       tags:
         - downloads
-      summary: Download an installer asset from the latest release (public)
+      summary: Download an installer asset from a recent release (public)
       description: >-
         Redirects to a short-lived signed URL for the requested release asset.
-        Only assets belonging to the latest release are served.
+        Only assets belonging to a recent published release are served (a
+        platform's installer may come from an older release than the latest
+        while newer builds are still in CI).
       parameters:
         - name: assetId
           in: path
@@ -93,7 +99,7 @@ paths:
         '302':
           description: Redirect to the signed installer download URL
         '404':
-          description: Asset does not belong to the latest release
+          description: Asset does not belong to a recent published release
           content:
             application/json:
               schema:
@@ -646,6 +652,266 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
+  /buildium/ping:
+    get:
+      operationId: buildiumPing
+      tags:
+        - buildium
+      summary: Test a Buildium API connection
+      description: >-
+        Verifies the supplied Buildium API key by requesting a single rental property from the
+        Buildium Open API. Requires a valid RentNotice Pro license key. Buildium credentials are
+        forwarded per-request and never stored.
+      parameters:
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+      responses:
+        '200':
+          description: Connection OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumPingResult'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+  /buildium/rentals:
+    get:
+      operationId: buildiumListRentals
+      tags:
+        - buildium
+      summary: List rental properties from Buildium
+      parameters:
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+        - $ref: '#/components/parameters/BuildiumLimit'
+        - $ref: '#/components/parameters/BuildiumOffset'
+      responses:
+        '200':
+          description: Rental properties (Buildium Rental schema, passed through)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildiumRecord'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '429':
+          description: Buildium rate limit hit — retry with backoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+  /buildium/units:
+    get:
+      operationId: buildiumListUnits
+      tags:
+        - buildium
+      summary: List rental units from Buildium
+      parameters:
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+        - $ref: '#/components/parameters/BuildiumLimit'
+        - $ref: '#/components/parameters/BuildiumOffset'
+        - name: propertyids
+          in: query
+          description: Restrict to specific Buildium rental property ids
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Rental units (Buildium RentalUnit schema, passed through)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildiumRecord'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '429':
+          description: Buildium rate limit hit — retry with backoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+  /buildium/leases:
+    get:
+      operationId: buildiumListLeases
+      tags:
+        - buildium
+      summary: List leases (with tenants) from Buildium
+      parameters:
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+        - $ref: '#/components/parameters/BuildiumLimit'
+        - $ref: '#/components/parameters/BuildiumOffset'
+        - name: leasestatuses
+          in: query
+          description: Filter by lease status (e.g. Active, Past)
+          schema:
+            type: array
+            items:
+              type: string
+          style: form
+          explode: true
+        - name: propertyids
+          in: query
+          description: Restrict to specific Buildium rental property ids
+          schema:
+            type: array
+            items:
+              type: integer
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: Leases (Buildium Lease schema incl. Tenants, passed through)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildiumRecord'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '429':
+          description: Buildium rate limit hit — retry with backoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+  /buildium/leases/outstandingbalances:
+    get:
+      operationId: buildiumListOutstandingBalances
+      tags:
+        - buildium
+      summary: List lease outstanding balances from Buildium
+      parameters:
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+        - $ref: '#/components/parameters/BuildiumLimit'
+        - $ref: '#/components/parameters/BuildiumOffset'
+      responses:
+        '200':
+          description: Outstanding balances per lease (passed through)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildiumRecord'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '429':
+          description: Buildium rate limit hit — retry with backoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+  '/buildium/leases/{leaseId}/transactions':
+    get:
+      operationId: buildiumListLeaseTransactions
+      tags:
+        - buildium
+      summary: List ledger transactions for a Buildium lease
+      parameters:
+        - name: leaseId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/LicenseKeyHeader'
+        - $ref: '#/components/parameters/BuildiumClientIdHeader'
+        - $ref: '#/components/parameters/BuildiumClientSecretHeader'
+        - $ref: '#/components/parameters/BuildiumLimit'
+        - $ref: '#/components/parameters/BuildiumOffset'
+      responses:
+        '200':
+          description: Lease ledger transactions (passed through)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BuildiumRecord'
+        '401':
+          description: Invalid license key or rejected Buildium credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '429':
+          description: Buildium rate limit hit — retry with backoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
+        '502':
+          description: Buildium API unreachable or returned an unexpected error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildiumProxyError'
   /www/admin/login:
     post:
       operationId: adminLogin
@@ -952,6 +1218,40 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 components:
+  parameters:
+    LicenseKeyHeader:
+      name: x-license-key
+      in: header
+      required: true
+      description: RentNotice Pro license key of the calling workspace
+      schema:
+        type: string
+    BuildiumClientIdHeader:
+      name: x-buildium-client-id
+      in: header
+      required: true
+      description: Buildium API key client id (forwarded, never stored)
+      schema:
+        type: string
+    BuildiumClientSecretHeader:
+      name: x-buildium-client-secret
+      in: header
+      required: true
+      description: Buildium API key secret (forwarded, never stored)
+      schema:
+        type: string
+    BuildiumLimit:
+      name: limit
+      in: query
+      description: Page size (Buildium max 1000)
+      schema:
+        type: integer
+    BuildiumOffset:
+      name: offset
+      in: query
+      description: Number of records to skip
+      schema:
+        type: integer
   schemas:
     HealthStatus:
       type: object
@@ -1001,7 +1301,15 @@ components:
           type:
             - string
             - 'null'
-          description: Proxy download URL for the Intel Mac .dmg
+          description: Proxy download URL for the Intel .dmg
+        macVersion:
+          type:
+            - string
+            - 'null'
+          description: >-
+            Release tag the Mac installers come from when it differs from the
+            latest release (e.g. Mac builds still in CI); null when Mac
+            installers match the latest version
     Plan:
       type: object
       required:
@@ -1526,6 +1834,39 @@ components:
           type: string
       required:
         - message
+    BuildiumRecord:
+      type: object
+      description: A Buildium Open API record, passed through unmodified
+      additionalProperties: true
+    BuildiumPingResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        propertyCount:
+          type: integer
+          nullable: true
+          description: Total rental property count reported by Buildium (when available)
+      required:
+        - ok
+    BuildiumProxyError:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable message safe to show in the desktop app
+        code:
+          type: string
+          description: >-
+            Machine code: invalid_license, missing_credentials, buildium_auth,
+            buildium_rate_limited, buildium_unreachable, buildium_error
+        buildiumStatus:
+          type: integer
+          nullable: true
+          description: HTTP status returned by Buildium, when the upstream responded
+      required:
+        - error
+        - code
     FieldEvidenceSync:
       type: object
       properties:
@@ -1608,6 +1949,13 @@ components:
         totalAmountCents:
           type:
             - integer
+            - 'null'
+        source:
+          description: >-
+            Origin of the underlying tenant/ledger data (e.g. "buildium").
+            Omitted or null for manually entered data.
+          type:
+            - string
             - 'null'
         evidence:
           type: array

@@ -28,6 +28,9 @@ export const fieldAssignmentsTable = pgTable("field_assignments", {
   noticeType: text("notice_type").notNull().default(""),
   deadlineDate: text("deadline_date"),
   totalAmountCents: integer("total_amount_cents"),
+  // Where the underlying tenant/ledger came from (e.g. "buildium"); lets the
+  // mobile app show a source badge. Null for manually entered data.
+  source: text("source"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

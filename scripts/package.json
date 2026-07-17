@@ -6,6 +6,8 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "check:mobile-layout": "tsx ./src/mobile-layout-check.ts",
+    "check:merge-field-picker": "tsx ./src/merge-field-picker-check.ts",
+    "check:state-prereq": "tsx ./src/state-prereq-check.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

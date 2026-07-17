@@ -4,6 +4,7 @@ import {
   useCreateFieldAssignment,
   useUpdateFieldAssignment,
   useNotices,
+  useTenants,
   useSettings,
   usePermissions,
   useRecordService,
@@ -73,6 +74,7 @@ type RemoteAssignment = {
   noticeType: string;
   deadlineDate: string | null;
   totalAmountCents: number | null;
+  source?: string | null;
   evidence: RemoteEvidence[];
   createdAt: string;
   updatedAt: string;
@@ -120,7 +122,11 @@ function localDateParts(iso: string): { date: string; time: string } {
   };
 }
 
-function toPushPayload(a: FieldAssignment, notice: Notice | undefined) {
+function toPushPayload(
+  a: FieldAssignment,
+  notice: Notice | undefined,
+  source: string | null,
+) {
   return {
     id: a.id,
     noticeId: a.noticeId,
@@ -136,6 +142,7 @@ function toPushPayload(a: FieldAssignment, notice: Notice | undefined) {
     noticeType: notice?.noticeType ?? "",
     deadlineDate: notice?.deadlineDate ?? null,
     totalAmountCents: notice?.totalAmountCents ?? null,
+    source,
     evidence: a.evidence.map((e) => ({
       id: e.id,
       photoDataUrl: e.photoDataUrl,
@@ -153,6 +160,7 @@ function toPushPayload(a: FieldAssignment, notice: Notice | undefined) {
 export default function FieldAssignmentsPage() {
   const { data: assignments, isLoading } = useFieldAssignments();
   const { data: notices } = useNotices();
+  const { data: tenants } = useTenants();
   const { data: settings } = useSettings();
   const createAssignment = useCreateFieldAssignment();
   const updateAssignment = useUpdateFieldAssignment();
@@ -176,6 +184,12 @@ export default function FieldAssignmentsPage() {
     (notices ?? []).forEach((n) => map.set(n.id, n));
     return map;
   }, [notices]);
+
+  const tenantSourceById = useMemo(() => {
+    const map = new Map<string, string | null>();
+    (tenants ?? []).forEach((t) => map.set(t.id, t.externalSource ?? null));
+    return map;
+  }, [tenants]);
 
   const eligibleNotices = useMemo(
     () =>
@@ -218,7 +232,13 @@ export default function FieldAssignmentsPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          assignments: assignments.map((a) => toPushPayload(a, noticeById.get(a.noticeId))),
+          assignments: assignments.map((a) => {
+            const notice = noticeById.get(a.noticeId);
+            const source = notice
+              ? (tenantSourceById.get(notice.tenantId) ?? null)
+              : null;
+            return toPushPayload(a, notice, source);
+          }),
         }),
       });
       if (!res.ok) throw new Error(`Sync server responded ${res.status}`);

@@ -68,8 +68,8 @@ function caTemplate(seed: CaTemplateSeed): NoticeTemplate {
 
 // --------------------------- 3-Day Pay Rent or Quit -------------------------
 
-// Body mirrors the First Light PM "Notice to Pay Rent or Surrender Possession"
-// reference notice (CCP §1161(2)): itemized months newest-first (including
+// Body mirrors a real-world California "Notice to Pay Rent or Surrender
+// Possession" reference notice (CCP §1161(2)): itemized months newest-first (including
 // fully-paid $0.00 months), city/county/zip sentence, bedrooms line, notice
 // served/expires dates, payment block with the individual person to whom rent
 // is paid, days-and-times line, and the HUD Fair Market Value limits table.

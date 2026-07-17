@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import initSqlJs from "sql.js";
 import type { BindParams, Database as SqlJsDatabase } from "sql.js";
 import { createRequire } from "node:module";
-import { runMigrations, currentSchemaVersion } from "./migrations";
+import { MIGRATIONS, runMigrations, currentSchemaVersion } from "./migrations";
 import type { AppDatabase } from "./client";
 import * as repos from "./repositories";
 
@@ -118,7 +118,7 @@ async function buildOldActivatedDb(commit: string): Promise<Uint8Array> {
   oldRepos.activationRepo.set(db, {
     licenseKey: "RNP-TEST-KEY-1234",
     companyId: "co_1",
-    companyName: "First Light PM",
+    companyName: "Golden Gate PM",
     licenseStatus: "active",
     statusReason: null,
     plan: "team",
@@ -166,14 +166,14 @@ describe("upgrade from each historical schema version", () => {
     it(`demo workspace saved at ${commit} upgrades cleanly`, async () => {
       const bytes = await buildOldDemoDb(commit);
       const out = await upgradeAndExercise(bytes);
-      expect(out.version).toBe(6);
+      expect(out.version).toBe(MIGRATIONS.length);
       expect(out.users.length).toBeGreaterThan(0);
     });
     if (hasActivation) {
       it(`activated workspace saved at ${commit} upgrades cleanly`, async () => {
         const bytes = await buildOldActivatedDb(commit);
         const out = await upgradeAndExercise(bytes);
-        expect(out.version).toBe(6);
+        expect(out.version).toBe(MIGRATIONS.length);
         expect(out.mode).toBe("activated");
         expect(out.users.length).toBeGreaterThan(0);
       });

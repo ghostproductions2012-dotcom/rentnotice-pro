@@ -7,19 +7,14 @@
 // field assignment that has evidence attached.
 // ---------------------------------------------------------------------------
 
-import type { FieldAssignment, ServiceMethod } from "../../types";
-import { NOTICE_TYPE_LABELS } from "../../types";
+import type { FieldAssignment } from "../../types";
+import { NOTICE_TYPE_LABELS, SERVICE_METHOD_LABELS } from "../../types";
 import { premisesAddress } from "../merge";
 import type { DocumentContext, GeneratedDocument, GenerateOptions } from "../context";
 import { fileName, finalize, newBuilder } from "./common";
 import { downscalePhotoDataUrl } from "../../images";
 
-const METHOD_LABELS: Record<ServiceMethod, string> = {
-  personal: "Personal service",
-  substitute: "Substituted service",
-  post_and_mail: "Post & mail",
-  other: "Other",
-};
+const METHOD_LABELS = SERVICE_METHOD_LABELS;
 
 const STATUS_LABELS: Record<FieldAssignment["status"], string> = {
   assigned: "Assigned",

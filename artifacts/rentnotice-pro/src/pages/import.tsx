@@ -61,7 +61,7 @@ const VENDOR_LABELS: Record<PmVendor, string> = {
   yardi: "Yardi",
   propertyware: "Propertyware",
   rent_manager: "Rent Manager",
-  first_light: "First Light PM — Tenant Statement",
+  tenant_statement: "Tenant Statement (PDF)",
   generic: "Generic / Other",
 };
 
@@ -374,11 +374,11 @@ export default function ImportWizard() {
                   Supports CSV, Excel, and PDF formats
                 </p>
                 <div className="mt-6 flex justify-center gap-4 text-xs text-muted-foreground font-mono">
-                  <span className="bg-muted px-2 py-1 rounded">First Light</span>
                   <span className="bg-muted px-2 py-1 rounded">AppFolio</span>
                   <span className="bg-muted px-2 py-1 rounded">Buildium</span>
                   <span className="bg-muted px-2 py-1 rounded">Yardi</span>
                   <span className="bg-muted px-2 py-1 rounded">Rent Manager</span>
+                  <span className="bg-muted px-2 py-1 rounded">Propertyware</span>
                 </div>
               </>
             )}

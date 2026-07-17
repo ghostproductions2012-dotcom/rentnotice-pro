@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Tenant-statement header extraction.
 //
-// Recognizes "Tenant Statement" PDFs (First Light PM and similar formats) and
+// Recognizes "Tenant Statement" PDFs (a format common across PM platforms) and
 // pulls the header block — tenant name, premises street/unit/city/state/zip,
 // lease number, and statement period — from the reconstructed text lines so
 // the import wizard can auto-match or create the tenant/property.
@@ -48,7 +48,7 @@ export function extractStatementInfo(lines: string[]): StatementInfo | null {
   const header = trimmed.slice(0, headerEnd);
 
   const info: StatementInfo = {
-    vendor: "first_light",
+    vendor: "tenant_statement",
     tenantName: null,
     street: null,
     unit: null,
@@ -122,9 +122,9 @@ export function extractStatementInfo(lines: string[]): StatementInfo | null {
     }
   }
 
-  // If the street itself still carries a trailing "#5", split it off. First
-  // Light property labels also append a listing index ("2021 Carnegie Lane
-  // #5 - 1") — strip that suffix before splitting.
+  // If the street itself still carries a trailing "#5", split it off. Some
+  // statements append a listing index to the property label ("2021 Carnegie
+  // Lane #5 - 1") — strip that suffix before splitting.
   if (info.street) {
     info.street = info.street.replace(/\s*-\s*\d+\s*$/, "").trim();
     const tu = info.street.match(TRAILING_UNIT_RE);

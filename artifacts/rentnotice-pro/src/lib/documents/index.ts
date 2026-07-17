@@ -20,6 +20,7 @@ import { generateExcludedSummary } from "./generators/excluded-summary";
 import { generateAuditSummary } from "./generators/audit-summary";
 import { generateLedgerBackup } from "./generators/ledger-backup";
 import { generateLahdLetter } from "./generators/lahd-letter";
+import { generateStatePrereq } from "./generators/state-prereq";
 
 // ----------------------------- context types -------------------------------
 
@@ -62,6 +63,7 @@ export {
   generateAuditSummary,
   generateLedgerBackup,
   generateLahdLetter,
+  generateStatePrereq,
 };
 
 // --------------------------- dispatch by kind ------------------------------
@@ -78,6 +80,7 @@ const GENERATORS: Record<DocumentKind, Generator> = {
   audit_summary: generateAuditSummary,
   ledger_backup: generateLedgerBackup,
   lahd_letter: generateLahdLetter,
+  state_prereq: generateStatePrereq,
 };
 
 /**

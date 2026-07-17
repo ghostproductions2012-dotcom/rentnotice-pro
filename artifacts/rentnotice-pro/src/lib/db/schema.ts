@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS settings (
   sync_endpoint TEXT NOT NULL DEFAULT '',
   disclaimer_acknowledged_at TEXT,
   onboarding_completed INTEGER NOT NULL DEFAULT 0,
+  buildium_client_id TEXT NOT NULL DEFAULT '',
+  buildium_client_secret TEXT NOT NULL DEFAULT '',
+  buildium_connected_at TEXT,
+  buildium_last_sync_at TEXT,
   updated_at TEXT NOT NULL
 );
 
@@ -65,9 +69,12 @@ CREATE TABLE IF NOT EXISTS properties (
   payment TEXT NOT NULL,
   is_los_angeles_city INTEGER NOT NULL DEFAULT 0,
   notes TEXT NOT NULL DEFAULT '',
+  external_source TEXT,
+  external_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_properties_external ON properties (external_source, external_id);
 
 CREATE TABLE IF NOT EXISTS tenants (
   id TEXT PRIMARY KEY,
@@ -81,9 +88,12 @@ CREATE TABLE IF NOT EXISTS tenants (
   move_out_date TEXT,
   notes TEXT NOT NULL DEFAULT '',
   archived INTEGER NOT NULL DEFAULT 0,
+  external_source TEXT,
+  external_id TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_tenants_external ON tenants (external_source, external_id);
 
 CREATE TABLE IF NOT EXISTS ledgers (
   id TEXT PRIMARY KEY,
@@ -174,6 +184,9 @@ CREATE TABLE IF NOT EXISTS notices (
   finalized_by TEXT,
   finalized_at TEXT,
   attorney_export_flag INTEGER NOT NULL DEFAULT 0,
+  prereq_completed TEXT NOT NULL DEFAULT '{}',
+  rule_card_key TEXT,
+  electronic_service_consent INTEGER NOT NULL DEFAULT 0,
   service_date_served TEXT,
   service_time_served TEXT,
   service_method TEXT,
@@ -252,6 +265,16 @@ CREATE TABLE IF NOT EXISTS holidays (
   built_in INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_holidays_date ON holidays (date);
+
+CREATE TABLE IF NOT EXISTS state_rule_reviews (
+  state TEXT PRIMARY KEY,
+  reviewer_name TEXT NOT NULL,
+  reviewed_at TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  recorded_by TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS audit_log (
   id TEXT PRIMARY KEY,

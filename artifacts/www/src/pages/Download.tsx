@@ -146,6 +146,12 @@ export default function Download() {
                   variant="outline"
                   testId="button-download-mac-intel"
                 />
+                {links?.macVersion && (
+                  <p className="text-xs text-muted-foreground" data-testid="text-mac-version">
+                    Mac installers are currently {links.macVersion}; the {links.version} Mac build
+                    will appear here as soon as it's ready.
+                  </p>
+                )}
               </CardFooter>
             </Card>
           </div>
