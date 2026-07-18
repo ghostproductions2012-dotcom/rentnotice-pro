@@ -109,6 +109,18 @@ if (locs.length !== sitemapRoutes.length) {
   );
 }
 
+// The static dev copy (public/sitemap.xml) is served as-is in development and
+// must be byte-identical to what buildSitemapXml() generates, or it silently
+// goes stale (it once sat at 7 entries while 12 were configured).
+const publicSitemapPath = path.join(wwwDir, "public", "sitemap.xml");
+if (!fs.existsSync(publicSitemapPath)) {
+  fail("artifacts/www/public/sitemap.xml is missing — regenerate it from buildSitemapXml().");
+} else if (fs.readFileSync(publicSitemapPath, "utf8") !== sitemap) {
+  fail(
+    "artifacts/www/public/sitemap.xml is stale — it differs from buildSitemapXml(). Regenerate it so the dev-served copy matches the build output.",
+  );
+}
+
 // ---------------------------------------------------------------------------
 // 3. Canonical link matches og:url for every SEO-transformed page
 // ---------------------------------------------------------------------------
