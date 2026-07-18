@@ -14,6 +14,7 @@
     "check:chat-expiry": "tsx ./src/chat-expiry-check.ts",
     "check:chat-token-expiry": "tsx ./src/chat-token-expiry-check.ts",
     "check:sitemap": "tsx ./src/sitemap-check.ts",
+    "check:attorney-referral": "tsx ./src/attorney-referral-check.ts",
     "check:rewrite": "tsx ./src/rewrite-check.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

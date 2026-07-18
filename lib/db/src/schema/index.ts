@@ -21,3 +21,4 @@ export * from "./licensing";
 export * from "./field";
 export * from "./work-orders";
 export * from "./communications";
+export * from "./attorney";

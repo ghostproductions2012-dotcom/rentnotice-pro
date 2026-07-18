@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ChevronLeft, ChevronRight, Landmark, FileText, AlertTriangle, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Landmark, FileText, AlertTriangle, CalendarDays, Gavel } from "lucide-react";
 import { useHolidays, useNotices, useSettings, useWorkOrders } from "@/lib/api/hooks";
 import type { Holiday, Notice, WorkOrder } from "@/lib/types";
 import { WORK_ORDER_PRIORITY_LABELS } from "@/lib/types";
@@ -160,6 +160,18 @@ export default function CalendarPage() {
     return m;
   }, [workOrders]);
 
+  // Court hearing dates reported by attorneys, keyed by day.
+  const courtDatesByDate = useMemo(() => {
+    const m = new Map<string, Notice[]>();
+    for (const n of notices ?? []) {
+      if (!n.courtDate) continue;
+      const list = m.get(n.courtDate) ?? [];
+      list.push(n);
+      m.set(n.courtDate, list);
+    }
+    return m;
+  }, [notices]);
+
   const customHolidays = useMemo(
     () => (holidays ?? []).filter((h) => !h.builtIn && h.courtHoliday),
     [holidays],
@@ -304,7 +316,7 @@ export default function CalendarPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-7 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground mb-2">
+              <div className="grid grid-cols-7 text-center text-sm font-medium uppercase tracking-wider text-muted-foreground mb-2">
                 {DOW_LABELS.map((d) => <div key={d} className="py-1">{d}</div>)}
               </div>
               <div className="grid grid-cols-7 gap-1">
@@ -313,6 +325,7 @@ export default function CalendarPage() {
                   const closures = closuresByDate.get(iso) ?? [];
                   const deadlines = deadlinesByDate.get(iso) ?? [];
                   const dueWorkOrders = workOrdersByDate.get(iso) ?? [];
+                  const courtHearings = courtDatesByDate.get(iso) ?? [];
                   const isToday = iso === today;
                   const isSelected = selectedDay === iso;
                   return (
@@ -325,54 +338,66 @@ export default function CalendarPage() {
                         <button
                           type="button"
                           data-testid={`cell-day-${iso}`}
-                          className={`min-h-16 w-full rounded-lg border p-1.5 text-left cursor-pointer transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                          className={`min-h-24 w-full rounded-lg border p-2 text-left cursor-pointer transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                             isToday ? "border-primary bg-primary/5" : "border-border/60"
                           } ${closures.length > 0 ? "bg-amber-50 dark:bg-amber-950/20" : ""} ${
                             isSelected ? "ring-2 ring-ring" : ""
                           }`}
                           aria-label={`Details for ${formatIso(iso)}`}
                         >
-                          <div className={`text-xs font-medium ${isToday ? "text-primary" : ""}`}>
+                          <div className={`text-sm font-semibold ${isToday ? "text-primary" : ""}`}>
                             {Number(iso.slice(8))}
                           </div>
                           <div className="mt-1 space-y-0.5">
                             {closures.slice(0, 2).map((c, i) => (
-                              <div key={i} className="truncate text-[10px] leading-tight text-amber-800 dark:text-amber-300" data-testid={`text-holiday-${iso}`}>
+                              <div key={i} className="truncate text-xs leading-tight text-amber-800 dark:text-amber-300" data-testid={`text-holiday-${iso}`}>
                                 {c.name}
                               </div>
                             ))}
                             {closures.length > 2 && (
-                              <div className="text-[10px] text-amber-700/70">+{closures.length - 2} more</div>
+                              <div className="text-xs text-amber-700/70">+{closures.length - 2} more</div>
                             )}
                             {deadlines.slice(0, 2).map((d) => (
                               <div
                                 key={d.notice.id}
-                                className="truncate text-[10px] leading-tight font-medium text-red-700 dark:text-red-400"
+                                className="truncate text-xs leading-tight font-medium text-red-700 dark:text-red-400"
                                 data-testid={`link-deadline-${d.notice.id}`}
                               >
                                 {d.notice.tenantNames.join(" & ")}
                               </div>
                             ))}
                             {deadlines.length > 2 && (
-                              <div className="text-[10px] text-red-700/70">+{deadlines.length - 2} more</div>
+                              <div className="text-xs text-red-700/70">+{deadlines.length - 2} more</div>
+                            )}
+                            {courtHearings.slice(0, 2).map((n) => (
+                              <div
+                                key={`court-${n.id}`}
+                                className="truncate text-[10px] leading-tight font-medium text-purple-700 dark:text-purple-400"
+                                data-testid={`text-court-hearing-${n.id}`}
+                              >
+                                ⚖ {n.tenantNames.join(" & ")}
+                              </div>
+                            ))}
+                            {courtHearings.length > 2 && (
+                              <div className="text-[10px] text-purple-700/70">+{courtHearings.length - 2} more</div>
                             )}
                             {dueWorkOrders.slice(0, 2).map((w) => (
                               <div
                                 key={w.id}
-                                className="truncate text-[10px] leading-tight font-medium text-blue-700 dark:text-blue-400"
+                                className="truncate text-xs leading-tight font-medium text-blue-700 dark:text-blue-400"
                                 data-testid={`text-work-order-${w.id}`}
                               >
                                 🔧 {w.title}
                               </div>
                             ))}
                             {dueWorkOrders.length > 2 && (
-                              <div className="text-[10px] text-blue-700/70">+{dueWorkOrders.length - 2} more</div>
+                              <div className="text-xs text-blue-700/70">+{dueWorkOrders.length - 2} more</div>
                             )}
                           </div>
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80" align="start" data-testid={`popover-day-${iso}`}>
-                        <DayDetails iso={iso} closures={closures} deadlines={deadlines} workOrders={dueWorkOrders} />
+                        <DayDetails iso={iso} closures={closures} deadlines={deadlines} workOrders={dueWorkOrders} courtHearings={courtHearings} />
                       </PopoverContent>
                     </Popover>
                   );
@@ -394,6 +419,12 @@ export default function CalendarPage() {
                     <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-blue-600">•</span>
                   </span>
                   Maintenance due
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded border border-purple-400 inline-block relative">
+                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-purple-600">•</span>
+                  </span>
+                  Court hearing
                 </span>
               </div>
             </CardContent>
@@ -493,17 +524,19 @@ function DayDetails({
   closures,
   deadlines,
   workOrders,
+  courtHearings,
 }: {
   iso: string;
   closures: ClosureEntry[];
   deadlines: DeadlineEntry[];
   workOrders: WorkOrder[];
+  courtHearings: Notice[];
 }) {
   return (
     <div className="space-y-3">
       <div className="font-serif font-semibold text-sm">{formatIso(iso)}</div>
-      {closures.length === 0 && deadlines.length === 0 && workOrders.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No court closures, notice deadlines, or maintenance due on this day.</p>
+      {closures.length === 0 && deadlines.length === 0 && workOrders.length === 0 && courtHearings.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No court closures, notice deadlines, court hearings, or maintenance due on this day.</p>
       ) : (
         <>
           {closures.length > 0 && (
@@ -549,6 +582,31 @@ function DayDetails({
                     {noticeTypeLabel(d.notice.noticeType)} • {d.notice.jurisdiction.toUpperCase()} •{" "}
                     {d.notice.status.replace(/_/g, " ")}
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {courtHearings.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Gavel className="w-3.5 h-3.5 text-purple-600" />
+                Court hearings
+              </div>
+              {courtHearings.map((n) => (
+                <div key={n.id} data-testid={`popover-court-hearing-${n.id}`}>
+                  <Link
+                    href={`/notices/${n.id}`}
+                    className="font-medium text-sm hover:underline text-purple-700 dark:text-purple-400"
+                  >
+                    {n.tenantNames.join(" & ")}
+                  </Link>
+                  <div className="text-xs text-muted-foreground">
+                    {n.courtCaseNumber ? `Case ${n.courtCaseNumber} • ` : ""}
+                    {noticeTypeLabel(n.noticeType)} • {n.jurisdiction.toUpperCase()}
+                  </div>
+                  {n.courtNotes && (
+                    <div className="text-xs text-muted-foreground mt-0.5">{n.courtNotes}</div>
+                  )}
                 </div>
               ))}
             </div>

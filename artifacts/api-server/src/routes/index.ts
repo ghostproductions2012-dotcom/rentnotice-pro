@@ -11,6 +11,7 @@ import workOrdersRouter from "./work-orders";
 import buildiumRouter from "./buildium";
 import downloadsRouter from "./downloads";
 import commsRouter from "./comms";
+import attorneyRouter from "./attorney";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(workOrdersRouter);
 router.use(buildiumRouter);
 router.use(downloadsRouter);
 router.use(commsRouter);
+router.use(attorneyRouter);
 
 export default router;

@@ -27,6 +27,7 @@ import {
 import { PREREQUISITE_LABELS, getRulePack } from "@/lib/engine/rulepacks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AttorneyReferralPanel } from "@/components/attorney-referral-panel";
 import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
 import {
   DocumentPreviewDialog,
@@ -368,6 +369,27 @@ export default function NoticeView() {
                     <dd className="mt-1">{new Date(notice.finalizedAt).toLocaleString()}</dd>
                   </div>
                 )}
+                {notice.courtDate && (
+                  <div className="col-span-2">
+                    <dt className="text-sm font-medium text-muted-foreground">Court Hearing</dt>
+                    <dd className="mt-1 flex items-center gap-2" data-testid="text-court-date">
+                      <Scale className="w-4 h-4 text-primary" />
+                      <span className="font-medium">
+                        {new Date(`${notice.courtDate}T00:00:00`).toLocaleDateString(undefined, {
+                          dateStyle: "medium",
+                        })}
+                      </span>
+                      {notice.courtCaseNumber && (
+                        <span className="text-sm text-muted-foreground">
+                          Case {notice.courtCaseNumber}
+                        </span>
+                      )}
+                    </dd>
+                    {notice.courtNotes && (
+                      <p className="mt-1 text-sm text-muted-foreground">{notice.courtNotes}</p>
+                    )}
+                  </div>
+                )}
                 {notice.rentOnlyAttestedAt && (
                   <div className="col-span-2">
                     <dt className="text-sm font-medium text-muted-foreground">Rent-Only Attestation</dt>
@@ -705,26 +727,15 @@ export default function NoticeView() {
                 </Button>
               )}
               {(notice.status === "served" || notice.status === "mailed") && (
-                <>
-                  <Button
-                    className="w-full"
-                    disabled={busy || !can("notice.status")}
-                    onClick={() => statusAction("paid", "Marked as paid")}
-                    data-testid="button-mark-paid"
-                  >
-                    <BadgeCheck className="w-4 h-4 mr-2" />
-                    Mark as Paid
-                  </Button>
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    disabled={busy || !can("notice.status")}
-                    onClick={() => statusAction("sent_to_attorney", "Flagged for attorney")}
-                    data-testid="button-send-attorney"
-                  >
-                    Send to Attorney
-                  </Button>
-                </>
+                <Button
+                  className="w-full"
+                  disabled={busy || !can("notice.status")}
+                  onClick={() => statusAction("paid", "Marked as paid")}
+                  data-testid="button-mark-paid"
+                >
+                  <BadgeCheck className="w-4 h-4 mr-2" />
+                  Mark as Paid
+                </Button>
               )}
               {revisable && (
                 <Button
@@ -820,6 +831,10 @@ export default function NoticeView() {
               )}
             </CardContent>
           </Card>
+
+          {["served", "mailed", "sent_to_attorney", "paid", "expired"].includes(
+            notice.status,
+          ) && <AttorneyReferralPanel notice={notice} />}
         </div>
       </div>
 

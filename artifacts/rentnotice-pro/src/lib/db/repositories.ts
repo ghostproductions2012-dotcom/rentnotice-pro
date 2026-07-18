@@ -36,6 +36,7 @@ import type {
   MailStatus,
   MailTracking,
   MailTrackingEvent,
+  AttorneyContact,
   MappingPreset,
   MonthCalculation,
   Notice,
@@ -780,6 +781,51 @@ export const mappingPresetsRepo = {
 };
 
 // =====================================================================
+// Attorney contacts (saved address book for the secure-link dialog)
+// =====================================================================
+
+function rowToAttorneyContact(r: Row): AttorneyContact {
+  return {
+    id: asStr(r.id),
+    name: asStr(r.name),
+    email: asStr(r.email),
+    createdAt: asStr(r.created_at),
+  };
+}
+
+export const attorneyContactsRepo = {
+  list(db: AppDatabase): AttorneyContact[] {
+    return db
+      .all("SELECT * FROM attorney_contacts ORDER BY lower(name), lower(email)")
+      .map(rowToAttorneyContact);
+  },
+  findByEmail(db: AppDatabase, email: string): AttorneyContact | null {
+    const r = db.get("SELECT * FROM attorney_contacts WHERE lower(email) = lower(?)", [
+      email.trim(),
+    ]);
+    return r ? rowToAttorneyContact(r) : null;
+  },
+  create(db: AppDatabase, contact: AttorneyContact): AttorneyContact {
+    upsertRow(db, "attorney_contacts", {
+      id: contact.id,
+      name: contact.name,
+      email: contact.email,
+      created_at: contact.createdAt,
+    });
+    return contact;
+  },
+  updateName(db: AppDatabase, id: Id, name: string): AttorneyContact {
+    db.run("UPDATE attorney_contacts SET name = ? WHERE id = ?", [name, id]);
+    const r = db.get("SELECT * FROM attorney_contacts WHERE id = ?", [id]);
+    if (!r) throw new Error("Attorney contact not found");
+    return rowToAttorneyContact(r);
+  },
+  remove(db: AppDatabase, id: Id): void {
+    db.run("DELETE FROM attorney_contacts WHERE id = ?", [id]);
+  },
+};
+
+// =====================================================================
 // Calculations (cached per ledger)
 // =====================================================================
 
@@ -871,6 +917,9 @@ function rowToNotice(r: Row): Notice {
       mailedDate: strOrNull(r.service_mailed_date),
     },
     deadlineDate: strOrNull(r.deadline_date),
+    courtDate: strOrNull(r.court_date),
+    courtCaseNumber: asStr(r.court_case_number),
+    courtNotes: asStr(r.court_notes),
     internalNotes: asStr(r.internal_notes),
     preparedBy: strOrNull(r.prepared_by),
     createdAt: asStr(r.created_at),
@@ -922,6 +971,9 @@ function noticeRow(n: Notice): Row {
     service_server_notes: n.service.serverNotes,
     service_mailed_date: n.service.mailedDate,
     deadline_date: n.deadlineDate,
+    court_date: n.courtDate,
+    court_case_number: n.courtCaseNumber,
+    court_notes: n.courtNotes,
     internal_notes: n.internalNotes,
     prepared_by: n.preparedBy,
     created_at: n.createdAt,
@@ -1105,8 +1157,9 @@ export const validationResultsRepo = {
 
 function rowToDocument(r: Row): NoticeDocument {
   const bytes = asBytes(r.bytes);
+  const mimeType = asStr(r.mime_type) || "application/pdf";
   const blobUrl = bytes
-    ? URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }))
+    ? URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: mimeType }))
     : "";
   return {
     id: asStr(r.id),
@@ -1120,6 +1173,7 @@ function rowToDocument(r: Row): NoticeDocument {
     sizeBytes: asNum(r.size_bytes),
     generatedAt: asStr(r.generated_at),
     generatedBy: strOrNull(r.generated_by),
+    mimeType,
     blobUrl,
   };
 }
@@ -1137,6 +1191,7 @@ function documentRow(doc: NoticeDocument, bytes: Uint8Array | null): Row {
     size_bytes: doc.sizeBytes,
     generated_at: doc.generatedAt,
     generated_by: doc.generatedBy,
+    mime_type: doc.mimeType || "application/pdf",
     bytes: bytes ?? null,
   };
 }
@@ -1175,6 +1230,29 @@ export const documentsRepo = {
   },
   remove(db: AppDatabase, id: Id): void {
     db.run("DELETE FROM documents WHERE id = ?", [id]);
+  },
+};
+
+// =====================================================================
+// Attorney referral links (plaintext secure links, local-only)
+// =====================================================================
+
+export const attorneyReferralLinksRepo = {
+  save(db: AppDatabase, entry: { referralId: Id; noticeId: Id; link: string; createdAt: string }): void {
+    upsertRow(db, "attorney_referral_links", {
+      referral_id: entry.referralId,
+      notice_id: entry.noticeId,
+      link: entry.link,
+      created_at: entry.createdAt,
+    });
+  },
+  /** Map of referralId -> plaintext link for one notice. */
+  listByNotice(db: AppDatabase, noticeId: Id): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const r of db.all("SELECT referral_id, link FROM attorney_referral_links WHERE notice_id = ?", [noticeId])) {
+      out[asStr(r.referral_id)] = asStr(r.link);
+    }
+    return out;
   },
 };
 
@@ -1388,6 +1466,53 @@ function auditRow(a: AuditEntry): Row {
   };
 }
 
+/**
+ * Resolve audit entries back to the property/unit their subject belongs to.
+ * Covers entries whose subject is a tenant, notice, ledger, work order, or the
+ * property itself. Entities that have since been deleted cannot be resolved
+ * and are excluded when a property/unit filter is active.
+ */
+function buildPropertyUnitResolver(db: AppDatabase): (
+  entityType: string,
+  entityId: string | null,
+) => { propertyId: string | null; unit: string | null } | null {
+  const tenantLoc = new Map<string, { propertyId: string | null; unit: string | null }>();
+  for (const r of db.all("SELECT id, property_id, unit FROM tenants")) {
+    tenantLoc.set(asStr(r.id), { propertyId: strOrNull(r.property_id), unit: strOrNull(r.unit) });
+  }
+  const noticeLoc = new Map<string, { propertyId: string | null; unit: string | null }>();
+  for (const r of db.all("SELECT id, property_id, unit FROM notices")) {
+    noticeLoc.set(asStr(r.id), { propertyId: strOrNull(r.property_id), unit: strOrNull(r.unit) });
+  }
+  const ledgerTenant = new Map<string, string>();
+  for (const r of db.all("SELECT id, tenant_id FROM ledgers")) {
+    ledgerTenant.set(asStr(r.id), asStr(r.tenant_id));
+  }
+  const workOrderLoc = new Map<string, { propertyId: string | null; unit: string | null }>();
+  for (const r of db.all("SELECT id, property_id, unit FROM work_orders")) {
+    workOrderLoc.set(asStr(r.id), { propertyId: strOrNull(r.property_id), unit: strOrNull(r.unit) });
+  }
+  return (entityType, entityId) => {
+    if (!entityId) return null;
+    switch (entityType) {
+      case "property":
+        return { propertyId: entityId, unit: null };
+      case "tenant":
+        return tenantLoc.get(entityId) ?? null;
+      case "notice":
+        return noticeLoc.get(entityId) ?? null;
+      case "ledger": {
+        const tenantId = ledgerTenant.get(entityId);
+        return tenantId ? (tenantLoc.get(tenantId) ?? null) : null;
+      }
+      case "work_order":
+        return workOrderLoc.get(entityId) ?? null;
+      default:
+        return null;
+    }
+  };
+}
+
 export const auditRepo = {
   list(db: AppDatabase, filters?: AuditFilters): AuditEntry[] {
     let all = db.all("SELECT * FROM audit_log ORDER BY timestamp DESC").map(rowToAudit);
@@ -1396,10 +1521,34 @@ export const auditRepo = {
       if (filters.entityId) all = all.filter((a) => a.entityId === filters.entityId);
       if (filters.userId) all = all.filter((a) => a.userId === filters.userId);
       if (filters.action) all = all.filter((a) => a.action === filters.action);
+      if (filters.actions && filters.actions.length > 0) {
+        const set = new Set<string>(filters.actions);
+        all = all.filter((a) => set.has(a.action));
+      }
+      if (filters.propertyId || filters.unit) {
+        const resolve = buildPropertyUnitResolver(db);
+        all = all.filter((a) => {
+          const loc = resolve(a.entityType, a.entityId);
+          if (!loc) return false;
+          if (filters.propertyId && loc.propertyId !== filters.propertyId) return false;
+          if (filters.unit && loc.unit !== filters.unit) return false;
+          return true;
+        });
+      }
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        all = all.filter(
+          (a) =>
+            a.summary.toLowerCase().includes(q) ||
+            a.userName.toLowerCase().includes(q),
+        );
+      }
       if (filters.from) all = all.filter((a) => a.timestamp >= filters.from!);
       if (filters.to) all = all.filter((a) => a.timestamp <= `${filters.to}T23:59:59`);
     }
-    return all.slice(0, filters?.limit ?? 200);
+    const limit = filters?.limit ?? 200;
+    if (limit === 0) return all;
+    return all.slice(0, limit);
   },
   create(db: AppDatabase, entry: AuditEntry): AuditEntry {
     upsertRow(db, "audit_log", auditRow(entry));

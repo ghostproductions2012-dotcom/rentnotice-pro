@@ -298,6 +298,53 @@ export const MIGRATIONS: Migration[] = [
       db.exec("ALTER TABLE users ADD COLUMN chat_token TEXT;");
     },
   },
+  {
+    version: 13,
+    name: "attorney_referrals",
+    up: (db) => {
+      // Fresh databases already get these columns from SCHEMA_SQL (migration 1).
+      const addColumnIfMissing = (table: string, column: string, ddl: string) => {
+        const exists = db
+          .all<{ name: string }>(`PRAGMA table_info(${table})`)
+          .some((c) => c.name === column);
+        if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl};`);
+      };
+      // Court date recorded by the referred attorney (synced from the relay).
+      addColumnIfMissing("notices", "court_date", "TEXT");
+      addColumnIfMissing("notices", "court_case_number", "TEXT NOT NULL DEFAULT ''");
+      addColumnIfMissing("notices", "court_notes", "TEXT NOT NULL DEFAULT ''");
+      // Attorney uploads can be images, not just PDFs.
+      addColumnIfMissing(
+        "documents",
+        "mime_type",
+        "TEXT NOT NULL DEFAULT 'application/pdf'",
+      );
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS attorney_referral_links (
+          referral_id TEXT PRIMARY KEY,
+          notice_id TEXT NOT NULL,
+          link TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_attorney_links_notice ON attorney_referral_links (notice_id);
+      `);
+    },
+  },
+  {
+    version: 14,
+    name: "attorney_contacts",
+    up: (db) => {
+      // Saved attorney address book for the secure-link send dialog.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS attorney_contacts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          email TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

@@ -48,6 +48,10 @@ args = "sitemap"
 task = "workflow.run"
 args = "sample-data-e2e"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "attorney-referral-e2e"
+
 [[workflows.workflow]]
 name = "typecheck-rentnotice-pro"
 author = "agent"
@@ -135,6 +139,17 @@ args = "pnpm --filter @workspace/scripts run check:sample-data"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "attorney-referral-e2e"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:attorney-referral"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [agent]
 stack = "PNPM_WORKSPACE"

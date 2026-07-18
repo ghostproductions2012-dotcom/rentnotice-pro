@@ -81,6 +81,9 @@ const GENERATORS: Record<DocumentKind, Generator> = {
   ledger_backup: generateLedgerBackup,
   lahd_letter: generateLahdLetter,
   state_prereq: generateStatePrereq,
+  // Attorney uploads are imported from the sync relay, never generated.
+  attorney_upload: () =>
+    Promise.reject(new Error("Attorney uploads are imported, not generated")),
 };
 
 /**

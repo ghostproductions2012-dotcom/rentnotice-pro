@@ -1,21 +1,60 @@
 import { usePermissions, useProperties, useSettings, useWorkspaceState } from "@/lib/api/hooks";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Building, MapPin, Search, Plus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Link } from "wouter";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PropertyFormDialog } from "@/components/property-form-dialog";
 import { BuildiumImportDialog } from "@/components/buildium-import-dialog";
 
+type PropertySort = "name" | "address" | "units" | "recent";
+
 export default function PropertiesList() {
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<PropertySort>("name");
+  const [stateFilter, setStateFilter] = useState("");
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const { data: properties, isLoading } = useProperties(search);
+  const { data: allProperties, isLoading } = useProperties(search);
   const { data: settings } = useSettings();
   const { data: workspace } = useWorkspaceState();
   const { can } = usePermissions();
+
+  const states = useMemo(() => {
+    const set = new Set((allProperties ?? []).map((p) => p.state).filter(Boolean));
+    return [...set].sort();
+  }, [allProperties]);
+
+  const properties = useMemo(() => {
+    let list = allProperties ?? [];
+    if (stateFilter) list = list.filter((p) => p.state === stateFilter);
+    const sorted = [...list];
+    switch (sort) {
+      case "name":
+        sorted.sort((a, b) => a.nickname.localeCompare(b.nickname));
+        break;
+      case "address":
+        sorted.sort((a, b) =>
+          `${a.addressLine1} ${a.city}`.localeCompare(`${b.addressLine1} ${b.city}`),
+        );
+        break;
+      case "units":
+        sorted.sort((a, b) => b.units.length - a.units.length);
+        break;
+      case "recent":
+        sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        break;
+    }
+    return sorted;
+  }, [allProperties, stateFilter, sort]);
 
   const buildiumReady =
     workspace?.mode === "activated" &&
@@ -51,16 +90,44 @@ export default function PropertiesList() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search properties..." 
+            placeholder="Search by name, address, city, or owner..." 
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            data-testid="input-property-search"
           />
         </div>
+        <Select
+          value={stateFilter || "__all"}
+          onValueChange={(v) => setStateFilter(v === "__all" ? "" : v)}
+        >
+          <SelectTrigger className="w-36" data-testid="select-property-state">
+            <SelectValue placeholder="All states" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">All states</SelectItem>
+            {states.map((s) => (
+              <SelectItem key={s} value={s}>
+                {s}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={sort} onValueChange={(v) => setSort(v as PropertySort)}>
+          <SelectTrigger className="w-44" data-testid="select-property-sort">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="name">Sort: Name</SelectItem>
+            <SelectItem value="address">Sort: Address</SelectItem>
+            <SelectItem value="units">Sort: Unit count</SelectItem>
+            <SelectItem value="recent">Sort: Recently added</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (

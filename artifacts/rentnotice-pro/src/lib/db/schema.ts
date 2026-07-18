@@ -143,6 +143,13 @@ CREATE TABLE IF NOT EXISTS mapping_presets (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS attorney_contacts (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS calculations (
   ledger_id TEXT PRIMARY KEY,
   months TEXT NOT NULL DEFAULT '[]',
@@ -194,6 +201,9 @@ CREATE TABLE IF NOT EXISTS notices (
   service_server_notes TEXT NOT NULL DEFAULT '',
   service_mailed_date TEXT,
   deadline_date TEXT,
+  court_date TEXT,
+  court_case_number TEXT NOT NULL DEFAULT '',
+  court_notes TEXT NOT NULL DEFAULT '',
   internal_notes TEXT NOT NULL DEFAULT '',
   prepared_by TEXT,
   created_at TEXT NOT NULL,
@@ -234,9 +244,20 @@ CREATE TABLE IF NOT EXISTS documents (
   size_bytes INTEGER NOT NULL DEFAULT 0,
   generated_at TEXT NOT NULL,
   generated_by TEXT,
+  mime_type TEXT NOT NULL DEFAULT 'application/pdf',
   bytes BLOB
 );
 CREATE INDEX IF NOT EXISTS idx_documents_notice ON documents (notice_id);
+
+-- Plaintext attorney secure links, kept locally only so the desktop can
+-- re-copy a link it created. The server stores just a hash.
+CREATE TABLE IF NOT EXISTS attorney_referral_links (
+  referral_id TEXT PRIMARY KEY,
+  notice_id TEXT NOT NULL,
+  link TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attorney_links_notice ON attorney_referral_links (notice_id);
 
 CREATE TABLE IF NOT EXISTS templates (
   id TEXT PRIMARY KEY,

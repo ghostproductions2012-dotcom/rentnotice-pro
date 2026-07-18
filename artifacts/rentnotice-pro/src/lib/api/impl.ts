@@ -71,7 +71,9 @@ import {
   type AppDatabase,
   attachmentsRepo,
   activationRepo,
+  attorneyReferralLinksRepo,
   auditRepo,
+  base64ToBytes,
   calculationsRepo,
   clearPersistedDatabase,
   companyRepo,
@@ -84,6 +86,7 @@ import {
   importBackup as importDbBackup,
   initDatabase,
   ledgersRepo,
+  attorneyContactsRepo,
   mailTrackingRepo,
   mappingPresetsRepo,
   noticesRepo,
@@ -535,7 +538,13 @@ function hydrateDocument(db: AppDatabase, doc: NoticeDocument): NoticeDocument {
   if (!url) {
     const bytes = documentsRepo.getBytes(db, doc.id);
     if (bytes) {
-      url = URL.createObjectURL(bytesToBlob(bytes));
+      // Attorney uploads may be images; type the blob by the stored mime.
+      const mime = doc.mimeType || "application/pdf";
+      const blob =
+        mime === "application/pdf"
+          ? bytesToBlob(bytes)
+          : new Blob([new Uint8Array(bytes)], { type: mime });
+      url = URL.createObjectURL(blob);
       blobUrlCache.set(doc.id, url);
     }
   }
@@ -1504,6 +1513,36 @@ function createServices(): AppServices {
       mappingPresetsRepo.remove(db, id);
     },
 
+    // --- attorney contacts ---
+    async listAttorneyContacts() {
+      const db = await getDb();
+      return attorneyContactsRepo.list(db);
+    },
+    async saveAttorneyContact(input) {
+      requirePermission("notice.create");
+      const db = await getDb();
+      const name = input.name.trim();
+      const email = input.email.trim();
+      if (!email) throw new Error("Attorney email is required");
+      const existing = attorneyContactsRepo.findByEmail(db, email);
+      if (existing) {
+        return name && name !== existing.name
+          ? attorneyContactsRepo.updateName(db, existing.id, name)
+          : existing;
+      }
+      return attorneyContactsRepo.create(db, {
+        id: uid("attorney"),
+        name,
+        email,
+        createdAt: nowIso(),
+      });
+    },
+    async deleteAttorneyContact(id: Id): Promise<void> {
+      requirePermission("notice.create");
+      const db = await getDb();
+      attorneyContactsRepo.remove(db, id);
+    },
+
     // --- calculation ---
     async calculateLedger(ledgerId: Id): Promise<CalculationResult> {
       const db = await getDb();
@@ -1549,6 +1588,9 @@ function createServices(): AppServices {
         templateVersion: template?.currentVersion ?? null,
         includeLahdLetter: input.includeLahdLetter,
         covenantDescription: input.covenantDescription ?? "",
+        courtDate: null,
+        courtCaseNumber: "",
+        courtNotes: "",
         entryDate: input.entryDate ?? null,
         entryTimeWindow: input.entryTimeWindow ?? "",
         entryReason: input.entryReason ?? "",
@@ -1903,6 +1945,7 @@ function createServices(): AppServices {
           sizeBytes: doc.bytes.length,
           generatedAt: t,
           generatedBy: session.user?.id ?? null,
+          mimeType: "application/pdf",
           blobUrl: "",
         };
         documentsRepo.create(db, record, doc.bytes);
@@ -1924,6 +1967,94 @@ function createServices(): AppServices {
     async listDocuments(noticeId: Id): Promise<NoticeDocument[]> {
       const db = await getDb();
       return documentsRepo.listByNotice(db, noticeId).map((d) => hydrateDocument(db, d));
+    },
+
+    // --- attorney secure links ---
+    async saveAttorneyReferralLink(entry): Promise<void> {
+      const db = await getDb();
+      attorneyReferralLinksRepo.save(db, { ...entry, createdAt: nowIso() });
+    },
+    async getAttorneyReferralLinks(noticeId: Id): Promise<Record<string, string>> {
+      const db = await getDb();
+      return attorneyReferralLinksRepo.listByNotice(db, noticeId);
+    },
+    // Imports attorney activity pulled from the sync relay: stamps court
+    // hearing details onto the notice and stores attorney uploads as local
+    // documents. No permission gate — this mirrors server state that the
+    // attorney (not the signed-in user) authored, and it runs automatically
+    // when the referral panel refreshes.
+    async applyAttorneyActivity(input): Promise<{ courtDateChanged: boolean; importedUploads: number }> {
+      const db = await getDb();
+      const notice = noticesRepo.get(db, input.noticeId);
+      if (!notice) throw new Error("Notice not found");
+
+      let courtDateChanged = false;
+      if (
+        input.courtDate &&
+        (notice.courtDate !== input.courtDate ||
+          notice.courtCaseNumber !== input.courtCaseNumber ||
+          notice.courtNotes !== input.courtNotes)
+      ) {
+        noticesRepo.update(db, notice.id, {
+          courtDate: input.courtDate,
+          courtCaseNumber: input.courtCaseNumber,
+          courtNotes: input.courtNotes,
+        });
+        logAudit(
+          db,
+          "attorney_court_date_recorded",
+          "notice",
+          notice.id,
+          `Attorney recorded court date ${input.courtDate}${input.courtCaseNumber ? ` (case ${input.courtCaseNumber})` : ""}`,
+          { previousValue: notice.courtDate, newValue: input.courtDate },
+        );
+        courtDateChanged = true;
+      }
+
+      let importedUploads = 0;
+      const t = nowIso();
+      for (const up of input.uploads) {
+        // The server upload id doubles as the local document id, so re-runs
+        // of the sync never duplicate documents.
+        if (documentsRepo.get(db, up.id)) continue;
+        // One corrupt payload must not block the rest of the batch: a
+        // failed import is skipped (and retried on the next refresh)
+        // while the remaining uploads still land.
+        try {
+          const bytes = base64ToBytes(up.dataBase64);
+          documentsRepo.create(
+            db,
+            {
+              id: up.id,
+              noticeId: notice.id,
+              kind: "attorney_upload",
+              packetKind: null,
+              fileName: up.fileName,
+              watermarked: false,
+              locked: true,
+              pageCount: 1,
+              sizeBytes: bytes.length,
+              generatedAt: up.createdAt || t,
+              generatedBy: null,
+              mimeType: up.mimeType || "application/pdf",
+              blobUrl: "",
+            },
+            bytes,
+          );
+        } catch (err) {
+          console.warn(`Skipping attorney upload "${up.fileName}" (${up.id}): import failed`, err);
+          continue;
+        }
+        logAudit(
+          db,
+          "attorney_upload_imported",
+          "document",
+          up.id,
+          `Imported attorney upload "${up.fileName}"`,
+        );
+        importedUploads++;
+      }
+      return { courtDateChanged, importedUploads };
     },
 
     // --- templates ---

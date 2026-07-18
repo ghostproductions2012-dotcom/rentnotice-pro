@@ -22,6 +22,7 @@ import Guidelines from "@/pages/Guidelines";
 import Support from "@/pages/Support";
 import Dashboard from "@/pages/portal/Dashboard";
 import Users from "@/pages/portal/Users";
+import AttorneyCase from "@/pages/AttorneyCase";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
 import AdminCompanyDetail from "@/pages/admin/AdminCompanyDetail";
@@ -83,6 +84,7 @@ function Router() {
       <Route path="/signup" component={Signup} />
       <Route path="/login" component={Login} />
       <Route path="/checkout/success" component={CheckoutSuccess} />
+      <Route path="/attorney/:token" component={AttorneyCase} />
       <Route path="/portal" component={Dashboard} />
       <Route path="/portal/users" component={Users} />
       <Route path="/admin/login" component={AdminLogin} />

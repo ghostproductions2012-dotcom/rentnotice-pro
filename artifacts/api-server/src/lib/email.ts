@@ -262,6 +262,93 @@ export async function sendInviteEmail(
   }
 }
 
+export interface AttorneyReferralEmailInput {
+  to: string;
+  attorneyName: string;
+  companyName: string;
+  propertyAddress: string;
+  unit: string;
+  tenantNames: string[];
+  message: string;
+  caseUrl: string;
+  expiresAt: Date;
+}
+
+/**
+ * Sends the attorney secure-link email. The link opens a private, no-account
+ * case page where the attorney can download the packet, reply, upload
+ * documents, and record the court date.
+ * Best-effort: returns true when sent, false on failure. Never throws.
+ */
+export async function sendAttorneyReferralEmail(
+  input: AttorneyReferralEmailInput,
+): Promise<boolean> {
+  const property = `${input.propertyAddress}${input.unit ? `, Unit ${input.unit}` : ""}`;
+  const tenants = input.tenantNames.join(" & ");
+  const subject = `Case referral from ${input.companyName} — ${property}`;
+  const messageHtml = input.message.trim()
+    ? `<p style="margin:0 0 24px;line-height:1.6;background:#f4f4f5;border:1px solid #e4e4e7;border-radius:6px;padding:12px 16px;">
+        ${escapeHtml(input.message.trim()).replace(/\n/g, "<br />")}
+      </p>`
+    : "";
+  const bodyHtml = `
+    <p style="margin:0 0 12px;line-height:1.6;">
+      Hi ${escapeHtml(input.attorneyName)},
+    </p>
+    <p style="margin:0 0 12px;line-height:1.6;">
+      <strong>${escapeHtml(input.companyName)}</strong> has referred an
+      eviction case to you via RentNotice Pro:
+    </p>
+    <p style="margin:0 0 12px;line-height:1.6;">
+      <strong>Property:</strong> ${escapeHtml(property)}<br />
+      <strong>Tenant(s):</strong> ${escapeHtml(tenants)}
+    </p>
+    ${messageHtml}
+    <p style="text-align:center;margin:0 0 16px;">
+      <a href="${escapeHtml(input.caseUrl)}"
+         style="display:inline-block;background:#18181b;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:bold;">
+        Open the Case Packet
+      </a>
+    </p>
+    <p style="margin:0 0 8px;color:#71717a;font-size:13px;line-height:1.6;">
+      From this private page you can download the full notice packet, send
+      replies, upload filed documents back, and record the court date. No
+      account is needed — the link is your access.
+    </p>
+    <p style="margin:0;color:#71717a;font-size:13px;line-height:1.6;">
+      This link is confidential and expires on
+      ${escapeHtml(formatDateLong(input.expiresAt))}. Please don't forward it.
+    </p>`;
+  const messageText = input.message.trim()
+    ? `\n\nMessage from ${input.companyName}:\n${input.message.trim()}`
+    : "";
+  const text =
+    `Hi ${input.attorneyName},\n\n` +
+    `${input.companyName} has referred an eviction case to you via RentNotice Pro.\n\n` +
+    `Property: ${property}\nTenant(s): ${tenants}${messageText}\n\n` +
+    `Open the private case page to download the packet, reply, upload filed ` +
+    `documents, and record the court date:\n${input.caseUrl}\n\n` +
+    `This link is confidential and expires on ${formatDateLong(input.expiresAt)}. ` +
+    `Please don't forward it.`;
+
+  try {
+    await sendEmail({
+      to: input.to,
+      subject,
+      html: emailShell("You've received a case referral", bodyHtml),
+      text,
+    });
+    logger.info({ to: input.to }, "Sent attorney referral email");
+    return true;
+  } catch (err) {
+    logger.warn(
+      { err, to: input.to },
+      "Failed to send attorney referral email; copyable link remains available",
+    );
+    return false;
+  }
+}
+
 export interface PaymentFailedEmailInput {
   to: string;
   adminName: string;

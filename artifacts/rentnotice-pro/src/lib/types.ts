@@ -261,6 +261,14 @@ export interface MappingPreset {
   createdAt: string;
 }
 
+/** Saved attorney address-book entry for the secure-link send dialog. */
+export interface AttorneyContact {
+  id: Id;
+  name: string;
+  email: string;
+  createdAt: string;
+}
+
 export interface Ledger {
   id: Id;
   tenantId: Id;
@@ -544,6 +552,11 @@ export interface Notice {
   electronicServiceConsent: boolean;
   service: ServiceRecord;
   deadlineDate: string | null; // computed expiration
+  // Court hearing details recorded by the referred attorney via the secure
+  // link (synced from the relay; shown on the Deadline Calendar).
+  courtDate: string | null;
+  courtCaseNumber: string;
+  courtNotes: string;
   internalNotes: string;
   preparedBy: Id | null;
   createdAt: string;
@@ -628,7 +641,8 @@ export type DocumentKind =
   | "audit_summary"
   | "ledger_backup"
   | "lahd_letter"
-  | "state_prereq";
+  | "state_prereq"
+  | "attorney_upload"; // document the referred attorney sent back
 
 export type PacketKind = "draft" | "final" | "internal_packet" | "attorney_packet";
 
@@ -644,7 +658,28 @@ export interface NoticeDocument {
   sizeBytes: number;
   generatedAt: string;
   generatedBy: Id | null;
+  mimeType: string; // application/pdf for generated docs; uploads vary
   blobUrl: string; // object URL for preview/download (session-scoped)
+}
+
+// ------------------------- attorney secure links ----------------------------
+
+/** An attorney upload pulled from the relay, ready to import locally. */
+export interface AttorneyActivityUpload {
+  id: Id; // server upload id; doubles as the local document id (dedupe)
+  fileName: string;
+  mimeType: string;
+  dataBase64: string;
+  createdAt: string;
+}
+
+export interface ApplyAttorneyActivityInput {
+  noticeId: Id;
+  /** Court details as currently recorded on the server (null = not set). */
+  courtDate: string | null;
+  courtCaseNumber: string;
+  courtNotes: string;
+  uploads: AttorneyActivityUpload[];
 }
 
 export interface GenerateDocumentsInput {
@@ -773,7 +808,9 @@ export type AuditAction =
   | "chat_channel_created"
   | "chat_channel_archived"
   | "sample_data_loaded"
-  | "sample_data_removed";
+  | "sample_data_removed"
+  | "attorney_court_date_recorded"
+  | "attorney_upload_imported";
 
 /** Audit actions recordable from the Communications hub UI. */
 export type CommsAuditAction =
@@ -800,8 +837,17 @@ export interface AuditFilters {
   entityId?: Id;
   userId?: Id;
   action?: AuditAction;
+  /** Match any of these actions (OR). Takes effect alongside `action`. */
+  actions?: AuditAction[];
+  /** Restrict to activity related to this property (tenants, notices, ledgers, work orders included). */
+  propertyId?: Id;
+  /** Restrict to activity related to this unit (requires propertyId). */
+  unit?: string;
+  /** Case-insensitive free-text match on summary and user name. */
+  search?: string;
   from?: string;
   to?: string;
+  /** Max rows returned. Defaults to 200; pass 0 for no cap (full history). */
   limit?: number;
 }
 
@@ -1136,6 +1182,7 @@ export const DOCUMENT_KIND_LABELS: Record<DocumentKind, string> = {
   ledger_backup: "Ledger Backup",
   state_prereq: "State Pre-Filing Prerequisites",
   lahd_letter: "LAHD Right to Counsel Letter",
+  attorney_upload: "Attorney Upload",
 };
 
 export function formatCents(cents: number): string {

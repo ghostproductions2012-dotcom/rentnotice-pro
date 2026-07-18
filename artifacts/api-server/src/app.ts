@@ -17,10 +17,15 @@ app.use(
     logger,
     serializers: {
       req(req) {
+        // Attorney case links carry a bearer-style token in the path; redact
+        // it so live tokens never land in request logs.
+        const path = req.url
+          ?.split("?")[0]
+          ?.replace(/(\/api\/attorney\/case\/)[^/]+/, "$1:token");
         return {
           id: req.id,
           method: req.method,
-          url: req.url?.split("?")[0],
+          url: path,
         };
       },
       res(res) {
@@ -76,7 +81,12 @@ app.use("/api", router);
 
 // Central error handler -- report failures explicitly instead of hanging
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  logger.error({ err, url: req.url }, "Unhandled route error");
+  // Attorney case links carry a bearer-style token in the path; redact it so
+  // live tokens never land in error logs either.
+  const url = req.url
+    .split("?")[0]
+    .replace(/(\/api\/attorney\/case\/)[^/]+/, "$1:token");
+  logger.error({ err, url }, "Unhandled route error");
   if (res.headersSent) return;
   res.status(500).json({ error: "Internal server error", code: "internal" });
 });

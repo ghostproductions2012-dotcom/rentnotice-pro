@@ -76,6 +76,7 @@ export const qk = {
   ledgers: (tenantId?: Id) => ["ledgers", tenantId ?? ""] as const,
   ledger: (id: Id) => ["ledger", id] as const,
   mappingPresets: ["mappingPresets"] as const,
+  attorneyContacts: ["attorneyContacts"] as const,
   calculation: (ledgerId: Id) => ["calculation", ledgerId] as const,
   notices: (filters?: NoticeFilters) => ["notices", filters ?? {}] as const,
   notice: (id: Id) => ["notice", id] as const,
@@ -482,6 +483,32 @@ export function useDeleteMappingPreset() {
   return useMutation({
     mutationFn: (id: Id) => getServices().deleteMappingPreset(id),
     onSuccess: () => invalidate(qc, ["mappingPresets"]),
+  });
+}
+
+// --------------------------- attorney contacts ------------------------------
+
+export function useAttorneyContacts() {
+  return useQuery({
+    queryKey: qk.attorneyContacts,
+    queryFn: () => getServices().listAttorneyContacts(),
+  });
+}
+
+export function useSaveAttorneyContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { name: string; email: string }) =>
+      getServices().saveAttorneyContact(input),
+    onSuccess: () => invalidate(qc, ["attorneyContacts"]),
+  });
+}
+
+export function useDeleteAttorneyContact() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: Id) => getServices().deleteAttorneyContact(id),
+    onSuccess: () => invalidate(qc, ["attorneyContacts"]),
   });
 }
 

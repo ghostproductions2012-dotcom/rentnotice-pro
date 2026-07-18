@@ -28,6 +28,7 @@ import type {
   Ledger,
   LedgerTransaction,
   MailTracking,
+  AttorneyContact,
   MappingPreset,
   Notice,
   NoticeDocument,
@@ -61,6 +62,7 @@ import type {
   WorkspaceState,
 } from "../types";
 import type { LicenseSummary } from "../licensing/types";
+import type { ApplyAttorneyActivityInput } from "../types";
 
 export interface DeadlineContext {
   /** Service method used — enables rule-pack mail extensions in other states. */
@@ -308,6 +310,11 @@ export interface AppServices {
   saveMappingPreset(preset: Omit<MappingPreset, "id" | "createdAt">): Promise<MappingPreset>;
   deleteMappingPreset(id: Id): Promise<void>;
 
+  listAttorneyContacts(): Promise<AttorneyContact[]>;
+  /** Upserts by email (case-insensitive): re-saving updates the name. */
+  saveAttorneyContact(input: { name: string; email: string }): Promise<AttorneyContact>;
+  deleteAttorneyContact(id: Id): Promise<void>;
+
   // --- calculation ---
   calculateLedger(ledgerId: Id): Promise<CalculationResult>;
 
@@ -342,6 +349,16 @@ export interface AppServices {
   // --- documents ---
   generateDocuments(input: GenerateDocumentsInput): Promise<NoticeDocument[]>;
   listDocuments(noticeId: Id): Promise<NoticeDocument[]>;
+
+  // --- attorney secure links ---
+  /** Stores the plaintext secure link locally so it can be re-copied later. */
+  saveAttorneyReferralLink(entry: { referralId: Id; noticeId: Id; link: string }): Promise<void>;
+  /** Map of referralId -> plaintext link for one notice. */
+  getAttorneyReferralLinks(noticeId: Id): Promise<Record<string, string>>;
+  /** Imports court date + uploads recorded by the attorney via the relay. */
+  applyAttorneyActivity(
+    input: ApplyAttorneyActivityInput,
+  ): Promise<{ courtDateChanged: boolean; importedUploads: number }>;
 
   // --- templates ---
   listTemplates(filters?: {
