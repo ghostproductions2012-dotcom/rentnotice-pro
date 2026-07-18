@@ -1,3 +1,4 @@
+import { Readable, pipeline } from "node:stream";
 import { Router, type IRouter } from "express";
 import {
   getRecentReleases,
@@ -99,6 +100,53 @@ router.get("/www/downloads/assets/:assetId", async (req, res) => {
     }
 
     const signedUrl = await getAssetRedirectUrl(assetId);
+
+    // ?proxy=1: stream the bytes through this server instead of redirecting.
+    // The desktop app's in-app updater fetches from a tauri:// origin where a
+    // cross-origin redirect to GitHub's signed URL would be blocked by CORS;
+    // this keeps the download same-origin with the relay.
+    if (req.query.proxy === "1") {
+      const assetName =
+        releases
+          .flatMap((r) => r.assets)
+          .find((a) => a.id === assetId)?.name ?? `download-${assetId}`;
+      const upstream = await fetch(signedUrl);
+      if (!upstream.ok || !upstream.body) {
+        logger.error(
+          { assetId, status: upstream.status },
+          "GitHub asset fetch failed while proxying download",
+        );
+        res.status(502).json({
+          error: "The download could not be fetched. Please try again.",
+          code: "upstream_failed",
+        });
+        return;
+      }
+      res.setHeader(
+        "Content-Type",
+        upstream.headers.get("content-type") ?? "application/octet-stream",
+      );
+      const len = upstream.headers.get("content-length");
+      if (len) res.setHeader("Content-Length", len);
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="${assetName.replace(/[^\w.\- ]/g, "_")}"`,
+      );
+      // pipeline (not .pipe) so a mid-stream GitHub abort or client
+      // disconnect destroys both sides instead of surfacing an unhandled
+      // 'error' event, and cancels the upstream fetch.
+      pipeline(
+        Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]),
+        res,
+        (err) => {
+          if (err) {
+            logger.warn({ err, assetId }, "Installer proxy stream ended early");
+          }
+        },
+      );
+      return;
+    }
+
     res.redirect(302, signedUrl);
   } catch (err) {
     if (err instanceof GithubCredentialError) {

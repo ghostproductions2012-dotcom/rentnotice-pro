@@ -21,7 +21,7 @@ export default function Home() {
         {/* Hero Section */}
         <section className="relative pt-24 pb-32 px-4 sm:px-8 overflow-hidden flex flex-col items-center">
           {/* Abstract background gradient */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] pointer-events-none opacity-50" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/10 rounded-full blur-[120px] pointer-events-none opacity-50 z-20" />
           
           <div className="max-w-5xl mx-auto text-center flex flex-col items-center gap-8 relative z-10">
             <motion.div 

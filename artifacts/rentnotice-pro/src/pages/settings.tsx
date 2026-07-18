@@ -32,11 +32,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActivationWizard } from "@/components/first-run";
 import { BuildiumIntegrationCard } from "@/components/buildium-integration-card";
 import { CommsIntegrationsCard } from "@/components/comms-integrations-card";
-import { KeyRound, CalendarPlus, Trash2, Smartphone, Ban, Copy, Check, FlaskConical } from "lucide-react";
+import { KeyRound, CalendarPlus, Trash2, Smartphone, Ban, Copy, Check, FlaskConical, RefreshCw, Download } from "lucide-react";
 import type { User } from "@/lib/types";
 import { ALL_RULE_PACKS } from "@/lib/engine/rulepacks";
 import { STATE_HOLIDAY_STATES, stateHolidaySource } from "@/lib/engine/stateHolidays";
 import { relayUrl } from "@/lib/field-sync";
+import { todayIsoDate } from "@/lib/utils";
+import {
+  isDesktopApp,
+  checkForUpdate,
+  downloadInstaller,
+  type UpdateCheckResult,
+} from "@/lib/updates";
 
 const DEVICES_URL = relayUrl("/api/field/devices");
 
@@ -419,7 +426,7 @@ function HolidaysCard({ canManage }: { canManage: boolean }) {
   const addHoliday = useAddHoliday();
   const deleteHoliday = useDeleteHoliday();
   const { toast } = useToast();
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(todayIsoDate);
   const [name, setName] = useState("");
   const [jurisdiction, setJurisdiction] = useState("US");
 
@@ -848,6 +855,116 @@ function SampleDataCard() {
   );
 }
 
+// In-app update checker — only rendered inside the packaged desktop app
+// (the web preview updates itself on deploy). Checks the same release feed
+// the website's download page uses, then downloads the right installer for
+// this machine through the relay.
+function AppUpdatesCard() {
+  const [checking, setChecking] = useState(false);
+  const [check, setCheck] = useState<UpdateCheckResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [savedPath, setSavedPath] = useState<string | null>(null);
+
+  const handleCheck = async () => {
+    setChecking(true);
+    setError(null);
+    setSavedPath(null);
+    try {
+      setCheck(await checkForUpdate());
+    } catch (e) {
+      setCheck(null);
+      setError(e instanceof Error ? e.message : "The update check failed. Please try again.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!check?.assetPath || !check.installerName) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      const res = await downloadInstaller(check.assetPath, check.installerName);
+      if (res.status === "saved") setSavedPath(res.path);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The download failed. Please try again.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader>
+        <CardTitle>App Updates</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <div className="font-medium">
+              {check ? `Installed version: ${check.currentVersion}` : "Check for updates"}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {check
+                ? check.updateAvailable
+                  ? `Version ${check.latestVersion} is available.`
+                  : "You're on the latest version."
+                : "See if a newer version of RentNotice Pro is available."}
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            onClick={handleCheck}
+            disabled={checking || downloading}
+            data-testid="button-check-updates"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${checking ? "animate-spin" : ""}`} />
+            {checking ? "Checking…" : "Check for updates"}
+          </Button>
+        </div>
+
+        {check?.updateAvailable && check.assetPath && !savedPath && (
+          <div className="border-t pt-4 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Download the version {check.latestVersion} installer for this computer. After it
+              saves, quit RentNotice Pro and run the installer — your data stays on this device
+              and is untouched by updates.
+            </p>
+            <Button onClick={handleDownload} disabled={downloading} data-testid="button-download-update">
+              <Download className="w-4 h-4 mr-2" />
+              {downloading ? "Downloading…" : `Download version ${check.latestVersion}`}
+            </Button>
+          </div>
+        )}
+
+        {check?.updateAvailable && !check.assetPath && (
+          <p className="text-sm text-muted-foreground border-t pt-4">
+            An installer for this computer isn't available yet. Please download the update from
+            the RentNotice Pro website.
+          </p>
+        )}
+
+        {savedPath && (
+          <div className="text-sm border-t pt-4 space-y-1" data-testid="text-update-saved">
+            <p className="font-medium">Installer saved to:</p>
+            <p className="text-muted-foreground break-all">{savedPath}</p>
+            <p className="text-muted-foreground">
+              Quit RentNotice Pro, then open the installer to finish updating.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <p className="text-sm text-destructive border-t pt-4" data-testid="text-update-error">
+            {error}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const { data: settings } = useSettings();
   const { data: company } = useCompanyProfile();
@@ -1064,6 +1181,8 @@ export default function SettingsPage() {
         <CommsIntegrationsCard />
 
         <HolidaysCard canManage={canManageSettings} />
+
+        {isDesktopApp() && <AppUpdatesCard />}
 
         <Card className="md:col-span-2">
           <CardHeader>

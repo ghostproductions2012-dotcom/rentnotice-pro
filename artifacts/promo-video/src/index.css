@@ -31,35 +31,35 @@
 }
 
 :root {
-  --background: 210 20% 98%;
-  --foreground: 222 47% 11%;
+  --background: 222 47% 11%;
+  --foreground: 210 40% 98%;
   
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --card-border: 214 32% 91%;
+  --card: 222 47% 13%;
+  --card-foreground: 210 40% 98%;
+  --card-border: 222 40% 20%;
   
-  --popover: 0 0% 100%;
-  --popover-foreground: 222 47% 11%;
-  --popover-border: 214 32% 91%;
+  --popover: 222 47% 13%;
+  --popover-foreground: 210 40% 98%;
+  --popover-border: 222 40% 20%;
   
-  --primary: 222 47% 11%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 38 90% 62%;
+  --primary-foreground: 222 47% 11%;
   
-  --secondary: 210 40% 96.1%;
-  --secondary-foreground: 222.2 47.4% 11.2%;
+  --secondary: 222 40% 20%;
+  --secondary-foreground: 210 40% 98%;
   
-  --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted: 222 40% 20%;
+  --muted-foreground: 215 20% 65%;
   
-  --accent: 38 90% 50%; /* A richer gold/tan */
-  --accent-foreground: 210 40% 98%;
+  --accent: 38 90% 62%;
+  --accent-foreground: 222 47% 11%;
   
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 210 40% 98%;
 
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
+  --border: 222 40% 20%;
+  --input: 222 40% 20%;
+  --ring: 38 90% 62%;
 
   --radius: 0.5rem;
 }

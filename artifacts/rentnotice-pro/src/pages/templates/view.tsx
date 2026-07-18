@@ -1,5 +1,6 @@
 import { useTemplate, useUpdateTemplate, usePermissions, useUsers } from "@/lib/api/hooks";
 import { useParams, Link } from "wouter";
+import { todayIsoDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Pencil, ShieldCheck, History, Braces, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -58,7 +59,7 @@ export default function TemplateView() {
     });
   };
   const [reviewerName, setReviewerName] = useState("");
-  const [reviewDate, setReviewDate] = useState("");
+  const [reviewDate, setReviewDate] = useState(todayIsoDate);
 
   const editUnknownFields = useMemo(() => unknownMergeFields(editBody), [editBody]);
 

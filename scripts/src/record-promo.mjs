@@ -11,8 +11,7 @@ import { resolve } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '../..');
 const URL = 'http://127.0.0.1:80/promo-video/';
 const OUT_DIR = '/tmp/promo-record';
-const TOTAL_MS = 60000;
-const MUSIC = resolve(ROOT, 'artifacts/promo-video/public/audio/bg_music.mp3');
+const TOTAL_MS = 34000;
 const FINAL = resolve(ROOT, 'artifacts/www/public/media/promo.mp4');
 
 mkdirSync(OUT_DIR, { recursive: true });
@@ -52,17 +51,19 @@ const startOffsetSec = ((startAt - openedAt) / 1000).toFixed(3);
 const durationSec = ((stopAt - startAt) / 1000).toFixed(3);
 console.log({ rawPath, startOffsetSec, durationSec });
 
+// The promo video is intentionally silent (no music), so no audio is muxed.
+// Playwright's webm is BT.601; browsers decode 1080p H.264 as BT.709 — convert
+// and tag explicitly, or the page-matching background color shifts visibly.
 execFileSync('ffmpeg', [
   '-y',
   '-ss', String(startOffsetSec),
   '-i', rawPath,
-  '-i', MUSIC,
   '-t', String(durationSec),
-  '-map', '0:v', '-map', '1:a',
-  '-c:v', 'libx264', '-preset', 'medium', '-crf', '20',
+  '-map', '0:v', '-an',
+  '-vf', 'scale=in_color_matrix=bt601:out_color_matrix=bt709',
+  '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709',
+  '-c:v', 'libx264', '-preset', 'medium', '-crf', '18',
   '-pix_fmt', 'yuv420p',
-  '-c:a', 'aac', '-b:a', '160k',
-  '-af', 'volume=0.9',
   '-movflags', '+faststart',
   FINAL,
 ], { stdio: 'inherit' });

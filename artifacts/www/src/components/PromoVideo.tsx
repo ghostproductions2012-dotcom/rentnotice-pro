@@ -1,21 +1,7 @@
-import { useRef, useState } from "react";
-import { Volume2, VolumeX } from "lucide-react";
-
 export default function PromoVideo() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [muted, setMuted] = useState(true);
-
-  const toggleMute = () => {
-    if (videoRef.current) {
-      videoRef.current.muted = !muted;
-      setMuted(!muted);
-    }
-  };
-
   return (
-    <div className="relative w-full max-w-5xl mx-auto aspect-video group">
+    <div className="relative w-full max-w-6xl mx-auto aspect-video pointer-events-none select-none">
       <video
-        ref={videoRef}
         src={`${import.meta.env.BASE_URL}media/promo.mp4`}
         className="w-full h-full object-cover"
         autoPlay
@@ -23,21 +9,18 @@ export default function PromoVideo() {
         loop
         playsInline
         preload="auto"
-      >
-        <p>
-          Your browser doesn't support HTML video. Here is a{" "}
-          <a href={`${import.meta.env.BASE_URL}media/promo.mp4`}>link to the video</a> instead.
-        </p>
-      </video>
-
-      <button
-        type="button"
-        onClick={toggleMute}
-        aria-label={muted ? "Unmute video" : "Mute video"}
-        className="absolute bottom-4 right-4 flex items-center justify-center w-10 h-10 rounded-full bg-background/60 backdrop-blur-sm text-foreground/80 hover:text-foreground hover:bg-background/80 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
-      >
-        {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-      </button>
+        disablePictureInPicture
+        controls={false}
+        tabIndex={-1}
+        aria-hidden="true"
+      />
+      {/* Edge feathering into the page background so the video reads as part of the page, not a framed object */}
+      <div aria-hidden="true" className="absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-background to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-background to-transparent" />
+        <div className="absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-background to-transparent" />
+      </div>
     </div>
   );
 }

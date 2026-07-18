@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
+import { todayIsoDate, addDaysIso } from "@/lib/utils";
 import {
   useCalculation,
   useCheckDuplicateNotice,
@@ -102,12 +103,15 @@ export default function NoticeNew() {
   const [templateId, setTemplateId] = useState<string>("");
   const [includeLahd, setIncludeLahd] = useState(false);
   const [covenantDescription, setCovenantDescription] = useState("");
-  const [entryDate, setEntryDate] = useState("");
+  // Required date fields default to today: the desktop webview renders an
+  // empty date input as if today were already selected, so leaving them empty
+  // looks "filled in" while still blocking the continue button.
+  const [entryDate, setEntryDate] = useState(todayIsoDate);
   const [entryTimeWindow, setEntryTimeWindow] = useState("");
   const [entryReason, setEntryReason] = useState("");
-  const [terminationDate, setTerminationDate] = useState("");
+  const [terminationDate, setTerminationDate] = useState(todayIsoDate);
   const [rentIncreaseAmount, setRentIncreaseAmount] = useState("");
-  const [rentIncreaseDate, setRentIncreaseDate] = useState("");
+  const [rentIncreaseDate, setRentIncreaseDate] = useState(todayIsoDate);
   const [internalNotes, setInternalNotes] = useState("");
   const [duplicateDialog, setDuplicateDialog] = useState(false);
   const [duplicateReason, setDuplicateReason] = useState("");
@@ -136,7 +140,27 @@ export default function NoticeNew() {
     : null;
   const largeIncrease = isLargeRentIncrease(rentIncreaseNewCents, tenant?.monthlyRentCents);
   const noticePeriodDays = largeIncrease ? 90 : 30;
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [today] = useState(todayIsoDate);
+
+  // Earliest legally adequate dates. The notice engine only validates that
+  // these fields are present (not that the notice period is long enough), so
+  // the wizard defaults to the earliest adequate date and warns when the user
+  // picks something earlier.
+  const terminationPeriodDays = noticeType === "termination_60day" ? 60 : 30;
+  const minTerminationDate = addDaysIso(today, terminationPeriodDays);
+  const minRentIncreaseDate = addDaysIso(today, noticePeriodDays);
+
+  useEffect(() => {
+    if (noticeType === "termination_30day" || noticeType === "termination_60day") {
+      setTerminationDate((prev) => (prev && prev >= minTerminationDate ? prev : minTerminationDate));
+    }
+  }, [noticeType, minTerminationDate]);
+
+  useEffect(() => {
+    if (noticeType === "rent_increase") {
+      setRentIncreaseDate((prev) => (prev && prev >= minRentIncreaseDate ? prev : minRentIncreaseDate));
+    }
+  }, [noticeType, minRentIncreaseDate]);
   const { data: deadlinePreview } = useDeadline(
     noticeType === "rent_increase" && rentIncreaseNewCents ? today : null,
     noticeType,
@@ -628,6 +652,13 @@ export default function NoticeNew() {
                   onChange={(e) => setTerminationDate(e.target.value)}
                   data-testid="input-termination-date"
                 />
+                {terminationDate && terminationDate < minTerminationDate && (
+                  <p className="text-sm text-accent flex gap-1.5" data-testid="text-termination-date-warning">
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                    A {terminationPeriodDays}-day notice requires a termination date on or after{" "}
+                    {minTerminationDate}.
+                  </p>
+                )}
               </div>
             )}
 
@@ -652,6 +683,13 @@ export default function NoticeNew() {
                     onChange={(e) => setRentIncreaseDate(e.target.value)}
                     data-testid="input-rent-increase-date"
                   />
+                  {rentIncreaseDate && rentIncreaseDate < minRentIncreaseDate && (
+                    <p className="text-sm text-accent flex gap-1.5" data-testid="text-rent-increase-date-warning">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                      This increase requires {noticePeriodDays} days&apos; notice — the earliest
+                      effective date is {minRentIncreaseDate}.
+                    </p>
+                  )}
                 </div>
                 {rentIncreaseNewCents != null && rentIncreaseNewCents > 0 && (
                   <div

@@ -5,6 +5,7 @@
 // imported ledgers.
 
 import { useEffect, useMemo, useState } from "react";
+import { todayIsoDate } from "@/lib/utils";
 import { useImportLedger, usePermissions, useTenants } from "@/lib/api/hooks";
 import type { Id, Ledger, ManualTransactionInput } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,10 @@ interface RowDraft {
   amount: string; // dollars, always entered positive
 }
 
-const emptyRow = (): RowDraft => ({ date: "", description: "", type: "rent", amount: "" });
+// The first row's date defaults to today — the desktop webview renders an
+// empty date input as if today were selected, so "" reads as filled in while
+// still failing the required-date check. Added rows copy the previous row.
+const emptyRow = (): RowDraft => ({ date: todayIsoDate(), description: "", type: "rent", amount: "" });
 
 interface ManualStatementDialogProps {
   open: boolean;

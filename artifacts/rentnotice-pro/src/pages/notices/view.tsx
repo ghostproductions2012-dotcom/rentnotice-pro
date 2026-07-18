@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
+import { todayIsoDate } from "@/lib/utils";
 import {
   useApproveNotice,
   useChangeNoticeStatus,
@@ -145,15 +146,18 @@ export default function NoticeView() {
   const [cancelReason, setCancelReason] = useState("");
   const [serviceOpen, setServiceOpen] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<PreviewDocument | null>(null);
-  const [svc, setSvc] = useState({
-    dateServed: "",
+  // Date fields default to today: the desktop webview renders an empty date
+  // input as if today were already selected, so an empty-string default reads
+  // as "filled in" while still failing required-field checks.
+  const [svc, setSvc] = useState(() => ({
+    dateServed: todayIsoDate(),
     timeServed: "",
     method: "personal" as ServiceMethod,
     servedBy: "",
     serverNotes: "",
-    mailedDate: "",
+    mailedDate: todayIsoDate(),
     electronicConsent: false,
-  });
+  }));
 
   const warnings = useMemo(
     () => (validation?.issues ?? []).filter((i) => i.level === "warning"),

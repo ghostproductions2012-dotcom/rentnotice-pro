@@ -10,7 +10,7 @@
 
 type TauriInvoke = (cmd: string, args?: Record<string, unknown>) => Promise<unknown>;
 
-function tauriInvoke(): TauriInvoke | null {
+export function tauriInvoke(): TauriInvoke | null {
   if (typeof window === "undefined") return null;
   const tauri = (window as { __TAURI__?: { core?: { invoke?: TauriInvoke } } }).__TAURI__;
   return tauri?.core?.invoke ?? null;

@@ -63,12 +63,12 @@ export function AppShell({ activePath = '/', children }: { activePath?: string, 
 
   return (
     <div className="w-[100vw] h-[100vh] flex bg-background text-foreground overflow-hidden">
-      <div className="w-[16vw] border-r border-border bg-card flex flex-col shrink-0 relative z-10">
+      <div className="w-[16vw] border-r border-border bg-card flex flex-col shrink-0 relative z-10 shadow-xl">
         <div className="p-[1.5vw] flex items-center gap-[0.75vw] border-b border-border">
           <div className="w-[2vw] h-[2vw] bg-primary rounded-[0.5vw] flex items-center justify-center text-primary-foreground">
             <Scale className="w-[1.2vw] h-[1.2vw]" />
           </div>
-          <span className="font-display font-bold text-[1.2vw] tracking-tight">RentNotice Pro</span>
+          <span className="font-display font-bold text-[1.2vw] tracking-tight text-foreground">RentNotice Pro</span>
         </div>
         
         <div className="flex-1 py-[1.5vw] px-[1vw] space-y-[1.5vw]">
@@ -80,7 +80,7 @@ export function AppShell({ activePath = '/', children }: { activePath?: string, 
               {g.items.map(item => {
                 const active = item.href === activePath;
                 return (
-                  <div key={item.label} className={`flex items-center gap-[0.75vw] px-[0.75vw] py-[0.5vw] rounded-[0.4vw] text-[0.9vw] font-medium ${active ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+                  <div key={item.label} className={`flex items-center gap-[0.75vw] px-[0.75vw] py-[0.5vw] rounded-[0.4vw] text-[0.9vw] font-medium transition-colors ${active ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-secondary'}`}>
                     <item.icon className="w-[1vw] h-[1vw]" />
                     {item.label}
                   </div>
@@ -90,7 +90,7 @@ export function AppShell({ activePath = '/', children }: { activePath?: string, 
           ))}
         </div>
       </div>
-      <div className="flex-1 relative bg-background">
+      <div className="flex-1 relative bg-background overflow-hidden">
         {children}
       </div>
     </div>
@@ -100,7 +100,7 @@ export function AppShell({ activePath = '/', children }: { activePath?: string, 
 export function Kicker({ text }: { text: string }) {
   return (
     <motion.div 
-      className="absolute bottom-[4vh] left-1/2 -translate-x-1/2 bg-foreground text-background px-[2vw] py-[1vh] rounded-full text-[1.2vw] font-medium shadow-2xl z-40 border border-border/20"
+      className="absolute bottom-[8vh] left-1/2 -translate-x-1/2 bg-card text-foreground px-[2.5vw] py-[1.5vh] rounded-full text-[1.5vw] font-medium shadow-2xl z-40 border border-border/50"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 10 }}

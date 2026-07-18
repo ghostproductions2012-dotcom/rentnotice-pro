@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from "react";
+import { todayIsoDate } from "@/lib/utils";
 import {
   ALL_RULE_PACKS,
   PERIOD_UNIT_LABELS,
@@ -65,10 +66,6 @@ function periodText(pack: StateRulePack): string {
     return "Not specified — attorney verification required";
   }
   return `${np.periodLength} ${PERIOD_UNIT_LABELS[np.periodUnit]}`;
-}
-
-function todayIsoDate(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function ApprovalDialog({
