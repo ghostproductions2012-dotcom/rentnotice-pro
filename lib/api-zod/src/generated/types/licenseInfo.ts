@@ -14,7 +14,11 @@ export interface LicenseInfo {
   statusReason: string;
   company: LicenseInfoCompany;
   tier: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   /** @nullable */
   paidThrough?: Date | null;
   users: DirectoryUser[];

@@ -5,12 +5,18 @@ import { Link } from "wouter";
 import { Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import SiteHeader from "@/components/SiteHeader";
+import Seo from "@/components/Seo";
 
 export default function Pricing() {
   const { data: plans, isLoading } = useListPlans();
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
+      <Seo
+        title="Pricing — RentNotice Pro"
+        description="Simple, transparent pricing for RentNotice Pro. Choose the plan that fits your property portfolio."
+        path="/pricing"
+      />
       <SiteHeader />
       <div className="py-12 md:py-24 px-4 sm:px-8 max-w-7xl mx-auto w-full">
         <div className="text-center mb-10 md:mb-16">
@@ -19,13 +25,14 @@ export default function Pricing() {
         </div>
 
         {isLoading ? (
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
+            <Skeleton className="h-[400px]" />
             <Skeleton className="h-[400px]" />
             <Skeleton className="h-[400px]" />
             <Skeleton className="h-[400px]" />
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto">
             {plans?.map((plan) => (
               <Card key={plan.tier} className={`flex flex-col ${plan.highlighted ? 'border-primary shadow-lg md:scale-105 relative z-10 mt-3 md:mt-0' : ''}`}>
                 {plan.highlighted && (
@@ -39,7 +46,7 @@ export default function Pricing() {
                 </CardHeader>
                 <CardContent className="flex-1">
                   <div className="mb-6">
-                    <span className="text-4xl font-bold">${(plan.priceMonthlyCents / 100).toFixed(0)}</span>
+                    <span className="text-4xl font-bold">${(plan.priceMonthlyCents / 100).toFixed(plan.priceMonthlyCents % 100 === 0 ? 0 : 2)}</span>
                     <span className="text-muted-foreground">/mo</span>
                   </div>
                   <ul className="space-y-3">

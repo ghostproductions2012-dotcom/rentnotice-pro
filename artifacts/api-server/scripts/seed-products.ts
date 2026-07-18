@@ -55,7 +55,12 @@ async function main(): Promise<void> {
       product = await stripe.products.create({
         name: `RentNotice Pro ${plan.name}`,
         description: plan.description,
-        metadata: { tier: plan.tier, seats: String(plan.seats) },
+        metadata: {
+          tier: plan.tier,
+          // JSON/Stripe metadata can't carry Infinity; "unlimited" is the
+          // agreed sentinel for tiers with no seat cap.
+          seats: plan.seats === null ? "unlimited" : String(plan.seats),
+        },
       });
       console.log(`[${plan.tier}] created product: ${product.id}`);
     }

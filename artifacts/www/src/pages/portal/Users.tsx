@@ -45,8 +45,11 @@ export default function Users() {
   const [usernameError, setUsernameError] = useState<string | null>(null);
   
   const isAdmin = me?.role === 'admin';
-  const seatsAvailable = overview ? overview.subscription.seats - overview.seatsUsed : 0;
-  const canInvite = isAdmin && seatsAvailable > 0;
+  const unlimitedSeats = overview ? overview.subscription.seats === null : false;
+  const seatsAvailable = overview && overview.subscription.seats !== null
+    ? overview.subscription.seats - overview.seatsUsed
+    : 0;
+  const canInvite = isAdmin && (unlimitedSeats || seatsAvailable > 0);
 
   const form = useForm<z.infer<typeof inviteSchema>>({
     resolver: zodResolver(inviteSchema),
@@ -269,7 +272,7 @@ export default function Users() {
         </Alert>
       )}
 
-      {overview && isAdmin && seatsAvailable <= 0 && (
+      {overview && isAdmin && !unlimitedSeats && seatsAvailable <= 0 && (
         <Alert variant="destructive" className="mb-6">
           <AlertDescription>You have reached your seat limit ({overview.subscription.seats}). Please manage your billing to upgrade your plan before inviting more users.</AlertDescription>
         </Alert>
@@ -279,7 +282,7 @@ export default function Users() {
         <CardHeader className="pb-0 border-b">
           <CardTitle className="text-lg">Team Directory</CardTitle>
           <CardDescription className="pb-4">
-            {overview && `Using ${overview.seatsUsed} of ${overview.subscription.seats} available seats.`}
+            {overview && `Using ${overview.seatsUsed} of ${overview.subscription.seats ?? "Unlimited"} available seats.`}
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">

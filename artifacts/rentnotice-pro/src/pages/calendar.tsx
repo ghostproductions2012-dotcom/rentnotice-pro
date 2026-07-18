@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronLeft, ChevronRight, Landmark, FileText, AlertTriangle, CalendarDays } from "lucide-react";
-import { useHolidays, useNotices, useSettings } from "@/lib/api/hooks";
-import type { Holiday, Notice } from "@/lib/types";
+import { useHolidays, useNotices, useSettings, useWorkOrders } from "@/lib/api/hooks";
+import type { Holiday, Notice, WorkOrder } from "@/lib/types";
+import { WORK_ORDER_PRIORITY_LABELS } from "@/lib/types";
 import { computeDeadline } from "@/lib/engine/deadlines";
 import { listCaHolidays } from "@/lib/engine/holidays";
 import {
@@ -145,6 +146,19 @@ export default function CalendarPage() {
   const { data: notices, isLoading: noticesLoading } = useNotices();
   const { data: holidays, isLoading: holidaysLoading } = useHolidays();
   const { data: settings } = useSettings();
+  const { data: workOrders } = useWorkOrders();
+
+  // Open work orders with a due date, keyed by day.
+  const workOrdersByDate = useMemo(() => {
+    const m = new Map<string, WorkOrder[]>();
+    for (const w of workOrders ?? []) {
+      if (!w.dueDate || ["completed", "cancelled"].includes(w.status)) continue;
+      const list = m.get(w.dueDate) ?? [];
+      list.push(w);
+      m.set(w.dueDate, list);
+    }
+    return m;
+  }, [workOrders]);
 
   const customHolidays = useMemo(
     () => (holidays ?? []).filter((h) => !h.builtIn && h.courtHoliday),
@@ -298,6 +312,7 @@ export default function CalendarPage() {
                   if (!iso) return <div key={`empty-${idx}`} />;
                   const closures = closuresByDate.get(iso) ?? [];
                   const deadlines = deadlinesByDate.get(iso) ?? [];
+                  const dueWorkOrders = workOrdersByDate.get(iso) ?? [];
                   const isToday = iso === today;
                   const isSelected = selectedDay === iso;
                   return (
@@ -341,11 +356,23 @@ export default function CalendarPage() {
                             {deadlines.length > 2 && (
                               <div className="text-[10px] text-red-700/70">+{deadlines.length - 2} more</div>
                             )}
+                            {dueWorkOrders.slice(0, 2).map((w) => (
+                              <div
+                                key={w.id}
+                                className="truncate text-[10px] leading-tight font-medium text-blue-700 dark:text-blue-400"
+                                data-testid={`text-work-order-${w.id}`}
+                              >
+                                🔧 {w.title}
+                              </div>
+                            ))}
+                            {dueWorkOrders.length > 2 && (
+                              <div className="text-[10px] text-blue-700/70">+{dueWorkOrders.length - 2} more</div>
+                            )}
                           </div>
                         </button>
                       </PopoverTrigger>
                       <PopoverContent className="w-80" align="start" data-testid={`popover-day-${iso}`}>
-                        <DayDetails iso={iso} closures={closures} deadlines={deadlines} />
+                        <DayDetails iso={iso} closures={closures} deadlines={deadlines} workOrders={dueWorkOrders} />
                       </PopoverContent>
                     </Popover>
                   );
@@ -361,6 +388,12 @@ export default function CalendarPage() {
                     <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-red-600">•</span>
                   </span>
                   Notice deadline
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded border border-blue-400 inline-block relative">
+                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-blue-600">•</span>
+                  </span>
+                  Maintenance due
                 </span>
               </div>
             </CardContent>
@@ -459,16 +492,18 @@ function DayDetails({
   iso,
   closures,
   deadlines,
+  workOrders,
 }: {
   iso: string;
   closures: ClosureEntry[];
   deadlines: DeadlineEntry[];
+  workOrders: WorkOrder[];
 }) {
   return (
     <div className="space-y-3">
       <div className="font-serif font-semibold text-sm">{formatIso(iso)}</div>
-      {closures.length === 0 && deadlines.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No court closures or notice deadlines on this day.</p>
+      {closures.length === 0 && deadlines.length === 0 && workOrders.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No court closures, notice deadlines, or maintenance due on this day.</p>
       ) : (
         <>
           {closures.length > 0 && (
@@ -513,6 +548,27 @@ function DayDetails({
                   <div className="text-xs text-muted-foreground">
                     {noticeTypeLabel(d.notice.noticeType)} • {d.notice.jurisdiction.toUpperCase()} •{" "}
                     {d.notice.status.replace(/_/g, " ")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {workOrders.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5 text-blue-600" />
+                Maintenance due
+              </div>
+              {workOrders.map((w) => (
+                <div key={w.id} data-testid={`popover-work-order-${w.id}`}>
+                  <Link
+                    href="/maintenance"
+                    className="font-medium text-sm hover:underline text-blue-700 dark:text-blue-400"
+                  >
+                    {w.title}
+                  </Link>
+                  <div className="text-xs text-muted-foreground">
+                    {WORK_ORDER_PRIORITY_LABELS[w.priority]} priority • {w.status.replace(/_/g, " ")}
                   </div>
                 </div>
               ))}

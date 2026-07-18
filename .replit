@@ -32,6 +32,18 @@ args = "merge-field-picker"
 task = "workflow.run"
 args = "state-prereq-e2e"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "work-order-e2e"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "chat-expiry-e2e"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "sitemap"
+
 [[workflows.workflow]]
 name = "typecheck-rentnotice-pro"
 author = "agent"
@@ -72,6 +84,39 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "pnpm --filter @workspace/scripts run check:state-prereq"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "work-order-e2e"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:work-order"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "chat-expiry-e2e"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:chat-expiry"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "sitemap"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:sitemap"
 
 [workflows.workflow.metadata]
 isValidation = true

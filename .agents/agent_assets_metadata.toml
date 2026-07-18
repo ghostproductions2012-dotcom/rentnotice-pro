@@ -1,8 +1,43 @@
 uploads = []
-outputs = []
 
 [[generated]]
 id = "4slyAWcv9V-nAlt2Mh81u"
 uri = "file://artifacts/rentnotice-field/assets/images/icon.png"
 type = "image"
 title = "field app icon"
+
+[[generated]]
+id = "rpT81KThxi17XeHWLxhPl"
+uri = "file://artifacts/promo-video/public/images/pain-bg.png"
+type = "image"
+title = "Rejected legal document abstract"
+
+[[generated]]
+id = "HdGh8Yw6jXpyKgGUTRDdh"
+uri = "file://artifacts/promo-video/public/images/desktop-bg.png"
+type = "image"
+title = "Desktop workflow interface abstract"
+
+[[generated]]
+id = "xbsdH-rq-ECWkeKduOPwF"
+uri = "file://artifacts/promo-video/public/images/documents-bg.png"
+type = "image"
+title = "Legal court documents stack"
+
+[[generated]]
+id = "YnO-h2Fpzd4Q69BUmMxNH"
+uri = "file://artifacts/promo-video/public/images/field-bg.png"
+type = "image"
+title = "Mobile field service app abstract"
+
+[[generated]]
+id = "wgu6RsFozZYrpPRxzdcir"
+uri = "file://artifacts/promo-video/public/images/payoff-bg.png"
+type = "image"
+title = "Premium real estate success"
+
+[[outputs]]
+id = "Cvaok4KOO5CxJ3Eyhi3dk"
+uri = "file://artifacts/promo-video/public/audio/bg_music.mp3"
+type = "audio"
+title = "background music"

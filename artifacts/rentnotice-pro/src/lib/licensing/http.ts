@@ -76,8 +76,10 @@ function deviceName(): string {
 
 // ------------------------------ wire mapping --------------------------------
 
-function tierLabel(tier: string, seats: number): string {
+function tierLabel(tier: string, seats: number | null): string {
   const name = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : "Company";
+  // null seats = unlimited tier; no "(N seats)" suffix makes sense there.
+  if (seats === null) return name;
   return seats > 0 ? `${name} (${seats} seats)` : name;
 }
 

@@ -1,6 +1,8 @@
 import type {
   FieldAssignmentSyncStatus,
   FieldAssignmentSyncServiceMethod,
+  WorkOrderSyncPriority,
+  WorkOrderSyncStatus,
 } from "@workspace/api-client-react";
 
 export const NOTICE_TYPE_LABELS: Record<string, string> = {
@@ -22,6 +24,36 @@ export const STATUS_LABELS: Record<FieldAssignmentSyncStatus, string> = {
   completed: "Completed",
   cancelled: "Cancelled",
 };
+
+export const WO_STATUS_LABELS: Record<WorkOrderSyncStatus, string> = {
+  new: "New",
+  assigned: "Assigned",
+  in_progress: "In progress",
+  on_hold: "On hold",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const WO_PRIORITY_LABELS: Record<WorkOrderSyncPriority, string> = {
+  low: "Low",
+  normal: "Normal",
+  high: "High",
+  emergency: "Emergency",
+};
+
+export const WO_CATEGORY_LABELS: Record<string, string> = {
+  plumbing: "Plumbing",
+  electrical: "Electrical",
+  hvac: "HVAC",
+  appliance: "Appliance",
+  landscaping: "Landscaping",
+  pest_control: "Pest control",
+  general: "General",
+};
+
+export function workOrderCategoryLabel(category: string): string {
+  return WO_CATEGORY_LABELS[category] ?? category;
+}
 
 export const SERVICE_METHOD_LABELS: Record<string, string> = {
   personal: "Personal service",

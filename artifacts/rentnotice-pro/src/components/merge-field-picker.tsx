@@ -29,21 +29,30 @@ export function insertMergeField(
 }
 
 /**
- * Collapsible list of all known merge fields with short descriptions.
- * Clicking a field calls `onInsert(field)`.
+ * Collapsible list of merge fields with short descriptions. Clicking a field
+ * calls `onInsert(field)`. Defaults to the notice-template field set; pass
+ * `fields`/`descriptions` for other contexts (e.g. tenant announcements).
  */
-export function MergeFieldPicker({ onInsert }: { onInsert: (field: string) => void }) {
+export function MergeFieldPicker({
+  onInsert,
+  fields = KNOWN_MERGE_FIELDS,
+  descriptions = MERGE_FIELD_DESCRIPTIONS,
+}: {
+  onInsert: (field: string) => void;
+  fields?: readonly string[];
+  descriptions?: Readonly<Record<string, string>>;
+}) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
 
   const query = filter.trim().toLowerCase();
   const visibleFields = query
-    ? KNOWN_MERGE_FIELDS.filter(
+    ? fields.filter(
         (f) =>
           f.toLowerCase().includes(query) ||
-          (MERGE_FIELD_DESCRIPTIONS[f] ?? "").toLowerCase().includes(query),
+          (descriptions[f] ?? "").toLowerCase().includes(query),
       )
-    : KNOWN_MERGE_FIELDS;
+    : fields;
 
   return (
     <div className="border rounded-lg bg-muted/20">
@@ -62,7 +71,7 @@ export function MergeFieldPicker({ onInsert }: { onInsert: (field: string) => vo
         <Braces className="w-4 h-4 text-muted-foreground shrink-0" />
         Insert merge field
         <span className="text-xs text-muted-foreground font-normal ml-auto">
-          {KNOWN_MERGE_FIELDS.length} available
+          {fields.length} available
         </span>
       </button>
       {open && (
@@ -95,7 +104,7 @@ export function MergeFieldPicker({ onInsert }: { onInsert: (field: string) => vo
             >
               <code className="text-xs font-mono shrink-0">{"{{"}{f}{"}}"}</code>
               <span className="text-xs text-muted-foreground truncate">
-                {MERGE_FIELD_DESCRIPTIONS[f] ?? ""}
+                {descriptions[f] ?? ""}
               </span>
             </button>
           ))}

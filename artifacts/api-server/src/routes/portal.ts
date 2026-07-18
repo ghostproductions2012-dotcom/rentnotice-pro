@@ -131,7 +131,7 @@ router.get("/www/portal/overview", requireAuth, async (req, res, next) => {
       subscription: {
         tier: company.tier,
         tierName: plan?.name ?? company.tier,
-        seats: plan?.seats ?? 0,
+        seats: plan ? plan.seats : 0,
         status: computed.subscriptionStatus,
         currentPeriodEnd: computed.currentPeriodEnd?.toISOString() ?? null,
         cancelAtPeriodEnd: computed.cancelAtPeriodEnd,
@@ -239,7 +239,7 @@ router.post(
             eq(cloudUsersTable.active, true),
           ),
         );
-      if (plan && activeMembers.length >= plan.seats) {
+      if (plan && plan.seats !== null && activeMembers.length >= plan.seats) {
         res.status(400).json({
           error: `Your ${plan.name} plan includes ${plan.seats} seats and all are in use. Upgrade to add more team members.`,
           code: "seat_limit",

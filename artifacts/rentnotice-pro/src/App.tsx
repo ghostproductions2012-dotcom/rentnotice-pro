@@ -8,7 +8,7 @@ import { StartupErrorScreen } from "@/components/startup-error";
 import { computeRouterBase } from "@/lib/router-base";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { evaluateGraceWarning } from "@/lib/licensing/gate";
-import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, X } from "lucide-react";
+import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, MessageSquare, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -32,6 +32,8 @@ import AuditPage from "@/pages/audit";
 import SettingsPage from "@/pages/settings";
 import StateRulesPage from "@/pages/state-rules";
 import FieldAssignmentsPage from "@/pages/field";
+import MaintenancePage from "@/pages/maintenance";
+import CommunicationsPage from "@/pages/communications";
 import { useEffect, useRef, useState } from "react";
 
 // All queries hit the local embedded database, so network-style retries only
@@ -171,6 +173,8 @@ function Sidebar() {
         { icon: Database, label: "Ledger Import", href: "/import" },
         { icon: CalendarIcon, label: "Calendar", href: "/calendar" },
         { icon: MapPin, label: "Field Service", href: "/field-service" },
+        { icon: Wrench, label: "Maintenance", href: "/maintenance" },
+        { icon: MessageSquare, label: "Communications", href: "/communications" },
       ]
     },
     {
@@ -416,6 +420,8 @@ function Router() {
         <Route path="/notices/:id" component={NoticeView} />
         <Route path="/calendar" component={CalendarPage} />
         <Route path="/field-service" component={FieldAssignmentsPage} />
+        <Route path="/maintenance" component={MaintenancePage} />
+        <Route path="/communications" component={CommunicationsPage} />
         <Route path="/templates" component={TemplatesList} />
         <Route path="/templates/:id" component={TemplateView} />
         <Route path="/state-rules" component={StateRulesPage} />

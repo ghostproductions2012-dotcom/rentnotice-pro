@@ -141,6 +141,16 @@ describe("validateKey", () => {
     );
   });
 
+  it("renders an unlimited-tier plan label without a seat count", async () => {
+    activateLicense.mockResolvedValue({
+      ...INFO,
+      tier: "unlimited",
+      seats: null,
+    });
+    const summary = await httpLicensingClient.validateKey(freshKey());
+    expect(summary.plan).toBe("Unlimited");
+  });
+
   it("uppercases and trims the key before sending", async () => {
     activateLicense.mockResolvedValue(INFO);
     await httpLicensingClient.validateKey("  rnp-lower-case-key-aaaa  ");

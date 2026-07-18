@@ -59,6 +59,12 @@ import type {
   UserRole,
   ValidationIssue,
   ValidationResult,
+  WorkOrder,
+  WorkOrderCategory,
+  WorkOrderFilters,
+  WorkOrderPriority,
+  WorkOrderStatus,
+  WorkOrderStatusChange,
 } from "../types";
 import {
   asBytes,
@@ -121,6 +127,7 @@ function rowToUser(r: Row): User {
     active: toBool(r.active),
     createdAt: asStr(r.created_at),
     cloudUserId: strOrNull(r.cloud_user_id),
+    chatToken: strOrNull(r.chat_token),
   };
 }
 
@@ -136,6 +143,7 @@ function userRow(u: User): Row {
     active: fromBool(u.active),
     created_at: u.createdAt,
     cloud_user_id: u.cloudUserId,
+    chat_token: u.chatToken,
   };
 }
 
@@ -1649,5 +1657,169 @@ export const mailTrackingRepo = {
   },
   remove(db: AppDatabase, id: Id): void {
     db.run("DELETE FROM mail_tracking WHERE id = ?", [id]);
+  },
+};
+
+// =====================================================================
+// Maintenance / work orders
+// =====================================================================
+
+function rowToStatusChange(r: Row): WorkOrderStatusChange {
+  return {
+    id: asStr(r.id),
+    workOrderId: asStr(r.work_order_id),
+    fromStatus: strOrNull(r.from_status) as WorkOrderStatus | null,
+    toStatus: asStr(r.to_status) as WorkOrderStatus,
+    changedBy: strOrNull(r.changed_by),
+    changedByName: asStr(r.changed_by_name),
+    note: asStr(r.note),
+    changedAt: asStr(r.changed_at),
+  };
+}
+
+function loadStatusHistory(db: AppDatabase, workOrderId: Id): WorkOrderStatusChange[] {
+  return db
+    .all("SELECT * FROM work_order_status_history WHERE work_order_id = ? ORDER BY changed_at", [
+      workOrderId,
+    ])
+    .map(rowToStatusChange);
+}
+
+function rowToWorkOrder(r: Row, statusHistory: WorkOrderStatusChange[]): WorkOrder {
+  return {
+    id: asStr(r.id),
+    propertyId: asStr(r.property_id),
+    tenantId: strOrNull(r.tenant_id),
+    unit: asStr(r.unit),
+    title: asStr(r.title),
+    description: asStr(r.description),
+    category: asStr(r.category) as WorkOrderCategory,
+    priority: asStr(r.priority) as WorkOrderPriority,
+    status: asStr(r.status) as WorkOrderStatus,
+    dueDate: strOrNull(r.due_date),
+    assigneeName: asStr(r.assignee_name),
+    vendorName: asStr(r.vendor_name),
+    vendorContact: asStr(r.vendor_contact),
+    costEstimateCents: numOrNull(r.cost_estimate_cents),
+    costActualCents: numOrNull(r.cost_actual_cents),
+    internalNotes: asStr(r.internal_notes),
+    completedAt: strOrNull(r.completed_at),
+    statusHistory,
+    createdAt: asStr(r.created_at),
+    updatedAt: asStr(r.updated_at),
+  };
+}
+
+function workOrderRow(w: WorkOrder): Row {
+  return {
+    id: w.id,
+    property_id: w.propertyId,
+    tenant_id: w.tenantId,
+    unit: w.unit,
+    title: w.title,
+    description: w.description,
+    category: w.category,
+    priority: w.priority,
+    status: w.status,
+    due_date: w.dueDate,
+    assignee_name: w.assigneeName,
+    vendor_name: w.vendorName,
+    vendor_contact: w.vendorContact,
+    cost_estimate_cents: w.costEstimateCents,
+    cost_actual_cents: w.costActualCents,
+    internal_notes: w.internalNotes,
+    completed_at: w.completedAt,
+    created_at: w.createdAt,
+    updated_at: w.updatedAt,
+  };
+}
+
+export const workOrdersRepo = {
+  list(db: AppDatabase, filters?: WorkOrderFilters): WorkOrder[] {
+    const clauses: string[] = [];
+    const params: SqlValue[] = [];
+    if (filters?.propertyId) {
+      clauses.push("property_id = ?");
+      params.push(filters.propertyId);
+    }
+    if (filters?.tenantId) {
+      clauses.push("tenant_id = ?");
+      params.push(filters.tenantId);
+    }
+    if (filters?.status) {
+      clauses.push("status = ?");
+      params.push(filters.status);
+    }
+    if (filters?.priority) {
+      clauses.push("priority = ?");
+      params.push(filters.priority);
+    }
+    if (filters?.category) {
+      clauses.push("category = ?");
+      params.push(filters.category);
+    }
+    if (filters?.search) {
+      clauses.push("(title LIKE ? OR description LIKE ? OR assignee_name LIKE ? OR vendor_name LIKE ?)");
+      const like = `%${filters.search}%`;
+      params.push(like, like, like, like);
+    }
+    const where = clauses.length ? ` WHERE ${clauses.join(" AND ")}` : "";
+    const rows = db.all(
+      `SELECT * FROM work_orders${where} ORDER BY created_at DESC`,
+      params,
+    );
+    return rows.map((r) => rowToWorkOrder(r, loadStatusHistory(db, asStr(r.id))));
+  },
+  get(db: AppDatabase, id: Id): WorkOrder | null {
+    const r = db.get("SELECT * FROM work_orders WHERE id = ?", [id]);
+    return r ? rowToWorkOrder(r, loadStatusHistory(db, id)) : null;
+  },
+  create(db: AppDatabase, workOrder: WorkOrder): WorkOrder {
+    db.transaction(() => {
+      upsertRow(db, "work_orders", workOrderRow(workOrder));
+      for (const change of workOrder.statusHistory) {
+        upsertRow(db, "work_order_status_history", {
+          id: change.id,
+          work_order_id: change.workOrderId,
+          from_status: change.fromStatus,
+          to_status: change.toStatus,
+          changed_by: change.changedBy,
+          changed_by_name: change.changedByName,
+          note: change.note,
+          changed_at: change.changedAt,
+        });
+      }
+    });
+    return workOrder;
+  },
+  update(
+    db: AppDatabase,
+    id: Id,
+    patch: Partial<Omit<WorkOrder, "id" | "createdAt" | "statusHistory">>,
+  ): WorkOrder {
+    const current = workOrdersRepo.get(db, id);
+    if (!current) throw new Error("Work order not found");
+    const next = applyPatch(current, { ...patch, updatedAt: patch.updatedAt ?? nowIso() });
+    upsertRow(db, "work_orders", workOrderRow(next));
+    return next;
+  },
+  addStatusChange(db: AppDatabase, change: WorkOrderStatusChange): void {
+    upsertRow(db, "work_order_status_history", {
+      id: change.id,
+      work_order_id: change.workOrderId,
+      from_status: change.fromStatus,
+      to_status: change.toStatus,
+      changed_by: change.changedBy,
+      changed_by_name: change.changedByName,
+      note: change.note,
+      changed_at: change.changedAt,
+    });
+  },
+  remove(db: AppDatabase, id: Id): void {
+    db.transaction(() => {
+      db.run("DELETE FROM work_order_status_history WHERE work_order_id = ?", [id]);
+      db.run("DELETE FROM attachments WHERE entity_type = 'work_order' AND entity_id = ?", [id]);
+      db.run("DELETE FROM work_orders WHERE id = ?", [id]);
+    });
   },
 };

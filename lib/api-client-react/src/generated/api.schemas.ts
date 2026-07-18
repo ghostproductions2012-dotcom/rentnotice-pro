@@ -46,12 +46,15 @@ export interface DownloadInfo {
 }
 
 export interface Plan {
-  /** Stable tier key (starter, professional, enterprise) */
+  /** Stable tier key (starter, professional, enterprise, unlimited) */
   tier: string;
   name: string;
   description: string;
-  /** Maximum number of user seats included */
-  seats: number;
+  /**
+     * Maximum number of user seats included; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   priceMonthlyCents: number;
   features: string[];
   /**
@@ -149,7 +152,11 @@ export interface LicenseSummary {
 export interface SubscriptionSummary {
   tier: string;
   tierName: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   /** Raw Stripe subscription status (active, past_due, canceled, ...) */
   status: string;
   /** @nullable */
@@ -338,7 +345,11 @@ export interface LicenseInfo {
   statusReason: string;
   company: LicenseInfoCompany;
   tier: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   /** @nullable */
   paidThrough?: string | null;
   users: DirectoryUser[];
@@ -526,6 +537,106 @@ export interface AddFieldEvidenceRequest {
   note?: string;
 }
 
+export interface WorkOrderPhotoSync {
+  id: string;
+  photoDataUrl: string;
+  /** @nullable */
+  latitude: number | null;
+  /** @nullable */
+  longitude: number | null;
+  /** @nullable */
+  accuracyMeters: number | null;
+  capturedAt: string;
+  note: string;
+}
+
+export type WorkOrderSyncStatus = typeof WorkOrderSyncStatus[keyof typeof WorkOrderSyncStatus];
+
+
+export const WorkOrderSyncStatus = {
+  new: 'new',
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type WorkOrderSyncPriority = typeof WorkOrderSyncPriority[keyof typeof WorkOrderSyncPriority];
+
+
+export const WorkOrderSyncPriority = {
+  low: 'low',
+  normal: 'normal',
+  high: 'high',
+  emergency: 'emergency',
+} as const;
+
+export interface WorkOrderSync {
+  id: string;
+  workOrderId: string;
+  assigneeName: string;
+  status: WorkOrderSyncStatus;
+  priority: WorkOrderSyncPriority;
+  category: string;
+  title: string;
+  description: string;
+  propertyAddress: string;
+  unit: string;
+  tenantNames: string;
+  /** @nullable */
+  dueDate: string | null;
+  vendorName: string;
+  vendorContact: string;
+  fieldNotes: string;
+  /** @nullable */
+  completedAt: string | null;
+  photos: WorkOrderPhotoSync[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PushWorkOrdersRequest {
+  workOrders: WorkOrderSync[];
+}
+
+export interface PushWorkOrdersResult {
+  pushed: number;
+}
+
+export type UpdateWorkOrderRequestStatus = typeof UpdateWorkOrderRequestStatus[keyof typeof UpdateWorkOrderRequestStatus];
+
+
+export const UpdateWorkOrderRequestStatus = {
+  new: 'new',
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface UpdateWorkOrderRequest {
+  status?: UpdateWorkOrderRequestStatus;
+  /** @nullable */
+  completedAt?: string | null;
+  fieldNotes?: string;
+  updatedAt: string;
+}
+
+export interface AddWorkOrderPhotoRequest {
+  id: string;
+  photoDataUrl: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  accuracyMeters?: number | null;
+  capturedAt: string;
+  note?: string;
+}
+
 export interface AdminLoginInput {
   email: string;
   password: string;
@@ -576,7 +687,11 @@ export interface AdminCompanySummary {
   contactEmail: string;
   tier: string;
   tierName: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   seatsUsed: number;
   /** Effective license status derived from the subscription */
   licenseStatus: AdminCompanySummaryLicenseStatus;
@@ -741,6 +856,276 @@ export interface AdminPendingSignup {
   createdAt: string;
 }
 
+export type TierPriceMismatchReason = typeof TierPriceMismatchReason[keyof typeof TierPriceMismatchReason];
+
+
+export const TierPriceMismatchReason = {
+  amount_mismatch: 'amount_mismatch',
+  no_usable_live_price: 'no_usable_live_price',
+  no_live_price: 'no_live_price',
+  stray_price_ignored: 'stray_price_ignored',
+} as const;
+
+export interface TierPriceMismatch {
+  tier: string;
+  catalogAmountCents: number;
+  liveAmountCents: number | null;
+  livePriceId: string | null;
+  reason: TierPriceMismatchReason;
+}
+
+export interface AdminPricingHealth {
+  ok: boolean;
+  mismatches: TierPriceMismatch[];
+}
+
+export type TeamMemberSyncRole = typeof TeamMemberSyncRole[keyof typeof TeamMemberSyncRole];
+
+
+export const TeamMemberSyncRole = {
+  admin: 'admin',
+  manager: 'manager',
+  staff: 'staff',
+  readonly: 'readonly',
+} as const;
+
+export interface TeamMemberSync {
+  id: string;
+  name: string;
+  email: string;
+  role: TeamMemberSyncRole;
+  active: boolean;
+}
+
+export type ChatChannelSyncKind = typeof ChatChannelSyncKind[keyof typeof ChatChannelSyncKind];
+
+
+export const ChatChannelSyncKind = {
+  channel: 'channel',
+  dm: 'dm',
+} as const;
+
+export interface ChatChannelSync {
+  id: string;
+  kind: ChatChannelSyncKind;
+  name: string;
+  /** @nullable */
+  dmKey: string | null;
+  memberKeys: string[];
+  archived: boolean;
+  createdByKey: string;
+  createdByName: string;
+  createdAt: string;
+  unreadCount: number;
+  /** @nullable */
+  lastMessageAt: string | null;
+  /** @nullable */
+  lastMessagePreview: string | null;
+}
+
+export interface CreateChatChannelRequest {
+  name: string;
+  createdByKey: string;
+  createdByName: string;
+}
+
+export interface SetChannelArchivedRequest {
+  archived: boolean;
+}
+
+export interface OpenDirectMessageRequest {
+  /** Exactly two member keys (the caller and the other member) */
+  memberKeys: string[];
+  /** Display names matching memberKeys by index */
+  memberNames: string[];
+  createdByKey: string;
+  createdByName: string;
+}
+
+export interface ChatMessageSync {
+  id: string;
+  channelId: string;
+  senderKey: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface SendChatMessageRequest {
+  /** Client-generated id used for idempotent offline retries */
+  id: string;
+  senderKey: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface MarkChannelReadRequest {
+  memberKey: string;
+  lastReadAt: string;
+}
+
+export interface OkResult {
+  ok: boolean;
+}
+
+export interface ChatDirectoryMember {
+  /** The key clients use as senderKey/memberKey */
+  memberKey: string;
+  name: string;
+  username?: string;
+  email?: string;
+  role?: string;
+  active?: boolean;
+  /** SHA-256 hex of the member's desktop password; empty when none is set (such members cannot mint chat tokens). */
+  secretHash?: string;
+}
+
+export interface ReplaceChatDirectoryRequest {
+  members: ChatDirectoryMember[];
+}
+
+export interface IssueChatTokenRequest {
+  /** Email or username of the member */
+  identifier: string;
+  /** The member's password */
+  secret: string;
+}
+
+export interface ChatTokenResult {
+  token: string;
+  memberKey: string;
+  memberName: string;
+  /** ISO timestamp after which the token stops working (401). Clients should sign in again (or silently re-mint) to get a fresh token. */
+  expiresAt?: string;
+}
+
+export type TenantCommunicationSyncKind = typeof TenantCommunicationSyncKind[keyof typeof TenantCommunicationSyncKind];
+
+
+export const TenantCommunicationSyncKind = {
+  email: 'email',
+  announcement: 'announcement',
+  notice_served: 'notice_served',
+  work_order: 'work_order',
+} as const;
+
+export type TenantCommunicationSyncStatus = typeof TenantCommunicationSyncStatus[keyof typeof TenantCommunicationSyncStatus];
+
+
+export const TenantCommunicationSyncStatus = {
+  sent: 'sent',
+  failed: 'failed',
+  logged: 'logged',
+} as const;
+
+export interface TenantCommunicationSync {
+  id: string;
+  tenantId: string;
+  tenantName: string;
+  tenantEmail: string;
+  propertyAddress: string;
+  kind: TenantCommunicationSyncKind;
+  subject: string;
+  bodyText: string;
+  status: TenantCommunicationSyncStatus;
+  createdByKey: string;
+  createdByName: string;
+  createdAt: string;
+}
+
+export interface SendTenantEmailRequest {
+  tenantId: string;
+  tenantName: string;
+  tenantEmail: string;
+  propertyAddress?: string;
+  subject: string;
+  bodyText: string;
+  createdByKey?: string;
+  createdByName?: string;
+}
+
+export type LogTenantCommunicationRequestKind = typeof LogTenantCommunicationRequestKind[keyof typeof LogTenantCommunicationRequestKind];
+
+
+export const LogTenantCommunicationRequestKind = {
+  announcement: 'announcement',
+  notice_served: 'notice_served',
+  work_order: 'work_order',
+} as const;
+
+export interface LogTenantCommunicationRequest {
+  tenantId: string;
+  kind: LogTenantCommunicationRequestKind;
+  tenantName?: string;
+  tenantEmail?: string;
+  propertyAddress?: string;
+  subject?: string;
+  bodyText?: string;
+  createdByKey?: string;
+  createdByName?: string;
+  createdAt?: string;
+  /** Skip the webhook event dispatch for this entry. Used when the originating event was already dispatched elsewhere (e.g. the field relay dispatches notice_served when a mobile user records service, and the desktop later mirrors it into tenant history). */
+  suppressEvent?: boolean;
+}
+
+export type IntegrationSettingsEventsItem = typeof IntegrationSettingsEventsItem[keyof typeof IntegrationSettingsEventsItem];
+
+
+export const IntegrationSettingsEventsItem = {
+  work_order_assigned: 'work_order_assigned',
+  work_order_completed: 'work_order_completed',
+  notice_served: 'notice_served',
+  tenant_email_sent: 'tenant_email_sent',
+} as const;
+
+export interface IntegrationSettings {
+  slackConfigured: boolean;
+  googleChatConfigured: boolean;
+  slackWebhookUrlMasked: string;
+  googleChatWebhookUrlMasked: string;
+  events: IntegrationSettingsEventsItem[];
+  mirrorTeamChat: boolean;
+  /** @nullable */
+  updatedAt: string | null;
+}
+
+export type UpdateIntegrationSettingsRequestEventsItem = typeof UpdateIntegrationSettingsRequestEventsItem[keyof typeof UpdateIntegrationSettingsRequestEventsItem];
+
+
+export const UpdateIntegrationSettingsRequestEventsItem = {
+  work_order_assigned: 'work_order_assigned',
+  work_order_completed: 'work_order_completed',
+  notice_served: 'notice_served',
+  tenant_email_sent: 'tenant_email_sent',
+} as const;
+
+export interface UpdateIntegrationSettingsRequest {
+  /** New Slack incoming-webhook URL; empty string disconnects */
+  slackWebhookUrl?: string;
+  /** New Google Chat incoming-webhook URL; empty string disconnects */
+  googleChatWebhookUrl?: string;
+  events?: UpdateIntegrationSettingsRequestEventsItem[];
+  mirrorTeamChat?: boolean;
+}
+
+export type TestIntegrationRequestTarget = typeof TestIntegrationRequestTarget[keyof typeof TestIntegrationRequestTarget];
+
+
+export const TestIntegrationRequestTarget = {
+  slack: 'slack',
+  google_chat: 'google_chat',
+} as const;
+
+export interface TestIntegrationRequest {
+  target: TestIntegrationRequestTarget;
+}
+
+export interface TestIntegrationResult {
+  ok: boolean;
+  message: string;
+}
+
 /**
  * RentNotice Pro license key of the calling workspace
  */
@@ -779,6 +1164,49 @@ export const ListFieldAssignmentsStatus = {
   completed: 'completed',
   cancelled: 'cancelled',
 } as const;
+
+export type ListWorkOrderAssignmentsParams = {
+status?: ListWorkOrderAssignmentsStatus;
+};
+
+export type ListWorkOrderAssignmentsStatus = typeof ListWorkOrderAssignmentsStatus[keyof typeof ListWorkOrderAssignmentsStatus];
+
+
+export const ListWorkOrderAssignmentsStatus = {
+  new: 'new',
+  assigned: 'assigned',
+  in_progress: 'in_progress',
+  on_hold: 'on_hold',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export type ListChatChannelsParams = {
+/**
+ * Caller member key used for unread counts and DM visibility
+ */
+memberKey: string;
+};
+
+export type ListChatMessagesParams = {
+/**
+ * The requesting member's key. Required for direct-message conversations — only the two participants may read a DM.
+ */
+memberKey?: string;
+/**
+ * Only return messages created strictly after this ISO timestamp
+ */
+after?: string;
+limit?: number;
+};
+
+export type ListTenantCommunicationsParams = {
+/**
+ * Filter to a single tenant
+ */
+tenantId?: string;
+limit?: number;
+};
 
 export type BuildiumListRentalsParams = {
 /**

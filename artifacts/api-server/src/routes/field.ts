@@ -1,14 +1,114 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, isNull, or } from "drizzle-orm";
 import {
   db,
   fieldAssignmentsTable,
   fieldEvidenceTable,
+  fieldSyncTokensTable,
   type FieldAssignmentRow,
   type FieldEvidenceRow,
+  type FieldSyncTokenRow,
 } from "@workspace/db";
+import {
+  generateFieldSyncToken,
+  hashFieldSyncToken,
+  requireFieldAuth,
+  requireLicenseAuth,
+} from "../lib/fieldAuth";
+import { dispatchCompanyEvent } from "../lib/notify";
 
 const router: IRouter = Router();
+
+// Every field-relay route (including device management below) requires
+// either the desktop license key or a device sync token.
+router.use("/field", requireFieldAuth);
+
+// The plaintext access code is never stored, so list/revoke responses can
+// only expose the masked suffix. Only issuance (POST) returns the full code.
+function devicePayload(row: FieldSyncTokenRow) {
+  return {
+    id: row.id,
+    deviceName: row.deviceName,
+    tokenSuffix: row.tokenSuffix,
+    revokedAt: row.revokedAt ? row.revokedAt.toISOString() : null,
+    lastUsedAt: row.lastUsedAt ? row.lastUsedAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+// Tenant scope for relay rows. Legacy rows created before auth have no
+// companyId; they remain visible to any authenticated tenant and get claimed
+// (stamped with the company) on the next desktop push.
+function assignmentScope(companyId: string) {
+  return or(
+    eq(fieldAssignmentsTable.companyId, companyId),
+    isNull(fieldAssignmentsTable.companyId),
+  );
+}
+
+function ownsAssignment(
+  row: { companyId: string | null },
+  companyId: string,
+): boolean {
+  return row.companyId === null || row.companyId === companyId;
+}
+
+// GET /api/field/devices — list issued device access codes (desktop only)
+router.get("/field/devices", requireLicenseAuth, async (req, res) => {
+  const rows = await db
+    .select()
+    .from(fieldSyncTokensTable)
+    .where(eq(fieldSyncTokensTable.companyId, req.fieldAuth!.companyId))
+    .orderBy(asc(fieldSyncTokensTable.createdAt));
+  res.json(rows.map(devicePayload));
+});
+
+// POST /api/field/devices — issue a new device access code (desktop only)
+router.post("/field/devices", requireLicenseAuth, async (req, res) => {
+  const body = req.body as Record<string, unknown> | undefined;
+  const deviceName =
+    typeof body?.["deviceName"] === "string" ? body["deviceName"].trim() : "";
+  if (!deviceName) {
+    res.status(400).json({ message: "deviceName is required" });
+    return;
+  }
+  const token = generateFieldSyncToken();
+  const [created] = await db
+    .insert(fieldSyncTokensTable)
+    .values({
+      companyId: req.fieldAuth!.companyId,
+      deviceName,
+      tokenHash: hashFieldSyncToken(token),
+      tokenSuffix: token.slice(-4),
+    })
+    .returning();
+  // One-time reveal: the plaintext code exists only in this response.
+  res.status(201).json({ ...devicePayload(created!), token });
+});
+
+// DELETE /api/field/devices/:id — revoke a device access code (desktop only)
+router.delete("/field/devices/:id", requireLicenseAuth, async (req, res) => {
+  const deviceId = String(req.params.id);
+  const rows = await db
+    .select()
+    .from(fieldSyncTokensTable)
+    .where(
+      and(
+        eq(fieldSyncTokensTable.id, deviceId),
+        eq(fieldSyncTokensTable.companyId, req.fieldAuth!.companyId),
+      ),
+    );
+  if (!rows[0]) {
+    res.status(404).json({ message: "Device not found" });
+    return;
+  }
+  const [updated] = await db
+    .update(fieldSyncTokensTable)
+    .set({ revokedAt: rows[0].revokedAt ?? new Date() })
+    .where(eq(fieldSyncTokensTable.id, deviceId))
+    .returning();
+  res.json(devicePayload(updated!));
+});
 
 const ASSIGNMENT_STATUSES = [
   "assigned",
@@ -94,10 +194,15 @@ function sortEvidence(evidence: FieldEvidenceRow[]): FieldEvidenceRow[] {
 // GET /api/field/assignments
 router.get("/field/assignments", async (req, res) => {
   const statusFilter = req.query["status"];
-  const rows = await db.select().from(fieldAssignmentsTable);
+  const rows = await db
+    .select()
+    .from(fieldAssignmentsTable)
+    .where(assignmentScope(req.fieldAuth!.companyId));
+  const rowIds = new Set(rows.map((r) => r.id));
   const allEvidence = await db.select().from(fieldEvidenceTable);
   const byAssignment = new Map<string, FieldEvidenceRow[]>();
   for (const e of allEvidence) {
+    if (!rowIds.has(e.assignmentId)) continue;
     const list = byAssignment.get(e.assignmentId) ?? [];
     list.push(e);
     byAssignment.set(e.assignmentId, list);
@@ -121,6 +226,7 @@ router.put("/field/assignments", async (req, res) => {
     res.status(400).json({ message: "assignments array is required" });
     return;
   }
+  const companyId = req.fieldAuth!.companyId;
   let pushed = 0;
   for (const raw of body.assignments) {
     const a = raw as Record<string, unknown>;
@@ -140,6 +246,9 @@ router.put("/field/assignments", async (req, res) => {
     const id = a["id"];
     const incoming = {
       id,
+      // Attribute pushed assignments to the authenticated company; this also
+      // claims legacy rows that predate authentication.
+      companyId,
       noticeId: a["noticeId"],
       assigneeName: a["assigneeName"],
       instructions: typeof a["instructions"] === "string" ? a["instructions"] : "",
@@ -167,6 +276,13 @@ router.put("/field/assignments", async (req, res) => {
       .where(eq(fieldAssignmentsTable.id, id));
     const existing = existingRows[0];
 
+    if (existing && !ownsAssignment(existing, companyId)) {
+      // Extremely unlikely UUID collision across tenants — never overwrite
+      // another company's data.
+      res.status(409).json({ message: `Assignment id conflict: ${id}` });
+      return;
+    }
+
     if (!existing) {
       await db.insert(fieldAssignmentsTable).values(incoming);
     } else if (existing.updatedAt > incoming.updatedAt) {
@@ -175,6 +291,7 @@ router.put("/field/assignments", async (req, res) => {
       await db
         .update(fieldAssignmentsTable)
         .set({
+          companyId,
           assigneeName: incoming.assigneeName,
           instructions: incoming.instructions,
           tenantNames: incoming.tenantNames,
@@ -240,7 +357,7 @@ router.patch("/field/assignments/:id", async (req, res) => {
     .select()
     .from(fieldAssignmentsTable)
     .where(eq(fieldAssignmentsTable.id, id));
-  if (!existingRows[0]) {
+  if (!existingRows[0] || !ownsAssignment(existingRows[0], req.fieldAuth!.companyId)) {
     res.status(404).json({ message: "Assignment not found" });
     return;
   }
@@ -262,6 +379,21 @@ router.patch("/field/assignments/:id", async (req, res) => {
     .update(fieldAssignmentsTable)
     .set(patch)
     .where(eq(fieldAssignmentsTable.id, id));
+
+  // Newly completed → notify the company's Slack / Google Chat webhooks.
+  const previous = existingRows[0];
+  if (patch.status === "completed" && previous.status !== "completed") {
+    const companyId = previous.companyId ?? req.fieldAuth!.companyId;
+    const who = (previous.tenantNames ?? []).join(", ") || "tenant";
+    const unit = previous.unit ? ` #${previous.unit}` : "";
+    const noticeType = previous.noticeType ? ` (${previous.noticeType})` : "";
+    dispatchCompanyEvent(
+      companyId,
+      "notice_served",
+      `Notice served: ${who} — ${previous.propertyAddress}${unit}${noticeType}`,
+    );
+  }
+
   const result = await loadAssignment(id);
   res.json(result);
 });
@@ -282,7 +414,7 @@ router.post("/field/assignments/:id/evidence", async (req, res) => {
     .select()
     .from(fieldAssignmentsTable)
     .where(eq(fieldAssignmentsTable.id, id));
-  if (!existingRows[0]) {
+  if (!existingRows[0] || !ownsAssignment(existingRows[0], req.fieldAuth!.companyId)) {
     res.status(404).json({ message: "Assignment not found" });
     return;
   }

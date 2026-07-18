@@ -19,3 +19,5 @@
 
 export * from "./licensing";
 export * from "./field";
+export * from "./work-orders";
+export * from "./communications";

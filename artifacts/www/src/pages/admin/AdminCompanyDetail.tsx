@@ -206,7 +206,7 @@ export default function AdminCompanyDetail() {
           <CardContent>
             <div className="text-2xl font-bold">{subscription.tierName}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {subscription.seats} seats ·{" "}
+              {subscription.seats ?? "Unlimited"} seats ·{" "}
               {money(subscription.priceMonthlyCents ?? 0)}/mo list price
             </p>
           </CardContent>
@@ -384,7 +384,7 @@ export default function AdminCompanyDetail() {
         <CardHeader>
           <CardTitle className="text-base">
             Team ({users.filter((u) => u.active).length} active of{" "}
-            {subscription.seats} seats)
+            {subscription.seats ?? "Unlimited"} seats)
           </CardTitle>
         </CardHeader>
         <CardContent>

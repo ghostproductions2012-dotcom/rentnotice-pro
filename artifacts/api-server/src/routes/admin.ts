@@ -34,6 +34,7 @@ import {
   type ComputedLicenseStatus,
 } from "../lib/license";
 import { getPlanConfig, PLAN_CONFIGS } from "../lib/plans";
+import { getTierPriceMismatches } from "../lib/stripeData";
 
 const router: IRouter = Router();
 
@@ -115,7 +116,7 @@ function companySummaryPayload(rollup: CompanyRollup) {
     contactEmail: company.contactEmail,
     tier: company.tier,
     tierName: plan?.name ?? company.tier,
-    seats: plan?.seats ?? 0,
+    seats: plan ? plan.seats : 0,
     seatsUsed: activeUsers.length,
     licenseStatus: computed.status,
     subscriptionStatus: computed.subscriptionStatus,
@@ -128,7 +129,8 @@ function companySummaryPayload(rollup: CompanyRollup) {
 function auditChecks(rollup: CompanyRollup) {
   const { company, computed, users, keys } = rollup;
   const plan = getPlanConfig(company.tier);
-  const seats = plan?.seats ?? 0;
+  const seats = plan ? plan.seats : 0;
+  const unlimitedSeats = seats === null;
   const seatsUsed = users.filter((u) => u.active).length;
   const liveKeys = keys.filter((k) => k.status !== "revoked");
   const revokedKeys = keys.length - liveKeys.length;
@@ -144,9 +146,10 @@ function auditChecks(rollup: CompanyRollup) {
   checks.push({
     id: "seat_limit",
     label: "Seat limit enforcement",
-    status: seatsUsed <= seats ? "pass" : "warn",
-    detail:
-      seatsUsed <= seats
+    status: unlimitedSeats || seatsUsed <= seats ? "pass" : "warn",
+    detail: unlimitedSeats
+      ? `${seatsUsed} of Unlimited seats in use. The ${plan?.name ?? company.tier} plan has no seat cap, so invites are never blocked.`
+      : seatsUsed <= seats
         ? `${seatsUsed} of ${seats} seats in use. New invites are blocked once the ${plan?.name ?? company.tier} limit is reached.`
         : `${seatsUsed} active members exceed the ${seats}-seat ${plan?.name ?? company.tier} limit (members added before a downgrade keep access; new invites are blocked).`,
   });
@@ -180,7 +183,7 @@ function auditChecks(rollup: CompanyRollup) {
     id: "tier_features",
     label: "Tier differences",
     status: "info",
-    detail: `Tiers differ by seat count (Starter 3, Professional 10, Enterprise 50); desktop features are identical across tiers. This company's ${plan?.name ?? company.tier} plan allows ${seats} seats.`,
+    detail: `Tiers differ by seat count (Starter 3, Professional 10, Enterprise 50, Unlimited no cap); desktop features are identical across tiers. This company's ${plan?.name ?? company.tier} plan allows ${unlimitedSeats ? "Unlimited" : seats} seats.`,
   });
 
   return checks;
@@ -367,7 +370,7 @@ router.get(
         subscription: {
           tier: company.tier,
           tierName: plan?.name ?? company.tier,
-          seats: plan?.seats ?? 0,
+          seats: plan ? plan.seats : 0,
           status: rollup.computed.subscriptionStatus,
           currentPeriodEnd:
             rollup.computed.currentPeriodEnd?.toISOString() ?? null,
@@ -597,6 +600,26 @@ router.get(
           createdAt: row.createdAt.toISOString(),
         })),
       );
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Pricing health -- catalog vs live Stripe prices
+// ---------------------------------------------------------------------------
+
+router.get(
+  "/www/admin/pricing-health",
+  requirePlatformAdmin,
+  async (_req, res, next) => {
+    try {
+      const mismatches = await getTierPriceMismatches();
+      res.json({
+        ok: mismatches.length === 0,
+        mismatches,
+      });
     } catch (err) {
       next(err);
     }

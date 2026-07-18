@@ -139,6 +139,51 @@ function emailShell(title: string, bodyHtml: string): string {
 </html>`;
 }
 
+export interface TenantMessageEmailInput {
+  to: string;
+  subject: string;
+  bodyText: string;
+  companyName: string;
+}
+
+/**
+ * Sends a tenant-facing message composed in the Communications hub.
+ * The plain-text body is rendered into the standard email shell with
+ * paragraphs preserved. Best-effort: returns true when sent, false on
+ * failure. Never throws.
+ */
+export async function sendTenantMessageEmail(
+  input: TenantMessageEmailInput,
+): Promise<boolean> {
+  const paragraphs = input.bodyText
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 12px;line-height:1.6;">${escapeHtml(p).replace(/\n/g, "<br />")}</p>`,
+    )
+    .join("\n");
+  const bodyHtml = `${paragraphs}
+    <p style="margin:24px 0 0;color:#71717a;font-size:13px;line-height:1.6;">
+      Sent by ${escapeHtml(input.companyName)} via RentNotice Pro.
+    </p>`;
+
+  try {
+    await sendEmail({
+      to: input.to,
+      subject: input.subject,
+      html: emailShell(input.subject, bodyHtml),
+      text: `${input.bodyText}\n\n— ${input.companyName}`,
+    });
+    logger.info({ to: input.to }, "Sent tenant message email");
+    return true;
+  } catch (err) {
+    logger.warn({ err, to: input.to }, "Failed to send tenant message email");
+    return false;
+  }
+}
+
 export interface InviteEmailInput {
   to: string;
   companyName: string;

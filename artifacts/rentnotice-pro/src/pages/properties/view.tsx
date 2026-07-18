@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { PropertyFormDialog } from "@/components/property-form-dialog";
+import { WorkOrderMiniList } from "@/components/work-order-mini-list";
 import { TenantFormDialog } from "@/components/tenant-form-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
@@ -131,6 +132,7 @@ export default function PropertyView() {
           <TabsTrigger value="details" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Details</TabsTrigger>
           <TabsTrigger value="tenants" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Tenants</TabsTrigger>
           <TabsTrigger value="payment" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Payment Profile</TabsTrigger>
+          <TabsTrigger value="maintenance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Maintenance</TabsTrigger>
         </TabsList>
         
         <TabsContent value="details" className="pt-6 space-y-6">
@@ -255,6 +257,10 @@ export default function PropertyView() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="maintenance" className="pt-6">
+          <WorkOrderMiniList filters={{ propertyId: property.id }} />
         </TabsContent>
       </Tabs>
 

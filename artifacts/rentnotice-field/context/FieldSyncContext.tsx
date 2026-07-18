@@ -1,12 +1,19 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   addFieldEvidence,
+  addWorkOrderPhoto,
   listFieldAssignments,
+  listWorkOrderAssignments,
   updateFieldAssignment,
+  updateWorkOrderAssignment,
   type AddFieldEvidenceRequest,
+  type AddWorkOrderPhotoRequest,
   type FieldAssignmentSync,
   type FieldEvidenceSync,
   type UpdateFieldAssignmentRequest,
+  type UpdateWorkOrderRequest,
+  type WorkOrderPhotoSync,
+  type WorkOrderSync,
 } from "@workspace/api-client-react";
 import {
   createContext,
@@ -20,6 +27,7 @@ import {
 } from "react";
 
 const CACHE_KEY = "rnf.assignments.cache.v1";
+const WO_CACHE_KEY = "rnf.workorders.cache.v1";
 const QUEUE_KEY = "rnf.mutation.queue.v1";
 
 type QueueEntry =
@@ -34,11 +42,27 @@ type QueueEntry =
       assignmentId: string;
       payload: AddFieldEvidenceRequest;
       queuedAt: string;
+    }
+  | {
+      type: "wo-update";
+      workOrderId: string;
+      payload: UpdateWorkOrderRequest;
+      queuedAt: string;
+    }
+  | {
+      type: "wo-photo";
+      workOrderId: string;
+      payload: AddWorkOrderPhotoRequest;
+      queuedAt: string;
     };
 
 interface FieldSyncValue {
   assignments: FieldAssignmentSync[];
+  workOrders: WorkOrderSync[];
   isOffline: boolean;
+  // The relay rejected our credentials (missing, mistyped, or revoked
+  // device access code) — the user needs to update it in Sync Settings.
+  isUnauthorized: boolean;
   isSyncing: boolean;
   isHydrated: boolean;
   pendingCount: number;
@@ -50,9 +74,63 @@ interface FieldSyncValue {
   ) => void;
   addEvidence: (id: string, evidence: AddFieldEvidenceRequest) => void;
   getAssignment: (id: string) => FieldAssignmentSync | undefined;
+  updateWorkOrder: (
+    id: string,
+    payload: Omit<UpdateWorkOrderRequest, "updatedAt">,
+  ) => void;
+  addWorkOrderPhoto: (id: string, photo: AddWorkOrderPhotoRequest) => void;
+  getWorkOrder: (id: string) => WorkOrderSync | undefined;
 }
 
 const FieldSyncContext = createContext<FieldSyncValue | null>(null);
+
+function applyWorkOrderQueue(
+  base: WorkOrderSync[],
+  queue: QueueEntry[],
+): WorkOrderSync[] {
+  if (queue.length === 0) return base;
+  const map = new Map(base.map((w) => [w.id, { ...w }]));
+
+  for (const entry of queue) {
+    if (entry.type !== "wo-update" && entry.type !== "wo-photo") continue;
+    const current = map.get(entry.workOrderId);
+    if (!current) continue;
+
+    if (entry.type === "wo-update") {
+      map.set(entry.workOrderId, {
+        ...current,
+        ...(entry.payload.status !== undefined
+          ? { status: entry.payload.status }
+          : {}),
+        ...(entry.payload.completedAt !== undefined
+          ? { completedAt: entry.payload.completedAt }
+          : {}),
+        ...(entry.payload.fieldNotes !== undefined
+          ? { fieldNotes: entry.payload.fieldNotes }
+          : {}),
+        updatedAt: entry.payload.updatedAt,
+      });
+    } else {
+      const exists = current.photos.some((p) => p.id === entry.payload.id);
+      if (exists) continue;
+      const photo: WorkOrderPhotoSync = {
+        id: entry.payload.id,
+        photoDataUrl: entry.payload.photoDataUrl,
+        latitude: entry.payload.latitude ?? null,
+        longitude: entry.payload.longitude ?? null,
+        accuracyMeters: entry.payload.accuracyMeters ?? null,
+        capturedAt: entry.payload.capturedAt,
+        note: entry.payload.note ?? "",
+      };
+      map.set(entry.workOrderId, {
+        ...current,
+        photos: [...current.photos, photo],
+      });
+    }
+  }
+
+  return Array.from(map.values());
+}
 
 function applyQueue(
   base: FieldAssignmentSync[],
@@ -62,6 +140,7 @@ function applyQueue(
   const map = new Map(base.map((a) => [a.id, { ...a }]));
 
   for (const entry of queue) {
+    if (entry.type !== "update" && entry.type !== "evidence") continue;
     const current = map.get(entry.assignmentId);
     if (!current) continue;
 
@@ -108,8 +187,10 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
   const [baseAssignments, setBaseAssignments] = useState<FieldAssignmentSync[]>(
     [],
   );
+  const [baseWorkOrders, setBaseWorkOrders] = useState<WorkOrderSync[]>([]);
   const [queue, setQueue] = useState<QueueEntry[]>([]);
   const [isOffline, setIsOffline] = useState(false);
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -127,15 +208,35 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next));
   }, []);
 
+  const persistWorkOrders = useCallback(async (next: WorkOrderSync[]) => {
+    setBaseWorkOrders(next);
+    await AsyncStorage.setItem(WO_CACHE_KEY, JSON.stringify(next));
+  }, []);
+
   const refresh = useCallback(async () => {
-    try {
-      const data = await listFieldAssignments();
-      await persistBase(data);
-      setIsOffline(false);
-    } catch {
-      setIsOffline(true);
+    const [assignmentsResult, workOrdersResult] = await Promise.allSettled([
+      listFieldAssignments(),
+      listWorkOrderAssignments(),
+    ]);
+    if (assignmentsResult.status === "fulfilled") {
+      await persistBase(assignmentsResult.value);
     }
-  }, [persistBase]);
+    if (workOrdersResult.status === "fulfilled") {
+      await persistWorkOrders(workOrdersResult.value);
+    }
+    const statusOf = (r: PromiseSettledResult<unknown>) =>
+      r.status === "rejected"
+        ? (r.reason as { status?: number } | undefined)?.status
+        : undefined;
+    const unauthorized =
+      statusOf(assignmentsResult) === 401 || statusOf(workOrdersResult) === 401;
+    setIsUnauthorized(unauthorized);
+    setIsOffline(
+      !unauthorized &&
+        assignmentsResult.status === "rejected" &&
+        workOrdersResult.status === "rejected",
+    );
+  }, [persistBase, persistWorkOrders]);
 
   const flush = useCallback(async () => {
     if (flushingRef.current) return;
@@ -147,12 +248,17 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
         try {
           if (entry.type === "update") {
             await updateFieldAssignment(entry.assignmentId, entry.payload);
-          } else {
+          } else if (entry.type === "evidence") {
             await addFieldEvidence(entry.assignmentId, entry.payload);
+          } else if (entry.type === "wo-update") {
+            await updateWorkOrderAssignment(entry.workOrderId, entry.payload);
+          } else {
+            await addWorkOrderPhoto(entry.workOrderId, entry.payload);
           }
           remaining = remaining.slice(1);
           await persistQueue(remaining);
           setIsOffline(false);
+          setIsUnauthorized(false);
         } catch (err) {
           const status = (err as { status?: number } | undefined)?.status;
           if (status === 404) {
@@ -160,6 +266,11 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
             remaining = remaining.slice(1);
             await persistQueue(remaining);
             continue;
+          }
+          if (status === 401) {
+            // Missing/revoked access code — keep the queue so nothing is
+            // lost; the user must fix the code in Sync Settings.
+            setIsUnauthorized(true);
           }
           if (status === undefined) {
             // Network failure — keep the queue and stop.
@@ -188,12 +299,16 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const [cachedRaw, queueRaw] = await Promise.all([
+        const [cachedRaw, woCachedRaw, queueRaw] = await Promise.all([
           AsyncStorage.getItem(CACHE_KEY),
+          AsyncStorage.getItem(WO_CACHE_KEY),
           AsyncStorage.getItem(QUEUE_KEY),
         ]);
         if (!cancelled && cachedRaw) {
           setBaseAssignments(JSON.parse(cachedRaw) as FieldAssignmentSync[]);
+        }
+        if (!cancelled && woCachedRaw) {
+          setBaseWorkOrders(JSON.parse(woCachedRaw) as WorkOrderSync[]);
         }
         if (!cancelled && queueRaw) {
           const parsed = JSON.parse(queueRaw) as QueueEntry[];
@@ -243,9 +358,44 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
     [persistQueue, flush],
   );
 
+  const updateWorkOrder = useCallback(
+    (id: string, payload: Omit<UpdateWorkOrderRequest, "updatedAt">) => {
+      const entry: QueueEntry = {
+        type: "wo-update",
+        workOrderId: id,
+        payload: { ...payload, updatedAt: new Date().toISOString() },
+        queuedAt: new Date().toISOString(),
+      };
+      const next = [...queueRef.current, entry];
+      void persistQueue(next);
+      void flush();
+    },
+    [persistQueue, flush],
+  );
+
+  const addPhoto = useCallback(
+    (id: string, photo: AddWorkOrderPhotoRequest) => {
+      const entry: QueueEntry = {
+        type: "wo-photo",
+        workOrderId: id,
+        payload: photo,
+        queuedAt: new Date().toISOString(),
+      };
+      const next = [...queueRef.current, entry];
+      void persistQueue(next);
+      void flush();
+    },
+    [persistQueue, flush],
+  );
+
   const assignments = useMemo(
     () => applyQueue(baseAssignments, queue),
     [baseAssignments, queue],
+  );
+
+  const workOrders = useMemo(
+    () => applyWorkOrderQueue(baseWorkOrders, queue),
+    [baseWorkOrders, queue],
   );
 
   const getAssignment = useCallback(
@@ -253,10 +403,17 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
     [assignments],
   );
 
+  const getWorkOrder = useCallback(
+    (id: string) => workOrders.find((w) => w.id === id),
+    [workOrders],
+  );
+
   const value = useMemo<FieldSyncValue>(
     () => ({
       assignments,
+      workOrders,
       isOffline,
+      isUnauthorized,
       isSyncing,
       isHydrated,
       pendingCount: queue.length,
@@ -265,10 +422,15 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
       updateAssignment,
       addEvidence,
       getAssignment,
+      updateWorkOrder,
+      addWorkOrderPhoto: addPhoto,
+      getWorkOrder,
     }),
     [
       assignments,
+      workOrders,
       isOffline,
+      isUnauthorized,
       isSyncing,
       isHydrated,
       queue.length,
@@ -277,6 +439,9 @@ export function FieldSyncProvider({ children }: { children: ReactNode }) {
       updateAssignment,
       addEvidence,
       getAssignment,
+      updateWorkOrder,
+      addPhoto,
+      getWorkOrder,
     ],
   );
 

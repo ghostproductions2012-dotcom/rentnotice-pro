@@ -48,6 +48,8 @@ import type {
   Tenant,
   User,
   ValidationResult,
+  WorkOrder,
+  WorkOrderStatus,
   WorkspaceState,
 } from "../types";
 import { LICENSE_BLOCK_MESSAGES, NOTICE_STATUS_LABELS, NOTICE_TYPE_LABELS } from "../types";
@@ -57,6 +59,11 @@ import type {
   LedgerDetail,
 } from "./services";
 import { registerServicesFactory } from "./services";
+import {
+  issueChatToken,
+  logTenantCommunication,
+  replaceChatDirectory,
+} from "@workspace/api-client-react";
 import { type Permission, checkPermission } from "./permissions";
 import {
   type AppDatabase,
@@ -93,6 +100,7 @@ import {
   uid,
   usersRepo,
   validationResultsRepo,
+  workOrdersRepo,
 } from "../db";
 import {
   getLicensingClient,
@@ -296,6 +304,115 @@ function singleLineAddress(property: Property): string {
     .join(", ");
 }
 
+// Best-effort mirror of served-notice and work-order events into the cloud
+// tenant communication history (Communications hub). Local operations must
+// never fail or block because the cloud is unreachable, so this is strictly
+// fire-and-forget: any error is swallowed and the local audit log remains
+// the authoritative record.
+function logTenantHistoryCloud(
+  db: AppDatabase,
+  entry: {
+    tenantId: Id;
+    kind: "notice_served" | "work_order";
+    subject: string;
+    bodyText?: string;
+    /** Skip the server-side webhook dispatch (event already sent elsewhere). */
+    suppressEvent?: boolean;
+  },
+): void {
+  try {
+    if (getWorkspaceMode(db) !== "activated") return;
+    const licenseKey = activationRepo.get(db)?.licenseKey;
+    if (!licenseKey) return;
+    const tenant = tenantsRepo.get(db, entry.tenantId);
+    const property = tenant?.propertyId ? propertiesRepo.get(db, tenant.propertyId) : null;
+    void logTenantCommunication(
+      {
+        tenantId: entry.tenantId,
+        kind: entry.kind,
+        tenantName: tenant?.names.join(", ") ?? "",
+        tenantEmail: tenant?.email ?? "",
+        propertyAddress: property ? singleLineAddress(property) : "",
+        subject: entry.subject,
+        bodyText: entry.bodyText ?? "",
+        createdByKey: session.user ? (session.user.cloudUserId ?? session.user.id) : "",
+        createdByName: session.user?.name ?? "",
+        ...(entry.suppressEvent ? { suppressEvent: true } : {}),
+      },
+      { headers: { "x-license-key": licenseKey } },
+    ).catch(() => {
+      // Cloud history is best-effort; ignore network/auth failures.
+    });
+  } catch {
+    // Never let history mirroring break the local operation.
+  }
+}
+
+// Best-effort replication of the local user directory to the communications
+// hub so the server can validate chat identities. Cloud-account members are
+// already known server-side; this pushes the local-only members (those
+// created directly in the desktop app, cloudUserId = null). Fire-and-forget:
+// chat directory replication must never block or fail local user management.
+function pushChatDirectoryCloud(db: AppDatabase): void {
+  try {
+    if (getWorkspaceMode(db) !== "activated") return;
+    const licenseKey = activationRepo.get(db)?.licenseKey;
+    if (!licenseKey) return;
+    const members = usersRepo
+      .list(db)
+      .filter((u) => !u.cloudUserId)
+      .map((u) => ({
+        memberKey: u.id,
+        name: u.name,
+        username: u.username,
+        email: u.email ?? "",
+        role: u.role,
+        active: u.active,
+        // pin already stores the SHA-256 hex of the password; empty = no
+        // secret set, which the server treats as "cannot mint chat tokens".
+        secretHash: u.pin ?? "",
+      }));
+    void replaceChatDirectory(
+      { members },
+      { headers: { "x-license-key": licenseKey } },
+    ).catch(() => {
+      // Best-effort; the next sync or user change retries.
+    });
+  } catch {
+    // Never let directory replication break the local operation.
+  }
+}
+
+// Best-effort fetch of a chat member token right after the user proved their
+// password (the only moment the raw secret is in hand). The token is cached
+// on the local user row and attached to /api/comms/* calls; without it the
+// Communications page shows guidance instead of chat.
+async function fetchChatTokenCloud(
+  db: AppDatabase,
+  userId: Id,
+  identifier: string,
+  secret: string,
+): Promise<void> {
+  try {
+    if (getWorkspaceMode(db) !== "activated") return;
+    const licenseKey = activationRepo.get(db)?.licenseKey;
+    if (!licenseKey || !identifier || !secret) return;
+    // Local-only members must exist in the cloud directory before the server
+    // can validate their credentials.
+    pushChatDirectoryCloud(db);
+    const result = await issueChatToken(
+      { identifier, secret },
+      { headers: { "x-license-key": licenseKey } },
+    );
+    const updated = usersRepo.update(db, userId, { chatToken: result.token });
+    if (session.user?.id === userId) session.user = updated;
+    await db.flush();
+  } catch {
+    // Offline or the hub is unreachable: sign-in proceeds; chat shows
+    // guidance until a later online sign-in succeeds.
+  }
+}
+
 function freshCalculation(db: AppDatabase, ledgerId: Id): CalculationResult {
   const txns = ledgersRepo.listTransactions(db, ledgerId);
   const result = calculateRentOnly(ledgerId, txns);
@@ -418,8 +535,11 @@ async function provisionActivatedWorkspace(opts: {
   me: DirectoryUser;
   /** sha256 hash of the secret the signing-in member just used online. */
   myHash: string;
+  /** Raw credentials the member just verified online, used once to mint a chat token. */
+  identifier: string;
+  secret: string;
 }): Promise<SessionInfo> {
-  const { licenseKey, license, directory, me, myHash } = opts;
+  const { licenseKey, license, directory, me, myHash, identifier, secret } = opts;
 
   // Activation always provisions a clean workspace: wipe demo/leftover data.
   let db = await getDb();
@@ -478,6 +598,7 @@ async function provisionActivatedWorkspace(opts: {
         active: member.active,
         createdAt: now,
         cloudUserId: member.cloudUserId,
+        chatToken: null,
       };
       usersRepo.create(db, localUser);
     }
@@ -511,7 +632,8 @@ async function provisionActivatedWorkspace(opts: {
   );
   logAudit(db, "login", "user", currentUser.id, `${currentUser.name} signed in`);
   await db.flush();
-  return { user: { ...currentUser }, locked: false };
+  await fetchChatTokenCloud(db, currentUser.id, identifier, secret);
+  return { user: session.user ? { ...session.user } : { ...currentUser }, locked: false };
 }
 
 function createServices(): AppServices {
@@ -556,12 +678,30 @@ function createServices(): AppServices {
       session.user = user;
       session.locked = false;
       logAudit(db, "login", "user", user.id, `${user.name} signed in`);
-      return { user: { ...user }, locked: false };
+      // Rotate the chat member token while the raw secret is in hand:
+      // tokens expire server-side, so every online sign-in silently
+      // re-mints a fresh one (best-effort; offline sign-in still works and
+      // keeps the cached token, chat shows guidance if it has expired).
+      await fetchChatTokenCloud(db, user.id, identifier, secret);
+      const fresh = session.user ?? user;
+      return { user: { ...fresh }, locked: false };
     },
     async lockApp(): Promise<SessionInfo> {
       await getDb();
       session.locked = true;
       return { user: session.user ? { ...session.user } : null, locked: true };
+    },
+    async clearChatToken(): Promise<SessionInfo> {
+      const db = await getDb();
+      if (session.user?.chatToken) {
+        const updated = usersRepo.update(db, session.user.id, { chatToken: null });
+        session.user = updated;
+        await db.flush();
+      }
+      return {
+        user: session.user ? { ...session.user } : null,
+        locked: session.locked,
+      };
     },
     async createUser(input): Promise<User> {
       requirePermission("user.manage");
@@ -590,9 +730,11 @@ function createServices(): AppServices {
         active: true,
         createdAt: nowIso(),
         cloudUserId: null,
+        chatToken: null,
       };
       usersRepo.create(db, user);
       logAudit(db, "user_created", "user", user.id, `Created user ${user.name} (${user.role})`);
+      pushChatDirectoryCloud(db);
       return user;
     },
     async updateUser(id, patch): Promise<User> {
@@ -627,6 +769,7 @@ function createServices(): AppServices {
       const user = usersRepo.update(db, id, next);
       if (session.user?.id === id) session.user = user;
       logAudit(db, "user_updated", "user", id, `Updated user ${user.name}`);
+      pushChatDirectoryCloud(db);
       return user;
     },
     async changeMyPassword({ currentPassword, newPassword }): Promise<User> {
@@ -680,7 +823,10 @@ function createServices(): AppServices {
       session.user = updated;
       logAudit(db, "user_updated", "user", me.id, `${me.name} changed their password`);
       await db.flush();
-      return updated;
+      // The new password invalidates the credentials the chat token was
+      // minted with; refresh it while the raw secret is in hand.
+      await fetchChatTokenCloud(db, me.id, me.email ?? me.username, newPassword);
+      return session.user ?? updated;
     },
 
     // --- workspace activation ---
@@ -722,6 +868,8 @@ function createServices(): AppServices {
         directory,
         me,
         myHash: await sha256Hex(input.secret),
+        identifier: input.identifier,
+        secret: input.secret,
       });
     },
     async redeemInviteCode(input): Promise<SessionInfo> {
@@ -741,6 +889,8 @@ function createServices(): AppServices {
         directory: redemption.directory,
         me: redemption.me,
         myHash: await sha256Hex(input.password),
+        identifier: redemption.me.email || redemption.me.username,
+        secret: input.password,
       });
     },
     async syncLicense(): Promise<WorkspaceState> {
@@ -786,6 +936,7 @@ function createServices(): AppServices {
                 active: member.active,
                 createdAt: now,
                 cloudUserId: member.cloudUserId,
+                chatToken: null,
               });
             }
           }
@@ -819,6 +970,7 @@ function createServices(): AppServices {
           `License verified and directory synced (${directory.length} members)`,
         );
         await db.flush();
+        pushChatDirectoryCloud(db);
       } catch (err) {
         if (err instanceof LicenseInvalidError) {
           // The key was revoked or no longer exists upstream.
@@ -1579,6 +1731,17 @@ function createServices(): AppServices {
           service.method === "post_and_mail" && service.mailedDate ? "mailed" : "served",
           fromFieldSync ? "Service recorded from field sync" : "Service recorded",
         );
+        logTenantHistoryCloud(db, {
+          tenantId: n.tenantId,
+          kind: "notice_served",
+          subject: `${NOTICE_TYPE_LABELS[n.noticeType]} served`,
+          bodyText: `Served ${service.dateServed} by ${service.servedBy || "unknown"} (${(
+            service.method ?? "unknown"
+          ).replace(/_/g, " ")}).`,
+          // Field-served notices already dispatched a webhook event from the
+          // relay when the mobile user recorded service.
+          suppressEvent: fromFieldSync,
+        });
       }
       return next;
     },
@@ -1796,6 +1959,11 @@ function createServices(): AppServices {
       const db = await getDb();
       return auditRepo.list(db, filters);
     },
+    async recordCommsAudit(action, entityId, summary): Promise<void> {
+      const db = await getDb();
+      const entityType = action === "settings_changed" ? "settings" : "chat_channel";
+      logAudit(db, action, entityType, entityId, summary);
+    },
 
     // --- attachments ---
     async listAttachments(entityType, entityId): Promise<Attachment[]> {
@@ -1879,6 +2047,162 @@ function createServices(): AppServices {
       const photoDataUrl = await downscalePhotoDataUrl(evidence.photoDataUrl);
       const full: FieldEvidence = { ...evidence, photoDataUrl, id: uid("ev") };
       return fieldAssignmentsRepo.addEvidence(db, assignmentId, full);
+    },
+
+    // --- maintenance / work orders ---
+    async listWorkOrders(filters): Promise<WorkOrder[]> {
+      const db = await getDb();
+      return workOrdersRepo.list(db, filters);
+    },
+    async getWorkOrder(id: Id): Promise<WorkOrder | null> {
+      const db = await getDb();
+      return workOrdersRepo.get(db, id);
+    },
+    async createWorkOrder(input): Promise<WorkOrder> {
+      requirePermission("field.manage");
+      const db = await getDb();
+      if (!input.title.trim()) throw new Error("A work order title is required.");
+      const property = propertiesRepo.get(db, input.propertyId);
+      if (!property) throw new Error("Property not found");
+      const t = nowIso();
+      const id = uid("wo");
+      const initialStatus: WorkOrderStatus = input.assigneeName?.trim() ? "assigned" : "new";
+      const workOrder: WorkOrder = {
+        id,
+        propertyId: input.propertyId,
+        tenantId: input.tenantId ?? null,
+        unit: input.unit ?? "",
+        title: input.title.trim(),
+        description: input.description ?? "",
+        category: input.category,
+        priority: input.priority,
+        status: initialStatus,
+        dueDate: input.dueDate ?? null,
+        assigneeName: input.assigneeName?.trim() ?? "",
+        vendorName: input.vendorName ?? "",
+        vendorContact: input.vendorContact ?? "",
+        costEstimateCents: input.costEstimateCents ?? null,
+        costActualCents: input.costActualCents ?? null,
+        internalNotes: input.internalNotes ?? "",
+        completedAt: null,
+        statusHistory: [
+          {
+            id: uid("wosc"),
+            workOrderId: id,
+            fromStatus: null,
+            toStatus: initialStatus,
+            changedBy: session.user?.id ?? null,
+            changedByName: session.user?.name ?? "",
+            note: "Work order created",
+            changedAt: t,
+          },
+        ],
+        createdAt: t,
+        updatedAt: t,
+      };
+      workOrdersRepo.create(db, workOrder);
+      logAudit(
+        db,
+        "work_order_created",
+        "work_order",
+        workOrder.id,
+        `Created work order "${workOrder.title}" for ${property.nickname}`,
+      );
+      if (workOrder.tenantId) {
+        logTenantHistoryCloud(db, {
+          tenantId: workOrder.tenantId,
+          kind: "work_order",
+          subject: `Work order opened: ${workOrder.title}`,
+          bodyText:
+            workOrder.description ||
+            `Category: ${workOrder.category.replace(/_/g, " ")}, priority ${workOrder.priority}.`,
+        });
+      }
+      return workOrder;
+    },
+    async updateWorkOrder(id, patch): Promise<WorkOrder> {
+      requirePermission("field.manage");
+      const db = await getDb();
+      const current = workOrdersRepo.get(db, id);
+      if (!current) throw new Error("Work order not found");
+      // If an assignee is set while the work order is still new, move it to
+      // "assigned" (with a timeline entry) so the board reflects reality.
+      const next = workOrdersRepo.update(db, id, patch);
+      if (
+        current.status === "new" &&
+        !current.assigneeName &&
+        typeof patch.assigneeName === "string" &&
+        patch.assigneeName.trim()
+      ) {
+        const t = nowIso();
+        workOrdersRepo.addStatusChange(db, {
+          id: uid("wosc"),
+          workOrderId: id,
+          fromStatus: "new",
+          toStatus: "assigned",
+          changedBy: session.user?.id ?? null,
+          changedByName: session.user?.name ?? "",
+          note: `Assigned to ${patch.assigneeName.trim()}`,
+          changedAt: t,
+        });
+        workOrdersRepo.update(db, id, { status: "assigned", updatedAt: t });
+      }
+      logAudit(db, "work_order_updated", "work_order", id, `Updated work order "${next.title}"`);
+      return workOrdersRepo.get(db, id) ?? next;
+    },
+    async changeWorkOrderStatus(id, toStatus, note): Promise<WorkOrder> {
+      requirePermission("field.manage");
+      const db = await getDb();
+      const current = workOrdersRepo.get(db, id);
+      if (!current) throw new Error("Work order not found");
+      if (current.status === toStatus) return current;
+      const t = nowIso();
+      workOrdersRepo.addStatusChange(db, {
+        id: uid("wosc"),
+        workOrderId: id,
+        fromStatus: current.status,
+        toStatus,
+        changedBy: session.user?.id ?? null,
+        changedByName: session.user?.name ?? "",
+        note: note ?? "",
+        changedAt: t,
+      });
+      const next = workOrdersRepo.update(db, id, {
+        status: toStatus,
+        completedAt: toStatus === "completed" ? t : current.completedAt,
+        updatedAt: t,
+      });
+      logAudit(
+        db,
+        "work_order_status_changed",
+        "work_order",
+        id,
+        `Work order "${current.title}": ${current.status.replace(/_/g, " ")} → ${toStatus.replace(/_/g, " ")}`,
+        { previousValue: current.status, newValue: toStatus, reason: note },
+      );
+      if (toStatus === "completed" && current.tenantId) {
+        logTenantHistoryCloud(db, {
+          tenantId: current.tenantId,
+          kind: "work_order",
+          subject: `Work order completed: ${current.title}`,
+          bodyText: note?.trim() || `"${current.title}" was marked completed.`,
+        });
+      }
+      return next;
+    },
+    async deleteWorkOrder(id, reason): Promise<void> {
+      requirePermission("field.manage");
+      const db = await getDb();
+      const current = workOrdersRepo.get(db, id);
+      workOrdersRepo.remove(db, id);
+      logAudit(
+        db,
+        "work_order_deleted",
+        "work_order",
+        id,
+        `Deleted work order "${current?.title ?? id}"`,
+        { reason },
+      );
     },
 
     // --- certified mail tracking ---
@@ -1978,6 +2302,7 @@ function createServices(): AppServices {
         repeat_delinquencies: "Repeat Tenant Delinquencies",
         excluded_charges: "Excluded Non-Rent Charges",
         staff_activity: "Staff Activity",
+        maintenance_summary: "Maintenance Summary",
       };
       const group = <T,>(
         items: T[],
@@ -2047,6 +2372,51 @@ function createServices(): AppServices {
         case "staff_activity":
           group(auditRepo.list(db), (a) => a.userName, () => 1, false);
           break;
+        case "maintenance_summary": {
+          const workOrders = workOrdersRepo.list(db);
+          const open = workOrders.filter(
+            (w) => !["completed", "cancelled"].includes(w.status),
+          );
+          const completed = workOrders.filter((w) => w.status === "completed");
+          rows.push({ label: "Open work orders", value: open.length, isMoney: false });
+          rows.push({
+            label: "Completed work orders",
+            value: completed.length,
+            isMoney: false,
+          });
+
+          // Average time to complete (creation → completion), in days.
+          const durationsDays = completed
+            .map((w) => {
+              const done = w.completedAt ?? w.updatedAt;
+              return (new Date(done).getTime() - new Date(w.createdAt).getTime()) / 86_400_000;
+            })
+            .filter((d) => Number.isFinite(d) && d >= 0);
+          if (durationsDays.length > 0) {
+            const avg =
+              durationsDays.reduce((s, d) => s + d, 0) / durationsDays.length;
+            rows.push({
+              label: "Average days to complete",
+              value: Math.round(avg * 10) / 10,
+              isMoney: false,
+            });
+          }
+
+          // Cost totals by property (actual cost when known, otherwise estimate).
+          const costByProperty = new Map<string, number>();
+          for (const w of workOrders) {
+            const cost = w.costActualCents ?? w.costEstimateCents ?? 0;
+            if (cost > 0)
+              costByProperty.set(w.propertyId, (costByProperty.get(w.propertyId) ?? 0) + cost);
+          }
+          for (const [propertyId, value] of [...costByProperty.entries()].sort((a, b) => b[1] - a[1]))
+            rows.push({
+              label: `Cost: ${propertiesRepo.get(db, propertyId)?.nickname ?? "Unknown property"}`,
+              value,
+              isMoney: true,
+            });
+          break;
+        }
       }
       return { kind, title: titleMap[kind], rows, generatedAt: nowIso() };
     },

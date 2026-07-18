@@ -334,6 +334,43 @@ CREATE TABLE IF NOT EXISTS field_evidence (
 );
 CREATE INDEX IF NOT EXISTS idx_field_evidence_assignment ON field_evidence (assignment_id);
 
+CREATE TABLE IF NOT EXISTS work_orders (
+  id TEXT PRIMARY KEY,
+  property_id TEXT NOT NULL,
+  tenant_id TEXT,
+  unit TEXT NOT NULL DEFAULT '',
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT 'general',
+  priority TEXT NOT NULL DEFAULT 'normal',
+  status TEXT NOT NULL DEFAULT 'new',
+  due_date TEXT,
+  assignee_name TEXT NOT NULL DEFAULT '',
+  vendor_name TEXT NOT NULL DEFAULT '',
+  vendor_contact TEXT NOT NULL DEFAULT '',
+  cost_estimate_cents INTEGER,
+  cost_actual_cents INTEGER,
+  internal_notes TEXT NOT NULL DEFAULT '',
+  completed_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_work_orders_property ON work_orders (property_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_tenant ON work_orders (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders (status);
+
+CREATE TABLE IF NOT EXISTS work_order_status_history (
+  id TEXT PRIMARY KEY,
+  work_order_id TEXT NOT NULL,
+  from_status TEXT,
+  to_status TEXT NOT NULL,
+  changed_by TEXT,
+  changed_by_name TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  changed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wo_status_history_wo ON work_order_status_history (work_order_id);
+
 CREATE TABLE IF NOT EXISTS mail_tracking (
   id TEXT PRIMARY KEY,
   notice_id TEXT NOT NULL,

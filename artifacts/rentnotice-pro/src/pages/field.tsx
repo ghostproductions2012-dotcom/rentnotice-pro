@@ -46,6 +46,10 @@ import {
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { downscalePhotoDataUrl } from "@/lib/images";
+import {
+  FIELD_SYNC_AUTH_REQUIRED_MESSAGE,
+  useFieldSyncAuth,
+} from "@/lib/field-sync";
 
 const SYNC_URL = "/api/field/assignments";
 
@@ -168,6 +172,7 @@ export default function FieldAssignmentsPage() {
   const { can } = usePermissions();
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
+  const { licenseKey, syncHeaders } = useFieldSyncAuth();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [noticeId, setNoticeId] = useState("");
@@ -226,11 +231,15 @@ export default function FieldAssignmentsPage() {
       toast({ title: "Nothing to push", description: "Create a field assignment first." });
       return;
     }
+    if (!licenseKey) {
+      toast({ title: "Push failed", description: FIELD_SYNC_AUTH_REQUIRED_MESSAGE, variant: "destructive" });
+      return;
+    }
     setSyncing("push");
     try {
       const res = await fetch(SYNC_URL, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...syncHeaders },
         body: JSON.stringify({
           assignments: assignments.map((a) => {
             const notice = noticeById.get(a.noticeId);
@@ -252,9 +261,13 @@ export default function FieldAssignmentsPage() {
   };
 
   const handlePull = async () => {
+    if (!licenseKey) {
+      toast({ title: "Pull failed", description: FIELD_SYNC_AUTH_REQUIRED_MESSAGE, variant: "destructive" });
+      return;
+    }
     setSyncing("pull");
     try {
-      const res = await fetch(SYNC_URL);
+      const res = await fetch(SYNC_URL, { headers: syncHeaders });
       if (!res.ok) throw new Error(`Sync server responded ${res.status}`);
       const remote = (await res.json()) as RemoteAssignment[];
       const local = assignments ?? [];

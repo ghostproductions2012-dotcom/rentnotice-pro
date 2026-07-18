@@ -2,7 +2,8 @@ export interface PlanConfig {
   tier: string;
   name: string;
   description: string;
-  seats: number;
+  /** Seat limit for the tier; null means unlimited (no seat cap). */
+  seats: number | null;
   priceMonthlyCents: number;
   features: string[];
   highlighted: boolean;
@@ -54,6 +55,23 @@ export const PLAN_CONFIGS: PlanConfig[] = [
     priceMonthlyCents: 24900,
     features: [
       "Up to 50 team members",
+      "Unlimited rent notices",
+      "State-compliant notice templates",
+      "Desktop app license",
+      "Role-based access control",
+      "Dedicated onboarding",
+      "Priority support",
+    ],
+    highlighted: false,
+  },
+  {
+    tier: "unlimited",
+    name: "Unlimited",
+    description: "For large customers who never want to think about seats.",
+    seats: null,
+    priceMonthlyCents: 74999,
+    features: [
+      "Unlimited team members",
       "Unlimited rent notices",
       "State-compliant notice templates",
       "Desktop app license",

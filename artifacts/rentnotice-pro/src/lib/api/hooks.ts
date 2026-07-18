@@ -25,6 +25,7 @@ import type {
   CreateTemplateInput,
   CreateTenantInput,
   CreateUserInput,
+  CreateWorkOrderInput,
   DeadlineContext,
   FinalizeAttestation,
   SetStateRuleReviewInput,
@@ -33,6 +34,7 @@ import type {
   AppSettings,
   Attachment,
   AuditFilters,
+  CommsAuditAction,
   CompanyProfile,
   FieldAssignment,
   FieldEvidence,
@@ -52,6 +54,9 @@ import type {
   TemplateUpdateInput,
   Tenant,
   User,
+  WorkOrder,
+  WorkOrderFilters,
+  WorkOrderStatus,
 } from "../types";
 
 // --------------------------------- keys -----------------------------------
@@ -90,6 +95,8 @@ export const qk = {
     ["attachments", entityType, entityId] as const,
   fieldAssignments: (noticeId?: Id) => ["fieldAssignments", noticeId ?? ""] as const,
   mailTracking: (noticeId?: Id) => ["mailTracking", noticeId ?? ""] as const,
+  workOrders: (filters?: WorkOrderFilters) => ["workOrders", filters ?? {}] as const,
+  workOrder: (id: Id) => ["workOrder", id] as const,
   dashboard: ["dashboard"] as const,
   report: (kind: ReportKind) => ["report", kind] as const,
   stateRules: ["stateRules"] as const,
@@ -147,6 +154,19 @@ export function useLogin() {
     mutationFn: ({ identifier, secret }: { identifier: string; secret: string }) =>
       getServices().login(identifier, secret),
     onSuccess: () => invalidate(qc, ["session", "audit", "dashboard"]),
+  });
+}
+
+/**
+ * Drop the cached chat token after the server rejects it (expired/revoked).
+ * Refreshing the session flips the Communications page to its "sign in
+ * again" guidance instead of surfacing raw request errors.
+ */
+export function useClearChatToken() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => getServices().clearChatToken(),
+    onSuccess: () => invalidate(qc, ["session"]),
   });
 }
 
@@ -678,6 +698,18 @@ export function useAuditLog(filters?: AuditFilters) {
   });
 }
 
+export function useRecordCommsAudit() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: {
+      action: CommsAuditAction;
+      entityId: string | null;
+      summary: string;
+    }) => getServices().recordCommsAudit(input.action, input.entityId, input.summary),
+    onSuccess: () => invalidate(qc, ["audit"]),
+  });
+}
+
 // ------------------------------ attachments ---------------------------------
 
 export function useAttachments(
@@ -750,6 +782,63 @@ export function useAddFieldEvidence() {
       evidence: Omit<FieldEvidence, "id">;
     }) => getServices().addFieldEvidence(assignmentId, evidence),
     onSuccess: () => invalidate(qc, ["fieldAssignments", "audit"]),
+  });
+}
+
+// ------------------------------ work orders ---------------------------------
+
+export function useWorkOrders(filters?: WorkOrderFilters) {
+  return useQuery({
+    queryKey: qk.workOrders(filters),
+    queryFn: () => getServices().listWorkOrders(filters),
+  });
+}
+
+export function useWorkOrder(id: Id | null) {
+  return useQuery({
+    queryKey: qk.workOrder(id ?? ""),
+    queryFn: () => getServices().getWorkOrder(id as Id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateWorkOrderInput) => getServices().createWorkOrder(input),
+    onSuccess: () => invalidate(qc, ["workOrders", "workOrder", "audit", "report"]),
+  });
+}
+
+export function useUpdateWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: Id;
+      patch: Partial<Omit<WorkOrder, "id" | "createdAt" | "statusHistory" | "status">>;
+    }) => getServices().updateWorkOrder(id, patch),
+    onSuccess: () => invalidate(qc, ["workOrders", "workOrder", "audit", "report"]),
+  });
+}
+
+export function useChangeWorkOrderStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, toStatus, note }: { id: Id; toStatus: WorkOrderStatus; note?: string }) =>
+      getServices().changeWorkOrderStatus(id, toStatus, note),
+    onSuccess: () => invalidate(qc, ["workOrders", "workOrder", "audit", "report"]),
+  });
+}
+
+export function useDeleteWorkOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: Id; reason: string }) =>
+      getServices().deleteWorkOrder(id, reason),
+    onSuccess: () => invalidate(qc, ["workOrders", "workOrder", "attachments", "audit", "report"]),
   });
 }
 

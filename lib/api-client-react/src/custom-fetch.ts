@@ -17,6 +17,8 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _licenseKeyGetter: AuthTokenGetter | null = null;
+let _memberTokenGetter: AuthTokenGetter | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -42,6 +44,28 @@ export function setBaseUrl(url: string | null): void {
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the workspace license key. Before every
+ * fetch the getter is invoked; when it returns a non-null string, an
+ * `x-license-key` header is attached to the request. Used by the desktop
+ * and mobile apps for license-scoped endpoints (e.g. the communications hub).
+ * Pass `null` to clear the getter.
+ */
+export function setLicenseKeyGetter(getter: AuthTokenGetter | null): void {
+  _licenseKeyGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the caller's chat member token. Before
+ * every fetch the getter is invoked; when it returns a non-null string, an
+ * `x-member-token` header is attached to the request. Team-chat routes on
+ * the communications hub require it to validate sender identity.
+ * Pass `null` to clear the getter.
+ */
+export function setMemberTokenGetter(getter: AuthTokenGetter | null): void {
+  _memberTokenGetter = getter;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -355,6 +379,24 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Attach the workspace license key when a getter is configured and the
+  // call site did not already supply one explicitly.
+  if (_licenseKeyGetter && !headers.has("x-license-key")) {
+    const licenseKey = await _licenseKeyGetter();
+    if (licenseKey) {
+      headers.set("x-license-key", licenseKey);
+    }
+  }
+
+  // Attach the chat member token when a getter is configured and the call
+  // site did not already supply one explicitly.
+  if (_memberTokenGetter && !headers.has("x-member-token")) {
+    const memberToken = await _memberTokenGetter();
+    if (memberToken) {
+      headers.set("x-member-token", memberToken);
     }
   }
 

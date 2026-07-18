@@ -5,6 +5,8 @@ import {
   getListAdminCompaniesQueryKey,
   useListAdminPendingSignups,
   getListAdminPendingSignupsQueryKey,
+  useGetAdminPricingHealth,
+  getGetAdminPricingHealthQueryKey,
 } from "@workspace/api-client-react";
 import AdminLayout from "./AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,6 +28,7 @@ import {
   Users,
   Hourglass,
   ChevronRight,
+  AlertTriangle,
 } from "lucide-react";
 
 function money(cents: number): string {
@@ -52,6 +55,9 @@ export default function AdminDashboard() {
     });
   const { data: pending } = useListAdminPendingSignups({
     query: { queryKey: getListAdminPendingSignupsQueryKey() },
+  });
+  const { data: pricingHealth } = useGetAdminPricingHealth({
+    query: { queryKey: getGetAdminPricingHealthQueryKey() },
   });
 
   const statCards = metrics
@@ -93,6 +99,39 @@ export default function AdminDashboard() {
           Every company, subscription and license across RentNotice Pro.
         </p>
       </div>
+
+      {pricingHealth && !pricingHealth.ok && (
+        <Card
+          className="mb-8 border-destructive"
+          data-testid="card-pricing-health"
+        >
+          <CardHeader className="flex flex-row items-center gap-2 space-y-0 pb-2">
+            <AlertTriangle className="w-4 h-4 text-destructive" />
+            <CardTitle className="text-base text-destructive">
+              Stripe pricing out of sync with the plan catalog
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="text-sm text-muted-foreground space-y-1">
+              {pricingHealth.mismatches.map((m, i) => (
+                <li key={`${m.tier}-${m.livePriceId ?? i}`}>
+                  <span className="font-medium capitalize text-foreground">
+                    {m.tier}
+                  </span>
+                  : catalog {money(m.catalogAmountCents)}/mo,{" "}
+                  {m.reason === "no_live_price"
+                    ? "no live Stripe price found"
+                    : m.reason === "no_usable_live_price"
+                      ? `only unusable live prices (e.g. ${m.liveAmountCents !== null ? money(m.liveAmountCents) : "no amount"}) — catalog price shown instead`
+                      : m.reason === "stray_price_ignored"
+                        ? `stray live price ${m.liveAmountCents !== null ? money(m.liveAmountCents) : "without an amount"} ignored (${m.livePriceId})`
+                        : `live price is ${m.liveAmountCents !== null ? money(m.liveAmountCents) : "unknown"} (${m.livePriceId})`}
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {metricsLoading &&
@@ -175,7 +214,7 @@ export default function AdminDashboard() {
                     </TableCell>
                     <TableCell>{c.tierName}</TableCell>
                     <TableCell>
-                      {c.seatsUsed} / {c.seats}
+                      {c.seatsUsed} / {c.seats ?? "Unlimited"}
                     </TableCell>
                     <TableCell>{licenseStatusBadge(c.licenseStatus)}</TableCell>
                     <TableCell>

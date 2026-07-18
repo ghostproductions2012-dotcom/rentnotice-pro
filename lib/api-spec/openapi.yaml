@@ -23,6 +23,10 @@ tags:
     description: License verification API used by the desktop app
   - name: field
     description: Field assignment sync relay for the mobile companion
+  - name: comms
+    description: >-
+      Communications hub — team chat, tenant messaging history, and outbound
+      Slack / Google Chat webhook integrations. License-scoped per company.
   - name: buildium
     description: >-
       Buildium Open API proxy used by the desktop app. Credentials are forwarded
@@ -652,6 +656,558 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorMessage'
+  /field/work-orders:
+    get:
+      operationId: listWorkOrderAssignments
+      tags:
+        - field
+      summary: List relayed work-order assignments
+      description: Returns all relayed maintenance work orders with their photos
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum:
+              - new
+              - assigned
+              - in_progress
+              - on_hold
+              - completed
+              - cancelled
+      responses:
+        '200':
+          description: Work-order assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WorkOrderSync'
+    put:
+      operationId: pushWorkOrderAssignments
+      tags:
+        - field
+      summary: Push work-order assignments from desktop
+      description: >-
+        Bulk-upserts assigned work orders into the relay. Snapshot fields are always refreshed;
+        mutable field-state uses last-write-wins by updatedAt. Photos are append-only by id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PushWorkOrdersRequest'
+      responses:
+        '200':
+          description: Push result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushWorkOrdersResult'
+  '/field/work-orders/{id}':
+    patch:
+      operationId: updateWorkOrderAssignment
+      tags:
+        - field
+      summary: Update a work order (mobile)
+      description: Records maintenance progress from the field agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateWorkOrderRequest'
+      responses:
+        '200':
+          description: Updated work order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrderSync'
+        '404':
+          description: Work order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  '/field/work-orders/{id}/photos':
+    post:
+      operationId: addWorkOrderPhoto
+      tags:
+        - field
+      summary: Attach a maintenance photo (mobile)
+      description: >-
+        Adds a photo + GPS record to a work order. Idempotent by client-generated photo id so
+        offline queues can safely retry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWorkOrderPhotoRequest'
+      responses:
+        '200':
+          description: Updated work order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrderSync'
+        '404':
+          description: Work order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+  /comms/directory:
+    put:
+      operationId: replaceChatDirectory
+      tags:
+        - comms
+      summary: Replace the replicated desktop team member directory
+      description: >-
+        Replace-set of the desktop app's local-only users (those without a
+        cloud account) so the server can validate chat identities. Requires
+        the workspace license key; portal sessions cannot rewrite the
+        directory.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReplaceChatDirectoryRequest'
+      responses:
+        '200':
+          description: Directory replaced
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResult'
+        '403':
+          description: Missing license credential
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/identity/token:
+    post:
+      operationId: issueChatToken
+      tags:
+        - comms
+      summary: Issue a chat member token
+      description: >-
+        The member proves who they are with their own credentials (email or
+        username plus password) and receives a member token. The token must
+        accompany all team-chat requests in the `x-member-token` header —
+        the license key alone identifies the company, not the person.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IssueChatTokenRequest'
+      responses:
+        '200':
+          description: Member token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatTokenResult'
+        '401':
+          description: Credentials not recognized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/members:
+    get:
+      operationId: listTeamMembers
+      tags:
+        - comms
+      summary: List team members
+      description: >-
+        Returns the active team members of the calling company (cloud users
+        plus replicated desktop-local users), used for direct messages and
+        sender identity in team chat. Requires a member token or portal
+        session.
+      responses:
+        '200':
+          description: Team members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamMemberSync'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/channels:
+    get:
+      operationId: listChatChannels
+      tags:
+        - comms
+      summary: List chat channels and DMs
+      description: >-
+        Returns the company's channels plus the caller's DMs, each with the
+        latest message preview and an unread count computed from the caller's
+        read state.
+      parameters:
+        - name: memberKey
+          in: query
+          required: true
+          description: Caller member key used for unread counts and DM visibility
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Channels
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatChannelSync'
+        '401':
+          description: Missing or invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: createChatChannel
+      tags:
+        - comms
+      summary: Create a team chat channel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChatChannelRequest'
+      responses:
+        '200':
+          description: Created channel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatChannelSync'
+        '409':
+          description: A channel with this name already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/comms/channels/{id}/archive':
+    post:
+      operationId: setChatChannelArchived
+      tags:
+        - comms
+      summary: Archive or restore a channel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetChannelArchivedRequest'
+      responses:
+        '200':
+          description: Updated channel
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatChannelSync'
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/dms:
+    post:
+      operationId: openDirectMessage
+      tags:
+        - comms
+      summary: Open (get or create) a direct-message conversation
+      description: >-
+        Idempotent by member pair — returns the existing DM when one already
+        exists between the two members.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenDirectMessageRequest'
+      responses:
+        '200':
+          description: The DM conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatChannelSync'
+  '/comms/channels/{id}/messages':
+    get:
+      operationId: listChatMessages
+      tags:
+        - comms
+      summary: List messages in a channel
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: memberKey
+          in: query
+          required: false
+          description: >-
+            The requesting member's key. Required for direct-message
+            conversations — only the two participants may read a DM.
+          schema:
+            type: string
+        - name: after
+          in: query
+          required: false
+          description: Only return messages created strictly after this ISO timestamp
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Messages in chronological order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessageSync'
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      operationId: sendChatMessage
+      tags:
+        - comms
+      summary: Send a message
+      description: >-
+        Idempotent by client-generated message id so offline queues can safely
+        retry.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendChatMessageRequest'
+      responses:
+        '200':
+          description: Stored message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessageSync'
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  '/comms/channels/{id}/read':
+    post:
+      operationId: markChatChannelRead
+      tags:
+        - comms
+      summary: Mark a channel as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkChannelReadRequest'
+      responses:
+        '200':
+          description: Acknowledged
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResult'
+  /comms/tenant-communications:
+    get:
+      operationId: listTenantCommunications
+      tags:
+        - comms
+      summary: List tenant communication history
+      parameters:
+        - name: tenantId
+          in: query
+          required: false
+          description: Filter to a single tenant
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: History entries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TenantCommunicationSync'
+    post:
+      operationId: logTenantCommunication
+      tags:
+        - comms
+      summary: Log a tenant communication event
+      description: >-
+        Records a log-only history entry (e.g. an automatic "notice served"
+        event pushed from the desktop). Does not send email.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogTenantCommunicationRequest'
+      responses:
+        '200':
+          description: Stored entry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantCommunicationSync'
+  /comms/tenant-email:
+    post:
+      operationId: sendTenantEmail
+      tags:
+        - comms
+      summary: Send an email to a tenant
+      description: >-
+        Sends the rendered message to the tenant's email address and records it
+        in the tenant communication history with the delivery status.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendTenantEmailRequest'
+      responses:
+        '200':
+          description: History entry with delivery status ("sent" or "failed")
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantCommunicationSync'
+        '400':
+          description: Invalid recipient email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/integrations:
+    get:
+      operationId: getIntegrationSettings
+      tags:
+        - comms
+      summary: Get Slack / Google Chat integration settings
+      description: Webhook URLs are returned masked; only configured flags reveal state.
+      responses:
+        '200':
+          description: Integration settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationSettings'
+    put:
+      operationId: updateIntegrationSettings
+      tags:
+        - comms
+      summary: Update Slack / Google Chat integration settings
+      description: >-
+        Webhook URLs must be Slack (https://hooks.slack.com/…) or Google Chat
+        (https://chat.googleapis.com/…) incoming-webhook URLs. Pass an empty
+        string to disconnect; omit a field to leave it unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateIntegrationSettingsRequest'
+      responses:
+        '200':
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntegrationSettings'
+        '400':
+          description: Webhook URL not allowed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /comms/integrations/test:
+    post:
+      operationId: testIntegration
+      tags:
+        - comms
+      summary: Send a test message to a connected webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestIntegrationRequest'
+      responses:
+        '200':
+          description: Delivery attempt result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestIntegrationResult'
   /buildium/ping:
     get:
       operationId: buildiumPing
@@ -1217,6 +1773,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /www/admin/pricing-health:
+    get:
+      operationId: getAdminPricingHealth
+      tags:
+        - admin
+      summary: Compare the plan catalog against live Stripe prices
+      responses:
+        '200':
+          description: Pricing health report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminPricingHealth'
+        '401':
+          description: Not logged in as platform admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   parameters:
     LicenseKeyHeader:
@@ -1323,14 +1898,16 @@ components:
       properties:
         tier:
           type: string
-          description: 'Stable tier key (starter, professional, enterprise)'
+          description: 'Stable tier key (starter, professional, enterprise, unlimited)'
         name:
           type: string
         description:
           type: string
         seats:
-          type: integer
-          description: Maximum number of user seats included
+          type:
+            - integer
+            - 'null'
+          description: Maximum number of user seats included; null means unlimited
         priceMonthlyCents:
           type: integer
         features:
@@ -1491,7 +2068,10 @@ components:
         tierName:
           type: string
         seats:
-          type: integer
+          type:
+            - integer
+            - 'null'
+          description: Seat limit for the tier; null means unlimited
         status:
           type: string
           description: 'Raw Stripe subscription status (active, past_due, canceled, ...)'
@@ -1811,7 +2391,10 @@ components:
         tier:
           type: string
         seats:
-          type: integer
+          type:
+            - integer
+            - 'null'
+          description: Seat limit for the tier; null means unlimited
         paidThrough:
           type:
             - string
@@ -2056,6 +2639,181 @@ components:
         - id
         - photoDataUrl
         - capturedAt
+    WorkOrderPhotoSync:
+      type: object
+      properties:
+        id:
+          type: string
+        photoDataUrl:
+          type: string
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        accuracyMeters:
+          type:
+            - number
+            - 'null'
+        capturedAt:
+          type: string
+        note:
+          type: string
+      required:
+        - id
+        - photoDataUrl
+        - latitude
+        - longitude
+        - accuracyMeters
+        - capturedAt
+        - note
+    WorkOrderSync:
+      type: object
+      properties:
+        id:
+          type: string
+        workOrderId:
+          type: string
+        assigneeName:
+          type: string
+        status:
+          type: string
+          enum:
+            - new
+            - assigned
+            - in_progress
+            - on_hold
+            - completed
+            - cancelled
+        priority:
+          type: string
+          enum:
+            - low
+            - normal
+            - high
+            - emergency
+        category:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        propertyAddress:
+          type: string
+        unit:
+          type: string
+        tenantNames:
+          type: string
+        dueDate:
+          type:
+            - string
+            - 'null'
+        vendorName:
+          type: string
+        vendorContact:
+          type: string
+        fieldNotes:
+          type: string
+        completedAt:
+          type:
+            - string
+            - 'null'
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkOrderPhotoSync'
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - workOrderId
+        - assigneeName
+        - status
+        - priority
+        - category
+        - title
+        - description
+        - propertyAddress
+        - unit
+        - tenantNames
+        - dueDate
+        - vendorName
+        - vendorContact
+        - fieldNotes
+        - completedAt
+        - photos
+        - createdAt
+        - updatedAt
+    PushWorkOrdersRequest:
+      type: object
+      properties:
+        workOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkOrderSync'
+      required:
+        - workOrders
+    PushWorkOrdersResult:
+      type: object
+      properties:
+        pushed:
+          type: integer
+      required:
+        - pushed
+    UpdateWorkOrderRequest:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - new
+            - assigned
+            - in_progress
+            - on_hold
+            - completed
+            - cancelled
+        completedAt:
+          type:
+            - string
+            - 'null'
+        fieldNotes:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - updatedAt
+    AddWorkOrderPhotoRequest:
+      type: object
+      properties:
+        id:
+          type: string
+        photoDataUrl:
+          type: string
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        accuracyMeters:
+          type:
+            - number
+            - 'null'
+        capturedAt:
+          type: string
+        note:
+          type: string
+      required:
+        - id
+        - photoDataUrl
+        - capturedAt
     AdminLoginInput:
       type: object
       required:
@@ -2151,7 +2909,10 @@ components:
         tierName:
           type: string
         seats:
-          type: integer
+          type:
+            - integer
+            - 'null'
+          description: Seat limit for the tier; null means unlimited
         seatsUsed:
           type: integer
         licenseStatus:
@@ -2410,3 +3171,465 @@ components:
         createdAt:
           type: string
           format: date-time
+    AdminPricingHealth:
+      type: object
+      required:
+        - ok
+        - mismatches
+      properties:
+        ok:
+          type: boolean
+        mismatches:
+          type: array
+          items:
+            $ref: '#/components/schemas/TierPriceMismatch'
+    TierPriceMismatch:
+      type: object
+      required:
+        - tier
+        - catalogAmountCents
+        - liveAmountCents
+        - livePriceId
+        - reason
+      properties:
+        tier:
+          type: string
+        catalogAmountCents:
+          type: integer
+        liveAmountCents:
+          type: integer
+          nullable: true
+        livePriceId:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          enum:
+            - amount_mismatch
+            - no_usable_live_price
+            - no_live_price
+            - stray_price_ignored
+    TeamMemberSync:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - role
+        - active
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum:
+            - admin
+            - manager
+            - staff
+            - readonly
+        active:
+          type: boolean
+    ChatChannelSync:
+      type: object
+      required:
+        - id
+        - kind
+        - name
+        - dmKey
+        - memberKeys
+        - archived
+        - createdByKey
+        - createdByName
+        - createdAt
+        - unreadCount
+        - lastMessageAt
+        - lastMessagePreview
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+            - channel
+            - dm
+        name:
+          type: string
+        dmKey:
+          type:
+            - string
+            - 'null'
+        memberKeys:
+          type: array
+          items:
+            type: string
+        archived:
+          type: boolean
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+        createdAt:
+          type: string
+        unreadCount:
+          type: integer
+        lastMessageAt:
+          type:
+            - string
+            - 'null'
+        lastMessagePreview:
+          type:
+            - string
+            - 'null'
+    CreateChatChannelRequest:
+      type: object
+      required:
+        - name
+        - createdByKey
+        - createdByName
+      properties:
+        name:
+          type: string
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+    SetChannelArchivedRequest:
+      type: object
+      required:
+        - archived
+      properties:
+        archived:
+          type: boolean
+    OpenDirectMessageRequest:
+      type: object
+      required:
+        - memberKeys
+        - memberNames
+        - createdByKey
+        - createdByName
+      properties:
+        memberKeys:
+          type: array
+          description: Exactly two member keys (the caller and the other member)
+          items:
+            type: string
+        memberNames:
+          type: array
+          description: Display names matching memberKeys by index
+          items:
+            type: string
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+    ChatMessageSync:
+      type: object
+      required:
+        - id
+        - channelId
+        - senderKey
+        - senderName
+        - body
+        - createdAt
+      properties:
+        id:
+          type: string
+        channelId:
+          type: string
+        senderKey:
+          type: string
+        senderName:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+    SendChatMessageRequest:
+      type: object
+      required:
+        - id
+        - senderKey
+        - senderName
+        - body
+        - createdAt
+      properties:
+        id:
+          type: string
+          description: Client-generated id used for idempotent offline retries
+        senderKey:
+          type: string
+        senderName:
+          type: string
+        body:
+          type: string
+        createdAt:
+          type: string
+    MarkChannelReadRequest:
+      type: object
+      required:
+        - memberKey
+        - lastReadAt
+      properties:
+        memberKey:
+          type: string
+        lastReadAt:
+          type: string
+    OkResult:
+      type: object
+      required:
+        - ok
+      properties:
+        ok:
+          type: boolean
+    ChatDirectoryMember:
+      type: object
+      required:
+        - memberKey
+        - name
+      properties:
+        memberKey:
+          type: string
+          description: The key clients use as senderKey/memberKey
+        name:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        active:
+          type: boolean
+        secretHash:
+          type: string
+          description: >-
+            SHA-256 hex of the member's desktop password; empty when none is
+            set (such members cannot mint chat tokens).
+    ReplaceChatDirectoryRequest:
+      type: object
+      required:
+        - members
+      properties:
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatDirectoryMember'
+    IssueChatTokenRequest:
+      type: object
+      required:
+        - identifier
+        - secret
+      properties:
+        identifier:
+          type: string
+          description: Email or username of the member
+        secret:
+          type: string
+          description: The member's password
+    ChatTokenResult:
+      type: object
+      required:
+        - token
+        - memberKey
+        - memberName
+      properties:
+        token:
+          type: string
+        memberKey:
+          type: string
+        memberName:
+          type: string
+        expiresAt:
+          type: string
+          description: >-
+            ISO timestamp after which the token stops working (401). Clients
+            should sign in again (or silently re-mint) to get a fresh token.
+    TenantCommunicationSync:
+      type: object
+      required:
+        - id
+        - tenantId
+        - tenantName
+        - tenantEmail
+        - propertyAddress
+        - kind
+        - subject
+        - bodyText
+        - status
+        - createdByKey
+        - createdByName
+        - createdAt
+      properties:
+        id:
+          type: string
+        tenantId:
+          type: string
+        tenantName:
+          type: string
+        tenantEmail:
+          type: string
+        propertyAddress:
+          type: string
+        kind:
+          type: string
+          enum:
+            - email
+            - announcement
+            - notice_served
+            - work_order
+        subject:
+          type: string
+        bodyText:
+          type: string
+        status:
+          type: string
+          enum:
+            - sent
+            - failed
+            - logged
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+        createdAt:
+          type: string
+    SendTenantEmailRequest:
+      type: object
+      required:
+        - tenantId
+        - tenantName
+        - tenantEmail
+        - subject
+        - bodyText
+      properties:
+        tenantId:
+          type: string
+        tenantName:
+          type: string
+        tenantEmail:
+          type: string
+        propertyAddress:
+          type: string
+        subject:
+          type: string
+        bodyText:
+          type: string
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+    LogTenantCommunicationRequest:
+      type: object
+      required:
+        - tenantId
+        - kind
+      properties:
+        tenantId:
+          type: string
+        kind:
+          type: string
+          enum:
+            - announcement
+            - notice_served
+            - work_order
+        tenantName:
+          type: string
+        tenantEmail:
+          type: string
+        propertyAddress:
+          type: string
+        subject:
+          type: string
+        bodyText:
+          type: string
+        createdByKey:
+          type: string
+        createdByName:
+          type: string
+        createdAt:
+          type: string
+        suppressEvent:
+          type: boolean
+          description: >-
+            Skip the webhook event dispatch for this entry. Used when the
+            originating event was already dispatched elsewhere (e.g. the
+            field relay dispatches notice_served when a mobile user records
+            service, and the desktop later mirrors it into tenant history).
+    IntegrationSettings:
+      type: object
+      required:
+        - slackConfigured
+        - googleChatConfigured
+        - slackWebhookUrlMasked
+        - googleChatWebhookUrlMasked
+        - events
+        - mirrorTeamChat
+        - updatedAt
+      properties:
+        slackConfigured:
+          type: boolean
+        googleChatConfigured:
+          type: boolean
+        slackWebhookUrlMasked:
+          type: string
+        googleChatWebhookUrlMasked:
+          type: string
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - work_order_assigned
+              - work_order_completed
+              - notice_served
+              - tenant_email_sent
+        mirrorTeamChat:
+          type: boolean
+        updatedAt:
+          type:
+            - string
+            - 'null'
+    UpdateIntegrationSettingsRequest:
+      type: object
+      properties:
+        slackWebhookUrl:
+          type: string
+          description: New Slack incoming-webhook URL; empty string disconnects
+        googleChatWebhookUrl:
+          type: string
+          description: New Google Chat incoming-webhook URL; empty string disconnects
+        events:
+          type: array
+          items:
+            type: string
+            enum:
+              - work_order_assigned
+              - work_order_completed
+              - notice_served
+              - tenant_email_sent
+        mirrorTeamChat:
+          type: boolean
+    TestIntegrationRequest:
+      type: object
+      required:
+        - target
+      properties:
+        target:
+          type: string
+          enum:
+            - slack
+            - google_chat
+    TestIntegrationResult:
+      type: object
+      required:
+        - ok
+        - message
+      properties:
+        ok:
+          type: boolean
+        message:
+          type: string

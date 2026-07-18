@@ -21,10 +21,10 @@ export const HealthCheckResponse = zod.object({
  * @summary List pricing plans (public)
  */
 export const ListPlansResponseItem = zod.object({
-  "tier": zod.string().describe('Stable tier key (starter, professional, enterprise)'),
+  "tier": zod.string().describe('Stable tier key (starter, professional, enterprise, unlimited)'),
   "name": zod.string(),
   "description": zod.string(),
-  "seats": zod.number().describe('Maximum number of user seats included'),
+  "seats": zod.number().nullable().describe('Maximum number of user seats included; null means unlimited'),
   "priceMonthlyCents": zod.number(),
   "features": zod.array(zod.string()),
   "stripePriceId": zod.string().nullish().describe('Live Stripe price id (null until Stripe products are seeded)'),
@@ -154,7 +154,7 @@ export const GetPortalOverviewResponse = zod.object({
   "subscription": zod.object({
   "tier": zod.string(),
   "tierName": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "status": zod.string().describe('Raw Stripe subscription status (active, past_due, canceled, ...)'),
   "currentPeriodEnd": zod.coerce.date().nullish(),
   "cancelAtPeriodEnd": zod.boolean().optional(),
@@ -312,7 +312,7 @@ export const RedeemInviteResponse = zod.object({
   "name": zod.string()
 }),
   "tier": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "paidThrough": zod.coerce.date().nullish(),
   "users": zod.array(zod.object({
   "id": zod.string(),
@@ -364,7 +364,7 @@ export const ActivateLicenseResponse = zod.object({
   "name": zod.string()
 }),
   "tier": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "paidThrough": zod.coerce.date().nullish(),
   "users": zod.array(zod.object({
   "id": zod.string(),
@@ -396,7 +396,7 @@ export const VerifyLicenseResponse = zod.object({
   "name": zod.string()
 }),
   "tier": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "paidThrough": zod.coerce.date().nullish(),
   "users": zod.array(zod.object({
   "id": zod.string(),
@@ -586,6 +586,545 @@ export const AddFieldEvidenceResponse = zod.object({
 
 
 /**
+ * Returns all relayed maintenance work orders with their photos
+ * @summary List relayed work-order assignments
+ */
+export const ListWorkOrderAssignmentsQueryParams = zod.object({
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']).optional()
+})
+
+export const ListWorkOrderAssignmentsResponseItem = zod.object({
+  "id": zod.string(),
+  "workOrderId": zod.string(),
+  "assigneeName": zod.string(),
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "category": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "tenantNames": zod.string(),
+  "dueDate": zod.string().nullable(),
+  "vendorName": zod.string(),
+  "vendorContact": zod.string(),
+  "fieldNotes": zod.string(),
+  "completedAt": zod.string().nullable(),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListWorkOrderAssignmentsResponse = zod.array(ListWorkOrderAssignmentsResponseItem)
+
+
+/**
+ * Bulk-upserts assigned work orders into the relay. Snapshot fields are always refreshed; mutable field-state uses last-write-wins by updatedAt. Photos are append-only by id.
+ * @summary Push work-order assignments from desktop
+ */
+export const PushWorkOrderAssignmentsBody = zod.object({
+  "workOrders": zod.array(zod.object({
+  "id": zod.string(),
+  "workOrderId": zod.string(),
+  "assigneeName": zod.string(),
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "category": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "tenantNames": zod.string(),
+  "dueDate": zod.string().nullable(),
+  "vendorName": zod.string(),
+  "vendorContact": zod.string(),
+  "fieldNotes": zod.string(),
+  "completedAt": zod.string().nullable(),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+})
+
+export const PushWorkOrderAssignmentsResponse = zod.object({
+  "pushed": zod.number()
+})
+
+
+/**
+ * Records maintenance progress from the field agent
+ * @summary Update a work order (mobile)
+ */
+export const UpdateWorkOrderAssignmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateWorkOrderAssignmentBody = zod.object({
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']).optional(),
+  "completedAt": zod.string().nullish(),
+  "fieldNotes": zod.string().optional(),
+  "updatedAt": zod.string()
+})
+
+export const UpdateWorkOrderAssignmentResponse = zod.object({
+  "id": zod.string(),
+  "workOrderId": zod.string(),
+  "assigneeName": zod.string(),
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "category": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "tenantNames": zod.string(),
+  "dueDate": zod.string().nullable(),
+  "vendorName": zod.string(),
+  "vendorContact": zod.string(),
+  "fieldNotes": zod.string(),
+  "completedAt": zod.string().nullable(),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * Adds a photo + GPS record to a work order. Idempotent by client-generated photo id so offline queues can safely retry.
+ * @summary Attach a maintenance photo (mobile)
+ */
+export const AddWorkOrderPhotoParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const AddWorkOrderPhotoBody = zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "accuracyMeters": zod.number().nullish(),
+  "capturedAt": zod.string(),
+  "note": zod.string().optional()
+})
+
+export const AddWorkOrderPhotoResponse = zod.object({
+  "id": zod.string(),
+  "workOrderId": zod.string(),
+  "assigneeName": zod.string(),
+  "status": zod.enum(['new', 'assigned', 'in_progress', 'on_hold', 'completed', 'cancelled']),
+  "priority": zod.enum(['low', 'normal', 'high', 'emergency']),
+  "category": zod.string(),
+  "title": zod.string(),
+  "description": zod.string(),
+  "propertyAddress": zod.string(),
+  "unit": zod.string(),
+  "tenantNames": zod.string(),
+  "dueDate": zod.string().nullable(),
+  "vendorName": zod.string(),
+  "vendorContact": zod.string(),
+  "fieldNotes": zod.string(),
+  "completedAt": zod.string().nullable(),
+  "photos": zod.array(zod.object({
+  "id": zod.string(),
+  "photoDataUrl": zod.string(),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "capturedAt": zod.string(),
+  "note": zod.string()
+})),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * Replace-set of the desktop app's local-only users (those without a cloud account) so the server can validate chat identities. Requires the workspace license key; portal sessions cannot rewrite the directory.
+ * @summary Replace the replicated desktop team member directory
+ */
+export const ReplaceChatDirectoryBody = zod.object({
+  "members": zod.array(zod.object({
+  "memberKey": zod.string().describe('The key clients use as senderKey\/memberKey'),
+  "name": zod.string(),
+  "username": zod.string().optional(),
+  "email": zod.string().optional(),
+  "role": zod.string().optional(),
+  "active": zod.boolean().optional(),
+  "secretHash": zod.string().optional().describe('SHA-256 hex of the member\'s desktop password; empty when none is set (such members cannot mint chat tokens).')
+}))
+})
+
+export const ReplaceChatDirectoryResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * The member proves who they are with their own credentials (email or username plus password) and receives a member token. The token must accompany all team-chat requests in the `x-member-token` header — the license key alone identifies the company, not the person.
+ * @summary Issue a chat member token
+ */
+export const IssueChatTokenBody = zod.object({
+  "identifier": zod.string().describe('Email or username of the member'),
+  "secret": zod.string().describe('The member\'s password')
+})
+
+export const IssueChatTokenResponse = zod.object({
+  "token": zod.string(),
+  "memberKey": zod.string(),
+  "memberName": zod.string(),
+  "expiresAt": zod.string().optional().describe('ISO timestamp after which the token stops working (401). Clients should sign in again (or silently re-mint) to get a fresh token.')
+})
+
+
+/**
+ * Returns the active team members of the calling company (cloud users plus replicated desktop-local users), used for direct messages and sender identity in team chat. Requires a member token or portal session.
+ * @summary List team members
+ */
+export const ListTeamMembersResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "email": zod.string(),
+  "role": zod.enum(['admin', 'manager', 'staff', 'readonly']),
+  "active": zod.boolean()
+})
+export const ListTeamMembersResponse = zod.array(ListTeamMembersResponseItem)
+
+
+/**
+ * Returns the company's channels plus the caller's DMs, each with the latest message preview and an unread count computed from the caller's read state.
+ * @summary List chat channels and DMs
+ */
+export const ListChatChannelsQueryParams = zod.object({
+  "memberKey": zod.coerce.string().describe('Caller member key used for unread counts and DM visibility')
+})
+
+export const ListChatChannelsResponseItem = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['channel', 'dm']),
+  "name": zod.string(),
+  "dmKey": zod.string().nullable(),
+  "memberKeys": zod.array(zod.string()),
+  "archived": zod.boolean(),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string(),
+  "unreadCount": zod.number(),
+  "lastMessageAt": zod.string().nullable(),
+  "lastMessagePreview": zod.string().nullable()
+})
+export const ListChatChannelsResponse = zod.array(ListChatChannelsResponseItem)
+
+
+/**
+ * @summary Create a team chat channel
+ */
+export const CreateChatChannelBody = zod.object({
+  "name": zod.string(),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string()
+})
+
+export const CreateChatChannelResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['channel', 'dm']),
+  "name": zod.string(),
+  "dmKey": zod.string().nullable(),
+  "memberKeys": zod.array(zod.string()),
+  "archived": zod.boolean(),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string(),
+  "unreadCount": zod.number(),
+  "lastMessageAt": zod.string().nullable(),
+  "lastMessagePreview": zod.string().nullable()
+})
+
+
+/**
+ * @summary Archive or restore a channel
+ */
+export const SetChatChannelArchivedParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SetChatChannelArchivedBody = zod.object({
+  "archived": zod.boolean()
+})
+
+export const SetChatChannelArchivedResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['channel', 'dm']),
+  "name": zod.string(),
+  "dmKey": zod.string().nullable(),
+  "memberKeys": zod.array(zod.string()),
+  "archived": zod.boolean(),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string(),
+  "unreadCount": zod.number(),
+  "lastMessageAt": zod.string().nullable(),
+  "lastMessagePreview": zod.string().nullable()
+})
+
+
+/**
+ * Idempotent by member pair — returns the existing DM when one already exists between the two members.
+ * @summary Open (get or create) a direct-message conversation
+ */
+export const OpenDirectMessageBody = zod.object({
+  "memberKeys": zod.array(zod.string()).describe('Exactly two member keys (the caller and the other member)'),
+  "memberNames": zod.array(zod.string()).describe('Display names matching memberKeys by index'),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string()
+})
+
+export const OpenDirectMessageResponse = zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['channel', 'dm']),
+  "name": zod.string(),
+  "dmKey": zod.string().nullable(),
+  "memberKeys": zod.array(zod.string()),
+  "archived": zod.boolean(),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string(),
+  "unreadCount": zod.number(),
+  "lastMessageAt": zod.string().nullable(),
+  "lastMessagePreview": zod.string().nullable()
+})
+
+
+/**
+ * @summary List messages in a channel
+ */
+export const ListChatMessagesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ListChatMessagesQueryParams = zod.object({
+  "memberKey": zod.coerce.string().optional().describe('The requesting member\'s key. Required for direct-message conversations — only the two participants may read a DM.'),
+  "after": zod.coerce.string().optional().describe('Only return messages created strictly after this ISO timestamp'),
+  "limit": zod.coerce.number().optional()
+})
+
+export const ListChatMessagesResponseItem = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "senderKey": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
+
+
+/**
+ * Idempotent by client-generated message id so offline queues can safely retry.
+ * @summary Send a message
+ */
+export const SendChatMessageParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SendChatMessageBody = zod.object({
+  "id": zod.string().describe('Client-generated id used for idempotent offline retries'),
+  "senderKey": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string()
+})
+
+export const SendChatMessageResponse = zod.object({
+  "id": zod.string(),
+  "channelId": zod.string(),
+  "senderKey": zod.string(),
+  "senderName": zod.string(),
+  "body": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Mark a channel as read
+ */
+export const MarkChatChannelReadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MarkChatChannelReadBody = zod.object({
+  "memberKey": zod.string(),
+  "lastReadAt": zod.string()
+})
+
+export const MarkChatChannelReadResponse = zod.object({
+  "ok": zod.boolean()
+})
+
+
+/**
+ * @summary List tenant communication history
+ */
+export const ListTenantCommunicationsQueryParams = zod.object({
+  "tenantId": zod.coerce.string().optional().describe('Filter to a single tenant'),
+  "limit": zod.coerce.number().optional()
+})
+
+export const ListTenantCommunicationsResponseItem = zod.object({
+  "id": zod.string(),
+  "tenantId": zod.string(),
+  "tenantName": zod.string(),
+  "tenantEmail": zod.string(),
+  "propertyAddress": zod.string(),
+  "kind": zod.enum(['email', 'announcement', 'notice_served', 'work_order']),
+  "subject": zod.string(),
+  "bodyText": zod.string(),
+  "status": zod.enum(['sent', 'failed', 'logged']),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string()
+})
+export const ListTenantCommunicationsResponse = zod.array(ListTenantCommunicationsResponseItem)
+
+
+/**
+ * Records a log-only history entry (e.g. an automatic "notice served" event pushed from the desktop). Does not send email.
+ * @summary Log a tenant communication event
+ */
+export const LogTenantCommunicationBody = zod.object({
+  "tenantId": zod.string(),
+  "kind": zod.enum(['announcement', 'notice_served', 'work_order']),
+  "tenantName": zod.string().optional(),
+  "tenantEmail": zod.string().optional(),
+  "propertyAddress": zod.string().optional(),
+  "subject": zod.string().optional(),
+  "bodyText": zod.string().optional(),
+  "createdByKey": zod.string().optional(),
+  "createdByName": zod.string().optional(),
+  "createdAt": zod.string().optional(),
+  "suppressEvent": zod.boolean().optional().describe('Skip the webhook event dispatch for this entry. Used when the originating event was already dispatched elsewhere (e.g. the field relay dispatches notice_served when a mobile user records service, and the desktop later mirrors it into tenant history).')
+})
+
+export const LogTenantCommunicationResponse = zod.object({
+  "id": zod.string(),
+  "tenantId": zod.string(),
+  "tenantName": zod.string(),
+  "tenantEmail": zod.string(),
+  "propertyAddress": zod.string(),
+  "kind": zod.enum(['email', 'announcement', 'notice_served', 'work_order']),
+  "subject": zod.string(),
+  "bodyText": zod.string(),
+  "status": zod.enum(['sent', 'failed', 'logged']),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * Sends the rendered message to the tenant's email address and records it in the tenant communication history with the delivery status.
+ * @summary Send an email to a tenant
+ */
+export const SendTenantEmailBody = zod.object({
+  "tenantId": zod.string(),
+  "tenantName": zod.string(),
+  "tenantEmail": zod.string(),
+  "propertyAddress": zod.string().optional(),
+  "subject": zod.string(),
+  "bodyText": zod.string(),
+  "createdByKey": zod.string().optional(),
+  "createdByName": zod.string().optional()
+})
+
+export const SendTenantEmailResponse = zod.object({
+  "id": zod.string(),
+  "tenantId": zod.string(),
+  "tenantName": zod.string(),
+  "tenantEmail": zod.string(),
+  "propertyAddress": zod.string(),
+  "kind": zod.enum(['email', 'announcement', 'notice_served', 'work_order']),
+  "subject": zod.string(),
+  "bodyText": zod.string(),
+  "status": zod.enum(['sent', 'failed', 'logged']),
+  "createdByKey": zod.string(),
+  "createdByName": zod.string(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * Webhook URLs are returned masked; only configured flags reveal state.
+ * @summary Get Slack / Google Chat integration settings
+ */
+export const GetIntegrationSettingsResponse = zod.object({
+  "slackConfigured": zod.boolean(),
+  "googleChatConfigured": zod.boolean(),
+  "slackWebhookUrlMasked": zod.string(),
+  "googleChatWebhookUrlMasked": zod.string(),
+  "events": zod.array(zod.enum(['work_order_assigned', 'work_order_completed', 'notice_served', 'tenant_email_sent'])),
+  "mirrorTeamChat": zod.boolean(),
+  "updatedAt": zod.string().nullable()
+})
+
+
+/**
+ * Webhook URLs must be Slack (https://hooks.slack.com/…) or Google Chat (https://chat.googleapis.com/…) incoming-webhook URLs. Pass an empty string to disconnect; omit a field to leave it unchanged.
+ * @summary Update Slack / Google Chat integration settings
+ */
+export const UpdateIntegrationSettingsBody = zod.object({
+  "slackWebhookUrl": zod.string().optional().describe('New Slack incoming-webhook URL; empty string disconnects'),
+  "googleChatWebhookUrl": zod.string().optional().describe('New Google Chat incoming-webhook URL; empty string disconnects'),
+  "events": zod.array(zod.enum(['work_order_assigned', 'work_order_completed', 'notice_served', 'tenant_email_sent'])).optional(),
+  "mirrorTeamChat": zod.boolean().optional()
+})
+
+export const UpdateIntegrationSettingsResponse = zod.object({
+  "slackConfigured": zod.boolean(),
+  "googleChatConfigured": zod.boolean(),
+  "slackWebhookUrlMasked": zod.string(),
+  "googleChatWebhookUrlMasked": zod.string(),
+  "events": zod.array(zod.enum(['work_order_assigned', 'work_order_completed', 'notice_served', 'tenant_email_sent'])),
+  "mirrorTeamChat": zod.boolean(),
+  "updatedAt": zod.string().nullable()
+})
+
+
+/**
+ * @summary Send a test message to a connected webhook
+ */
+export const TestIntegrationBody = zod.object({
+  "target": zod.enum(['slack', 'google_chat'])
+})
+
+export const TestIntegrationResponse = zod.object({
+  "ok": zod.boolean(),
+  "message": zod.string()
+})
+
+
+/**
  * Verifies the supplied Buildium API key by requesting a single rental property from the Buildium Open API. Requires a valid RentNotice Pro license key. Buildium credentials are forwarded per-request and never stored.
  * @summary Test a Buildium API connection
  */
@@ -754,7 +1293,7 @@ export const ListAdminCompaniesResponseItem = zod.object({
   "contactEmail": zod.string(),
   "tier": zod.string(),
   "tierName": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "seatsUsed": zod.number(),
   "licenseStatus": zod.enum(['active', 'paused', 'cancelled']).describe('Effective license status derived from the subscription'),
   "subscriptionStatus": zod.string().describe('Raw Stripe subscription status (active, past_due, unknown, ...)'),
@@ -785,7 +1324,7 @@ export const GetAdminCompanyResponse = zod.object({
   "subscription": zod.object({
   "tier": zod.string(),
   "tierName": zod.string(),
-  "seats": zod.number(),
+  "seats": zod.number().nullable().describe('Seat limit for the tier; null means unlimited'),
   "status": zod.string().describe('Raw Stripe subscription status (active, past_due, canceled, ...)'),
   "currentPeriodEnd": zod.coerce.date().nullish(),
   "cancelAtPeriodEnd": zod.boolean().optional(),
@@ -935,5 +1474,20 @@ export const ListAdminPendingSignupsResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListAdminPendingSignupsResponse = zod.array(ListAdminPendingSignupsResponseItem)
+
+
+/**
+ * @summary Compare the plan catalog against live Stripe prices
+ */
+export const GetAdminPricingHealthResponse = zod.object({
+  "ok": zod.boolean(),
+  "mismatches": zod.array(zod.object({
+  "tier": zod.string(),
+  "catalogAmountCents": zod.number(),
+  "liveAmountCents": zod.number().nullable(),
+  "livePriceId": zod.string().nullable(),
+  "reason": zod.enum(['amount_mismatch', 'no_usable_live_price', 'no_live_price', 'stray_price_ignored'])
+}))
+})
 
 

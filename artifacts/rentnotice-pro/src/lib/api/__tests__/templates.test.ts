@@ -133,6 +133,7 @@ describe("Templates API (real impl over in-memory sql.js)", () => {
         active: true,
         createdAt: new Date().toISOString(),
         cloudUserId: null,
+        chatToken: null,
       };
       usersRepo.create(db as never, user);
       users.set(role, user);

@@ -25,9 +25,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActivationWizard } from "@/components/first-run";
 import { BuildiumIntegrationCard } from "@/components/buildium-integration-card";
-import { KeyRound, CalendarPlus, Trash2 } from "lucide-react";
+import { CommsIntegrationsCard } from "@/components/comms-integrations-card";
+import { KeyRound, CalendarPlus, Trash2, Smartphone, Ban, Copy, Check } from "lucide-react";
 import type { User } from "@/lib/types";
 import { ALL_RULE_PACKS } from "@/lib/engine/rulepacks";
 import { STATE_HOLIDAY_STATES, stateHolidaySource } from "@/lib/engine/stateHolidays";
@@ -50,6 +52,226 @@ const ROLE_LABELS: Record<string, string> = {
   staff: "Staff",
   readonly: "Read-only",
 };
+
+type FieldDevice = {
+  id: string;
+  deviceName: string;
+  tokenSuffix: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+};
+
+// Returned only by POST /api/field/devices — the plaintext code is shown
+// once at issuance and cannot be retrieved again.
+type IssuedFieldDevice = FieldDevice & { token: string };
+
+// Field devices authenticate against the sync relay with per-device access
+// codes. Issuing and revoking codes requires the desktop license key.
+function FieldDevicesSection({
+  licenseKey,
+  canManage,
+}: {
+  licenseKey: string;
+  canManage: boolean;
+}) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [deviceName, setDeviceName] = useState("");
+  const [issuedToken, setIssuedToken] = useState<IssuedFieldDevice | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const headers = { "x-license-key": licenseKey };
+
+  const { data: devices, isLoading, isError } = useQuery<FieldDevice[]>({
+    queryKey: ["field-devices"],
+    queryFn: async () => {
+      const res = await fetch("/api/field/devices", { headers });
+      if (!res.ok) throw new Error(`Sync server responded ${res.status}`);
+      return (await res.json()) as FieldDevice[];
+    },
+  });
+
+  const issueDevice = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/field/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ deviceName: name }),
+      });
+      if (!res.ok) throw new Error(`Sync server responded ${res.status}`);
+      return (await res.json()) as IssuedFieldDevice;
+    },
+    onSuccess: (device) => {
+      setIssuedToken(device);
+      setCopied(false);
+      setDeviceName("");
+      qc.invalidateQueries({ queryKey: ["field-devices"] });
+    },
+    onError: (e: unknown) =>
+      toast({
+        title: "Could not issue access code",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      }),
+  });
+
+  const revokeDevice = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/field/devices/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      if (!res.ok) throw new Error(`Sync server responded ${res.status}`);
+      return (await res.json()) as FieldDevice;
+    },
+    onSuccess: (device) => {
+      qc.invalidateQueries({ queryKey: ["field-devices"] });
+      toast({
+        title: "Access revoked",
+        description: `${device.deviceName || "The device"} can no longer sync.`,
+      });
+    },
+    onError: (e: unknown) =>
+      toast({
+        title: "Could not revoke access",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      }),
+  });
+
+  const activeDevices = (devices ?? []).filter((d) => !d.revokedAt);
+
+  return (
+    <div className="border-t pt-4 space-y-4" data-testid="section-field-devices">
+      <div>
+        <div className="font-medium flex items-center gap-2">
+          <Smartphone className="w-4 h-4" />
+          Field device access codes
+        </div>
+        <div className="text-sm text-muted-foreground max-w-xl">
+          The sync relay only accepts requests from devices with an access code. Issue a code for
+          each phone running RentNotice Field and enter it in the app's sync settings. Revoke a
+          code to immediately cut that device off.
+        </div>
+      </div>
+
+      {canManage && (
+        <form
+          className="flex items-center gap-2 max-w-md"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (deviceName.trim()) issueDevice.mutate(deviceName.trim());
+          }}
+        >
+          <Input
+            placeholder="Device name (e.g. Marcus's iPhone)"
+            value={deviceName}
+            onChange={(e) => setDeviceName(e.target.value)}
+            data-testid="input-device-name"
+          />
+          <Button
+            type="submit"
+            disabled={!deviceName.trim() || issueDevice.isPending}
+            data-testid="button-issue-device"
+          >
+            {issueDevice.isPending ? "Issuing…" : "Issue code"}
+          </Button>
+        </form>
+      )}
+
+      {issuedToken && (
+        <div
+          className="rounded-md border bg-muted/50 p-3 space-y-1"
+          data-testid="panel-issued-token"
+        >
+          <div className="text-sm font-medium">
+            Access code for {issuedToken.deviceName || "new device"}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="font-mono text-lg tracking-wide" data-testid="text-issued-token">
+              {issuedToken.token}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard
+                  .writeText(issuedToken.token)
+                  .then(() => setCopied(true))
+                  .catch(() =>
+                    toast({
+                      title: "Could not copy",
+                      description: "Copy the code manually instead.",
+                      variant: "destructive",
+                    }),
+                  );
+              }}
+              data-testid="button-copy-token"
+            >
+              {copied ? (
+                <Check className="w-4 h-4 mr-1" />
+              ) : (
+                <Copy className="w-4 h-4 mr-1" />
+              )}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Enter this code in the RentNotice Field app under Sync settings. For security, this
+            code is shown only once — it cannot be viewed again after you leave this page.
+          </div>
+        </div>
+      )}
+
+      {isLoading && <div className="text-sm text-muted-foreground">Loading devices…</div>}
+      {isError && (
+        <div className="text-sm text-destructive">
+          Could not load field devices. Check that the sync relay is reachable.
+        </div>
+      )}
+      {devices && activeDevices.length === 0 && (
+        <div className="text-sm text-muted-foreground" data-testid="text-no-devices">
+          No field devices have access yet. Mobile apps cannot sync until you issue a code.
+        </div>
+      )}
+      {activeDevices.length > 0 && (
+        <div className="space-y-2">
+          {activeDevices.map((d) => (
+            <div
+              key={d.id}
+              className="flex items-center justify-between gap-4 rounded-md border p-3"
+              data-testid={`row-device-${d.id}`}
+            >
+              <div className="min-w-0">
+                <div className="font-medium truncate">{d.deviceName || "Unnamed device"}</div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  Code ending in ••••{d.tokenSuffix || "????"}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Added {formatDateTime(d.createdAt)} · Last sync {formatDateTime(d.lastUsedAt)}
+                </div>
+              </div>
+              {canManage && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => revokeDevice.mutate(d.id)}
+                  disabled={revokeDevice.isPending}
+                  data-testid={`button-revoke-${d.id}`}
+                >
+                  <Ban className="w-4 h-4 mr-1" />
+                  Revoke
+                </Button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function MyAccountCard({ user }: { user: User }) {
   const changePassword = useChangeMyPassword();
@@ -542,6 +764,8 @@ export default function SettingsPage() {
 
         <BuildiumIntegrationCard />
 
+        <CommsIntegrationsCard />
+
         <HolidaysCard canManage={canManageSettings} />
 
         <Card className="md:col-span-2">
@@ -569,6 +793,18 @@ export default function SettingsPage() {
               <div className="text-sm text-muted-foreground border-t pt-4">
                 Sync is on. Use the <span className="font-medium text-foreground">Field Service</span> page
                 to push assignments to mobile agents and pull back service evidence.
+              </div>
+            )}
+            {settings?.syncEnabled && activation && (
+              <FieldDevicesSection
+                licenseKey={activation.licenseKey}
+                canManage={canManageSettings}
+              />
+            )}
+            {settings?.syncEnabled && !activation && (
+              <div className="text-sm text-muted-foreground border-t pt-4">
+                Field sync now requires an activated license. Activate this workspace to push
+                assignments and issue device access codes.
               </div>
             )}
           </CardContent>

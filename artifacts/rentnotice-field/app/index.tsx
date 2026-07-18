@@ -14,10 +14,14 @@ import {
 } from "react-native";
 
 import { AssignmentCard } from "@/components/AssignmentCard";
+import { WorkOrderCard } from "@/components/WorkOrderCard";
 import { fonts } from "@/constants/fonts";
 import { useFieldSync } from "@/context/FieldSyncContext";
 import { useColors } from "@/hooks/useColors";
-import type { FieldAssignmentSyncStatus } from "@workspace/api-client-react";
+import type {
+  FieldAssignmentSyncStatus,
+  WorkOrderSyncStatus,
+} from "@workspace/api-client-react";
 
 const WEB_BOTTOM_INSET = Platform.OS === "web" ? 34 : 0;
 
@@ -31,9 +35,38 @@ const FILTERS: { value: FilterValue; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-function HeaderSyncButton() {
+type WoFilterValue = WorkOrderSyncStatus | "all";
+
+const WO_FILTERS: { value: WoFilterValue; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "assigned", label: "Assigned" },
+  { value: "in_progress", label: "Active" },
+  { value: "on_hold", label: "On hold" },
+  { value: "completed", label: "Done" },
+];
+
+type TabValue = "notices" | "workOrders";
+
+function HeaderChatButton() {
   const colors = useColors();
-  const { isOffline, isSyncing, pendingCount, syncNow } = useFieldSync();
+  const router = useRouter();
+  return (
+    <Pressable
+      testID="header-chat-button"
+      onPress={() => router.push("/chat")}
+      hitSlop={10}
+      style={styles.headerButton}
+    >
+      <Feather name="message-circle" size={20} color={colors.mutedForeground} />
+    </Pressable>
+  );
+}
+
+function HeaderButtons() {
+  const colors = useColors();
+  const router = useRouter();
+  const { isOffline, isUnauthorized, isSyncing, pendingCount, syncNow } =
+    useFieldSync();
 
   const iconColor = isOffline
     ? colors.warning
@@ -42,23 +75,38 @@ function HeaderSyncButton() {
       : colors.mutedForeground;
 
   return (
-    <Pressable
-      testID="header-sync-button"
-      onPress={() => void syncNow()}
-      disabled={isSyncing}
-      hitSlop={10}
-      style={styles.headerButton}
-    >
-      {isSyncing ? (
-        <ActivityIndicator size="small" color={colors.primary} />
-      ) : (
+    <View style={styles.headerButtonsRow}>
+      <HeaderChatButton />
+      <Pressable
+        testID="header-sync-button"
+        onPress={() => void syncNow()}
+        disabled={isSyncing}
+        hitSlop={10}
+        style={styles.headerButton}
+      >
+        {isSyncing ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Feather
+            name={isOffline ? "cloud-off" : "refresh-cw"}
+            size={20}
+            color={iconColor}
+          />
+        )}
+      </Pressable>
+      <Pressable
+        testID="header-settings-button"
+        onPress={() => router.push("/settings")}
+        hitSlop={10}
+        style={styles.headerButton}
+      >
         <Feather
-          name={isOffline ? "cloud-off" : "refresh-cw"}
+          name="settings"
           size={20}
-          color={iconColor}
+          color={isUnauthorized ? colors.destructive : colors.mutedForeground}
         />
-      )}
-    </Pressable>
+      </Pressable>
+    </View>
   );
 }
 
@@ -67,19 +115,29 @@ export default function HomeScreen() {
   const router = useRouter();
   const {
     assignments,
+    workOrders,
     isOffline,
+    isUnauthorized,
     isSyncing,
     isHydrated,
     pendingCount,
     syncNow,
   } = useFieldSync();
+  const [tab, setTab] = useState<TabValue>("notices");
   const [filter, setFilter] = useState<FilterValue>("all");
+  const [woFilter, setWoFilter] = useState<WoFilterValue>("all");
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: assignments.length };
     for (const a of assignments) c[a.status] = (c[a.status] ?? 0) + 1;
     return c;
   }, [assignments]);
+
+  const woCounts = useMemo(() => {
+    const c: Record<string, number> = { all: workOrders.length };
+    for (const w of workOrders) c[w.status] = (c[w.status] ?? 0) + 1;
+    return c;
+  }, [workOrders]);
 
   const filtered = useMemo(() => {
     const list =
@@ -93,11 +151,46 @@ export default function HomeScreen() {
     });
   }, [assignments, filter]);
 
+  const woFiltered = useMemo(() => {
+    const list =
+      woFilter === "all"
+        ? workOrders
+        : workOrders.filter((w) => w.status === woFilter);
+    const prioRank: Record<string, number> = {
+      emergency: 0,
+      high: 1,
+      normal: 2,
+      low: 3,
+    };
+    return [...list].sort((a, b) => {
+      const p = (prioRank[a.priority] ?? 2) - (prioRank[b.priority] ?? 2);
+      if (p !== 0) return p;
+      const da = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+      const db = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+      return da - db;
+    });
+  }, [workOrders, woFilter]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Stack.Screen options={{ headerRight: () => <HeaderSyncButton /> }} />
+      <Stack.Screen options={{ headerRight: () => <HeaderButtons /> }} />
 
-      {isOffline && (
+      {isUnauthorized && (
+        <Pressable
+          testID="auth-required-banner"
+          onPress={() => router.push("/settings")}
+          style={[styles.banner, { backgroundColor: colors.destructive }]}
+        >
+          <Feather name="key" size={15} color={colors.primaryForeground} />
+          <Text
+            style={[styles.bannerText, { color: colors.primaryForeground }]}
+          >
+            Sync needs an access code — tap to enter it
+          </Text>
+        </Pressable>
+      )}
+
+      {!isUnauthorized && isOffline && (
         <View
           testID="offline-banner"
           style={[styles.banner, { backgroundColor: colors.warning }]}
@@ -154,45 +247,144 @@ export default function HomeScreen() {
         </View>
       )}
 
+      <View style={styles.tabWrap}>
+        <View
+          style={[
+            styles.tabTrack,
+            {
+              backgroundColor: colors.muted,
+              borderRadius: colors.radius * 1.5,
+            },
+          ]}
+        >
+          <Pressable
+            testID="tab-notices"
+            onPress={() => setTab("notices")}
+            style={[
+              styles.tabBtn,
+              {
+                backgroundColor:
+                  tab === "notices" ? colors.card : "transparent",
+                borderRadius: colors.radius,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    tab === "notices"
+                      ? colors.foreground
+                      : colors.mutedForeground,
+                },
+              ]}
+            >
+              Notices{assignments.length > 0 ? `  ${assignments.length}` : ""}
+            </Text>
+          </Pressable>
+          <Pressable
+            testID="tab-work-orders"
+            onPress={() => setTab("workOrders")}
+            style={[
+              styles.tabBtn,
+              {
+                backgroundColor:
+                  tab === "workOrders" ? colors.card : "transparent",
+                borderRadius: colors.radius,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                {
+                  color:
+                    tab === "workOrders"
+                      ? colors.foreground
+                      : colors.mutedForeground,
+                },
+              ]}
+            >
+              Work Orders{workOrders.length > 0 ? `  ${workOrders.length}` : ""}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       <View style={styles.filterWrap}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          {FILTERS.map((f) => {
-            const active = filter === f.value;
-            const count = counts[f.value] ?? 0;
-            return (
-              <Pressable
-                key={f.value}
-                testID={`filter-${f.value}`}
-                onPress={() => setFilter(f.value)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? colors.primary : colors.card,
-                    borderColor: active ? colors.primary : colors.border,
-                    borderRadius: colors.radius * 2,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.chipText,
-                    {
-                      color: active
-                        ? colors.primaryForeground
-                        : colors.mutedForeground,
-                    },
-                  ]}
-                >
-                  {f.label}
-                  {count > 0 ? `  ${count}` : ""}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {tab === "notices"
+            ? FILTERS.map((f) => {
+                const active = filter === f.value;
+                const count = counts[f.value] ?? 0;
+                return (
+                  <Pressable
+                    key={f.value}
+                    testID={`filter-${f.value}`}
+                    onPress={() => setFilter(f.value)}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: active ? colors.primary : colors.card,
+                        borderColor: active ? colors.primary : colors.border,
+                        borderRadius: colors.radius * 2,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        {
+                          color: active
+                            ? colors.primaryForeground
+                            : colors.mutedForeground,
+                        },
+                      ]}
+                    >
+                      {f.label}
+                      {count > 0 ? `  ${count}` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })
+            : WO_FILTERS.map((f) => {
+                const active = woFilter === f.value;
+                const count = woCounts[f.value] ?? 0;
+                return (
+                  <Pressable
+                    key={f.value}
+                    testID={`wo-filter-${f.value}`}
+                    onPress={() => setWoFilter(f.value)}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: active ? colors.primary : colors.card,
+                        borderColor: active ? colors.primary : colors.border,
+                        borderRadius: colors.radius * 2,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        {
+                          color: active
+                            ? colors.primaryForeground
+                            : colors.mutedForeground,
+                        },
+                      ]}
+                    >
+                      {f.label}
+                      {count > 0 ? `  ${count}` : ""}
+                    </Text>
+                  </Pressable>
+                );
+              })}
         </ScrollView>
       </View>
 
@@ -200,7 +392,7 @@ export default function HomeScreen() {
         <View style={styles.centerFill}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : (
+      ) : tab === "notices" ? (
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
@@ -243,6 +435,45 @@ export default function HomeScreen() {
             </View>
           }
         />
+      ) : (
+        <FlatList
+          data={woFiltered}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <WorkOrderCard
+              workOrder={item}
+              onPress={() => router.push(`/work-order/${item.id}`)}
+            />
+          )}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: 32 + WEB_BOTTOM_INSET },
+            woFiltered.length === 0 && styles.listEmpty,
+          ]}
+          scrollEnabled={woFiltered.length > 0}
+          refreshControl={
+            <RefreshControl
+              refreshing={isSyncing}
+              onRefresh={() => void syncNow()}
+              tintColor={colors.primary}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Feather name="tool" size={44} color={colors.mutedForeground} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                No work orders
+              </Text>
+              <Text
+                style={[styles.emptyText, { color: colors.mutedForeground }]}
+              >
+                {woFilter === "all"
+                  ? "Pull down to sync maintenance work assigned to you."
+                  : "No work orders match this filter."}
+              </Text>
+            </View>
+          }
+        />
       )}
     </View>
   );
@@ -250,6 +481,11 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerButtonsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
   headerButton: {
     width: 32,
     height: 32,
@@ -274,6 +510,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
+  },
+  tabWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  tabTrack: {
+    flexDirection: "row",
+    padding: 4,
+    gap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+  },
+  tabText: {
+    fontFamily: fonts.semibold,
+    fontSize: 13.5,
   },
   syncBarLeft: {
     flexDirection: "row",

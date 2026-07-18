@@ -132,7 +132,7 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-muted-foreground flex items-center gap-2"><UsersIcon className="w-4 h-4"/> Seats</span>
-                  <span className="font-medium">{overview.seatsUsed} / {overview.subscription.seats}</span>
+                  <span className="font-medium">{overview.seatsUsed} / {overview.subscription.seats ?? "Unlimited"}</span>
                 </div>
                 
                 {overview.subscription.currentPeriodEnd && (

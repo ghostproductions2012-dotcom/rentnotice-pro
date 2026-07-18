@@ -80,8 +80,9 @@ export default function CaptureScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { addEvidence } = useFieldSync();
+  const { id, kind } = useLocalSearchParams<{ id: string; kind?: string }>();
+  const { addEvidence, addWorkOrderPhoto } = useFieldSync();
+  const isWorkOrder = kind === "work-order";
 
   const [camPerm, requestCamPerm] = useCameraPermissions();
   const [locPerm, requestLocPerm] = Location.useForegroundPermissions();
@@ -162,7 +163,7 @@ export default function CaptureScreen() {
   const save = useCallback(() => {
     if (!captured || !id) return;
     haptic(Haptics.ImpactFeedbackStyle.Heavy);
-    addEvidence(id, {
+    const payload = {
       id: generateId(),
       photoDataUrl: captured.photoDataUrl,
       latitude: captured.latitude,
@@ -170,9 +171,14 @@ export default function CaptureScreen() {
       accuracyMeters: captured.accuracyMeters,
       capturedAt: new Date().toISOString(),
       note: note.trim(),
-    });
+    };
+    if (isWorkOrder) {
+      addWorkOrderPhoto(id, payload);
+    } else {
+      addEvidence(id, payload);
+    }
     router.back();
-  }, [captured, id, note, addEvidence, router]);
+  }, [captured, id, note, isWorkOrder, addEvidence, addWorkOrderPhoto, router]);
 
   // ---- Confirm view (photo preview + note + save) ----
   if (captured) {

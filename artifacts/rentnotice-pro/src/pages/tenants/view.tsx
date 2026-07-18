@@ -41,11 +41,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { TenantFormDialog } from "@/components/tenant-form-dialog";
+import { WorkOrderMiniList } from "@/components/work-order-mini-list";
 import { LedgerViewDialog } from "@/components/ledger-view-dialog";
 import { ManualStatementDialog } from "@/components/manual-statement-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { formatCents, type Id } from "@/lib/types";
 import { useState } from "react";
+import {
+  useListTenantCommunications,
+  getListTenantCommunicationsQueryKey,
+} from "@workspace/api-client-react";
+import { registerCommsLicenseKey, useCommsIdentity } from "@/lib/comms/identity";
+
+registerCommsLicenseKey();
 
 export default function TenantView() {
   const { id } = useParams<{ id: string }>();
@@ -207,6 +215,8 @@ export default function TenantView() {
           <TabsTrigger value="ledgers" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Ledgers</TabsTrigger>
           <TabsTrigger value="notices" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Notices</TabsTrigger>
           <TabsTrigger value="details" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Details</TabsTrigger>
+          <TabsTrigger value="maintenance" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Maintenance</TabsTrigger>
+          <TabsTrigger value="communications" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:shadow-none px-6">Communications</TabsTrigger>
         </TabsList>
         
         <TabsContent value="ledgers" className="pt-6">
@@ -329,6 +339,14 @@ export default function TenantView() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="maintenance" className="pt-6">
+          <WorkOrderMiniList filters={{ tenantId: tenant.id }} />
+        </TabsContent>
+
+        <TabsContent value="communications" className="pt-6">
+          <TenantCommunicationsTab tenantId={tenant.id} />
+        </TabsContent>
       </Tabs>
 
       <TenantFormDialog open={editOpen} onOpenChange={setEditOpen} tenant={tenant} />
@@ -364,5 +382,91 @@ export default function TenantView() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+const COMM_KIND_LABELS: Record<string, string> = {
+  email: "Email",
+  announcement: "Announcement",
+  notice_served: "Notice served",
+  work_order: "Work order",
+};
+
+/**
+ * Server-side communication log for this tenant (emails, announcements,
+ * served-notice and work-order entries). Cloud-backed, so it needs an
+ * activated workspace.
+ */
+function TenantCommunicationsTab({ tenantId }: { tenantId: Id }) {
+  const identity = useCommsIdentity();
+  const historyQuery = useListTenantCommunications(
+    { tenantId, limit: 100 },
+    {
+      query: {
+        queryKey: getListTenantCommunicationsQueryKey({ tenantId, limit: 100 }),
+        enabled: identity.ready,
+      },
+    },
+  );
+
+  if (!identity.ready) {
+    return (
+      <Card>
+        <CardContent className="p-8 text-center text-muted-foreground" data-testid="text-comms-tab-requires-activation">
+          Communication history syncs through your company's cloud workspace and is
+          available once this workspace is activated with a license key.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const history = historyQuery.data ?? [];
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <div className="divide-y" data-testid="list-tenant-comm-history">
+          {historyQuery.isLoading ? (
+            <div className="p-8 text-center text-muted-foreground">Loading…</div>
+          ) : history.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No communications logged for this tenant yet. Send one from the
+              Communications page.
+            </div>
+          ) : (
+            history.map((c) => (
+              <div key={c.id} className="p-4 space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="font-normal">
+                    {COMM_KIND_LABELS[c.kind] ?? c.kind}
+                  </Badge>
+                  {c.subject && <span className="font-medium text-sm truncate">{c.subject}</span>}
+                  <Badge
+                    variant={
+                      c.status === "failed"
+                        ? "destructive"
+                        : c.status === "logged"
+                          ? "secondary"
+                          : "default"
+                    }
+                    className="ml-auto"
+                  >
+                    {c.status}
+                  </Badge>
+                </div>
+                {c.bodyText && (
+                  <p className="text-sm text-muted-foreground line-clamp-2 whitespace-pre-wrap">
+                    {c.bodyText}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {new Date(c.createdAt).toLocaleString()}
+                  {c.createdByName ? ` · by ${c.createdByName}` : ""}
+                </p>
+              </div>
+            ))
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

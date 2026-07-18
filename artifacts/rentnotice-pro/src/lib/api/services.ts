@@ -10,6 +10,7 @@ import type {
   AttachmentKind,
   AuditEntry,
   AuditFilters,
+  CommsAuditAction,
   BackupMeta,
   CalculationResult,
   CompanyProfile,
@@ -50,6 +51,11 @@ import type {
   User,
   UserRole,
   ValidationResult,
+  WorkOrder,
+  WorkOrderCategory,
+  WorkOrderFilters,
+  WorkOrderPriority,
+  WorkOrderStatus,
   WorkspaceState,
 } from "../types";
 import type { LicenseSummary } from "../licensing/types";
@@ -150,7 +156,7 @@ export interface CreateTemplateInput {
 }
 
 export interface AddAttachmentInput {
-  entityType: "notice" | "tenant" | "property" | "ledger";
+  entityType: "notice" | "tenant" | "property" | "ledger" | "work_order";
   entityId: Id;
   kind: AttachmentKind;
   fileName: string;
@@ -174,6 +180,23 @@ export interface FinalizeAttestation {
   rentOnlyConfirmed: boolean;
 }
 
+export interface CreateWorkOrderInput {
+  propertyId: Id;
+  tenantId?: Id | null;
+  unit?: string;
+  title: string;
+  description?: string;
+  category: WorkOrderCategory;
+  priority: WorkOrderPriority;
+  dueDate?: string | null;
+  assigneeName?: string;
+  vendorName?: string;
+  vendorContact?: string;
+  costEstimateCents?: number | null;
+  costActualCents?: number | null;
+  internalNotes?: string;
+}
+
 export interface CreateMailTrackingInput {
   noticeId: Id;
   carrier: string;
@@ -193,6 +216,12 @@ export interface AppServices {
   /** Sign in with an email plus the account's password (legacy usernames and short numeric secrets are still accepted). */
   login(identifier: string, secret: string): Promise<SessionInfo>;
   lockApp(): Promise<SessionInfo>;
+  /**
+   * Forget the signed-in user's cached chat token. Called when the server
+   * rejects it (expired or revoked); the Communications page then shows
+   * sign-in guidance until the next online sign-in re-mints a fresh one.
+   */
+  clearChatToken(): Promise<SessionInfo>;
   createUser(input: CreateUserInput): Promise<User>;
   updateUser(id: Id, patch: Partial<Omit<User, "id" | "createdAt">>): Promise<User>;
   /**
@@ -319,6 +348,11 @@ export interface AppServices {
 
   // --- audit ---
   listAudit(filters?: AuditFilters): Promise<AuditEntry[]>;
+  recordCommsAudit(
+    action: CommsAuditAction,
+    entityId: Id | null,
+    summary: string,
+  ): Promise<void>;
 
   // --- attachments ---
   listAttachments(entityType: Attachment["entityType"], entityId: Id): Promise<Attachment[]>;
@@ -333,6 +367,17 @@ export interface AppServices {
     patch: Partial<Omit<FieldAssignment, "id" | "noticeId" | "createdAt">>,
   ): Promise<FieldAssignment>;
   addFieldEvidence(assignmentId: Id, evidence: Omit<FieldEvidence, "id">): Promise<FieldAssignment>;
+
+  // --- maintenance / work orders ---
+  listWorkOrders(filters?: WorkOrderFilters): Promise<WorkOrder[]>;
+  getWorkOrder(id: Id): Promise<WorkOrder | null>;
+  createWorkOrder(input: CreateWorkOrderInput): Promise<WorkOrder>;
+  updateWorkOrder(
+    id: Id,
+    patch: Partial<Omit<WorkOrder, "id" | "createdAt" | "statusHistory" | "status">>,
+  ): Promise<WorkOrder>;
+  changeWorkOrderStatus(id: Id, toStatus: WorkOrderStatus, note?: string): Promise<WorkOrder>;
+  deleteWorkOrder(id: Id, reason: string): Promise<void>;
 
   // --- certified mail tracking ---
   listMailTracking(noticeId?: Id): Promise<MailTracking[]>;

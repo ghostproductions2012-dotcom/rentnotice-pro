@@ -1,9 +1,11 @@
 import {
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgTable,
   text,
+  timestamp,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -14,6 +16,10 @@ import { z } from "zod/v4";
 
 export const fieldAssignmentsTable = pgTable("field_assignments", {
   id: text("id").primaryKey(),
+  // Company that owns this assignment; populated when the desktop pushes
+  // with a license credential. Null for legacy rows — the event dispatcher
+  // simply skips webhook delivery when unresolved.
+  companyId: text("company_id"),
   noticeId: text("notice_id").notNull(),
   assigneeName: text("assignee_name").notNull(),
   instructions: text("instructions").notNull().default(""),
@@ -47,6 +53,36 @@ export const fieldEvidenceTable = pgTable("field_evidence", {
   capturedAt: text("captured_at").notNull(),
   note: text("note").notNull().default(""),
 });
+
+// Per-device access tokens for the field sync relay. Issued from the desktop
+// app (authenticated by its license key) and typed into the mobile field app.
+// Every /api/field/* sync request must present either a valid license key
+// (desktop) or a non-revoked device token (mobile).
+export const fieldSyncTokensTable = pgTable(
+  "field_sync_tokens",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    // Company that issued the token; null only if the license row has been
+    // deleted out from under it (tokens are revoked, not deleted).
+    companyId: text("company_id"),
+    deviceName: text("device_name").notNull().default(""),
+    // SHA-256 hex digest of the normalized access code. The plaintext code is
+    // shown exactly once at issuance and never stored.
+    tokenHash: text("token_hash").notNull().unique(),
+    // Last 4 characters of the code, for masked display in device lists.
+    tokenSuffix: text("token_suffix").notNull().default(""),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("field_sync_tokens_company_idx").on(t.companyId)],
+);
+
+export type FieldSyncTokenRow = typeof fieldSyncTokensTable.$inferSelect;
 
 export const insertFieldAssignmentSchema = createInsertSchema(
   fieldAssignmentsTable,

@@ -183,8 +183,8 @@ re-verify the key and pull the latest user directory.
 | `status`       | `active \| paused \| cancelled` | Effective status derived from the Stripe subscription. |
 | `statusReason` | string              | Display-ready explanation.                                        |
 | `company`      | `{ id, name }`      | The subscribing company.                                          |
-| `tier`         | string              | `starter`, `professional`, or `enterprise`.                       |
-| `seats`        | integer             | Seat limit for the tier.                                          |
+| `tier`         | string              | `starter`, `professional`, `enterprise`, or `unlimited`.          |
+| `seats`        | integer \| null     | Seat limit for the tier; `null` means unlimited (no seat cap).    |
 | `paidThrough`  | ISO datetime \| null | End of the last paid billing period.                             |
 | `users`        | DirectoryUser[]     | All **active** company users (including invited, not-yet-accepted users). Deactivated users are omitted. |
 | `graceDays`    | integer             | Offline grace window (see above).                                 |

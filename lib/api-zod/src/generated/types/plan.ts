@@ -7,12 +7,15 @@
  */
 
 export interface Plan {
-  /** Stable tier key (starter, professional, enterprise) */
+  /** Stable tier key (starter, professional, enterprise, unlimited) */
   tier: string;
   name: string;
   description: string;
-  /** Maximum number of user seats included */
-  seats: number;
+  /**
+     * Maximum number of user seats included; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   priceMonthlyCents: number;
   features: string[];
   /**

@@ -1,19 +1,18 @@
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
+import { logger } from "./logger";
+import {
+  computeTierPrices,
+  computeTierPriceMismatches,
+  type RawPriceRow,
+  type TierPriceRow,
+  type TierPriceMismatch,
+} from "./stripePricing";
 
-export interface TierPriceRow {
-  tier: string;
-  priceId: string;
-  unitAmount: number | null;
-}
+export type { TierPriceRow, TierPriceMismatch } from "./stripePricing";
 
-/**
- * Read live tier prices from the synced stripe schema.
- * Products are matched by metadata.tier (set by scripts/seed-products.ts).
- * Returns an empty map when the stripe schema does not exist yet.
- */
-export async function getTierPrices(): Promise<Map<string, TierPriceRow>> {
-  const map = new Map<string, TierPriceRow>();
+async function fetchActiveMonthlyPrices(): Promise<RawPriceRow[]> {
+  const rows: RawPriceRow[] = [];
   try {
     const result = await db.execute(
       sql`SELECT p.metadata->>'tier' AS tier,
@@ -31,9 +30,9 @@ export async function getTierPrices(): Promise<Map<string, TierPriceRow>> {
     for (const raw of result.rows as Array<Record<string, unknown>>) {
       const tier = raw["tier"] as string | null;
       const priceId = raw["price_id"] as string | null;
-      if (!tier || !priceId || map.has(tier)) continue;
+      if (!tier || !priceId) continue;
       const unitAmount = raw["unit_amount"];
-      map.set(tier, {
+      rows.push({
         tier,
         priceId,
         unitAmount:
@@ -45,7 +44,41 @@ export async function getTierPrices(): Promise<Map<string, TierPriceRow>> {
   } catch {
     // stripe schema not migrated yet -- Stripe not connected
   }
-  return map;
+  return rows;
+}
+
+/**
+ * Read live tier prices from the synced stripe schema.
+ * Products are matched by metadata.tier (set by scripts/seed-products.ts).
+ * Returns an empty map when the stripe schema does not exist yet.
+ * Prices that don't match the plan catalog are guarded (see stripePricing.ts)
+ * and mismatches are logged.
+ */
+export async function getTierPrices(): Promise<Map<string, TierPriceRow>> {
+  const rows = await fetchActiveMonthlyPrices();
+  const { prices, mismatches } = computeTierPrices(rows);
+  for (const mismatch of mismatches) {
+    logger.warn(
+      {
+        tier: mismatch.tier,
+        catalogAmountCents: mismatch.catalogAmountCents,
+        liveAmountCents: mismatch.liveAmountCents,
+        livePriceId: mismatch.livePriceId,
+        reason: mismatch.reason,
+      },
+      "Live Stripe price does not match the plan catalog",
+    );
+  }
+  return prices;
+}
+
+/**
+ * Compare the plan catalog against the live Stripe prices and report
+ * every tier that is out of sync. Used by the admin pricing health check.
+ */
+export async function getTierPriceMismatches(): Promise<TierPriceMismatch[]> {
+  const rows = await fetchActiveMonthlyPrices();
+  return computeTierPriceMismatches(rows);
 }
 
 export function getPublicBaseUrl(): string {

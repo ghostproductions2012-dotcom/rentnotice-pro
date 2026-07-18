@@ -66,7 +66,9 @@ async function buildLicenseInfo(
     statusReason: computed.statusReason,
     company: { id: company.id, name: company.name },
     tier: company.tier,
-    seats: plan?.seats ?? 0,
+    // null = unlimited seats (JSON can't serialize Infinity); missing plan
+    // still reports 0 so an unknown tier never looks unlimited.
+    seats: plan ? plan.seats : 0,
     paidThrough: computed.paidThrough?.toISOString() ?? null,
     users: users.map(directoryUser),
     graceDays: LICENSE_GRACE_DAYS,

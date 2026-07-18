@@ -13,7 +13,11 @@ export interface AdminCompanySummary {
   contactEmail: string;
   tier: string;
   tierName: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   seatsUsed: number;
   /** Effective license status derived from the subscription */
   licenseStatus: AdminCompanySummaryLicenseStatus;

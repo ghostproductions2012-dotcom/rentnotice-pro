@@ -15,12 +15,14 @@ export class GithubCredentialError extends Error {
 }
 
 /**
- * Resolves a GitHub API token. Prefers a GITHUB_TOKEN secret; falls back to
- * the Replit GitHub connector. Not cached -- connector tokens can rotate,
- * so fetch fresh each time.
+ * Resolves a GitHub API token. Prefers a GITHUB_TOKEN secret, then
+ * GITHUB_PERSONAL_ACCESS_TOKEN, then falls back to the Replit GitHub
+ * connector. Not cached -- connector tokens can rotate, so fetch fresh
+ * each time.
  */
 async function getGithubToken(): Promise<string> {
-  const envToken = process.env.GITHUB_TOKEN;
+  const envToken =
+    process.env.GITHUB_TOKEN ?? process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
   if (envToken) {
     return envToken;
   }

@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import SiteHeader from "@/components/SiteHeader";
+import Seo from "@/components/Seo";
 import { useGetLatestDownloads, getGetLatestDownloadsQueryKey } from "@workspace/api-client-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,11 @@ export default function Download() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background">
+      <Seo
+        title="Download — RentNotice Pro"
+        description="Download RentNotice Pro for Windows and macOS. Get the desktop app for automated rent notices, deadline tracking, and court-ready evidence."
+        path="/download"
+      />
       <SiteHeader />
 
       <main className="flex-1 py-10 md:py-16 px-4 sm:px-8">

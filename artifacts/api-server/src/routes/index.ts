@@ -7,8 +7,10 @@ import adminRouter from "./admin";
 import portalRouter from "./portal";
 import licenseRouter from "./license";
 import fieldRouter from "./field";
+import workOrdersRouter from "./work-orders";
 import buildiumRouter from "./buildium";
 import downloadsRouter from "./downloads";
+import commsRouter from "./comms";
 
 const router: IRouter = Router();
 
@@ -20,7 +22,9 @@ router.use(adminRouter);
 router.use(portalRouter);
 router.use(licenseRouter);
 router.use(fieldRouter);
+router.use(workOrdersRouter);
 router.use(buildiumRouter);
 router.use(downloadsRouter);
+router.use(commsRouter);
 
 export default router;

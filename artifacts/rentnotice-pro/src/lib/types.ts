@@ -21,6 +21,7 @@ export interface User {
   active: boolean;
   createdAt: string; // ISO datetime
   cloudUserId: string | null; // id in the company's cloud directory (activated workspaces)
+  chatToken: string | null; // server-issued token proving chat identity to the communications hub
 }
 
 // --------------------------- Workspace activation ---------------------------
@@ -732,7 +733,19 @@ export type AuditAction =
   | "warning_acknowledged"
   | "workspace_activated"
   | "directory_synced"
-  | "service_recorded";
+  | "service_recorded"
+  | "work_order_created"
+  | "work_order_updated"
+  | "work_order_status_changed"
+  | "work_order_deleted"
+  | "chat_channel_created"
+  | "chat_channel_archived";
+
+/** Audit actions recordable from the Communications hub UI. */
+export type CommsAuditAction =
+  | "chat_channel_created"
+  | "chat_channel_archived"
+  | "settings_changed";
 
 export interface AuditEntry {
   id: Id;
@@ -774,7 +787,7 @@ export type AttachmentKind =
 
 export interface Attachment {
   id: Id;
-  entityType: "notice" | "tenant" | "property" | "ledger";
+  entityType: "notice" | "tenant" | "property" | "ledger" | "work_order";
   entityId: Id;
   kind: AttachmentKind;
   fileName: string;
@@ -816,6 +829,96 @@ export interface FieldAssignment {
   createdAt: string;
   updatedAt: string;
 }
+
+// ----------------------------- Maintenance / work orders ----------------------
+
+export type WorkOrderStatus =
+  | "new"
+  | "assigned"
+  | "in_progress"
+  | "on_hold"
+  | "completed"
+  | "cancelled";
+
+export type WorkOrderPriority = "low" | "normal" | "high" | "emergency";
+
+export type WorkOrderCategory =
+  | "plumbing"
+  | "electrical"
+  | "hvac"
+  | "appliance"
+  | "landscaping"
+  | "pest_control"
+  | "general";
+
+export interface WorkOrderStatusChange {
+  id: Id;
+  workOrderId: Id;
+  fromStatus: WorkOrderStatus | null;
+  toStatus: WorkOrderStatus;
+  changedBy: Id | null;
+  changedByName: string;
+  note: string;
+  changedAt: string;
+}
+
+export interface WorkOrder {
+  id: Id;
+  propertyId: Id;
+  tenantId: Id | null;
+  unit: string;
+  title: string;
+  description: string;
+  category: WorkOrderCategory;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  dueDate: string | null; // ISO date (YYYY-MM-DD)
+  assigneeName: string;
+  vendorName: string;
+  vendorContact: string;
+  costEstimateCents: number | null;
+  costActualCents: number | null;
+  internalNotes: string;
+  completedAt: string | null;
+  statusHistory: WorkOrderStatusChange[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkOrderFilters {
+  propertyId?: Id;
+  tenantId?: Id;
+  status?: WorkOrderStatus;
+  priority?: WorkOrderPriority;
+  category?: WorkOrderCategory;
+  search?: string;
+}
+
+export const WORK_ORDER_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  new: "New",
+  assigned: "Assigned",
+  in_progress: "In Progress",
+  on_hold: "On Hold",
+  completed: "Completed",
+  cancelled: "Cancelled",
+};
+
+export const WORK_ORDER_PRIORITY_LABELS: Record<WorkOrderPriority, string> = {
+  low: "Low",
+  normal: "Normal",
+  high: "High",
+  emergency: "Emergency",
+};
+
+export const WORK_ORDER_CATEGORY_LABELS: Record<WorkOrderCategory, string> = {
+  plumbing: "Plumbing",
+  electrical: "Electrical",
+  hvac: "HVAC",
+  appliance: "Appliance",
+  landscaping: "Landscaping",
+  pest_control: "Pest Control",
+  general: "General",
+};
 
 // ----------------------------- Certified mail tracking ------------------------
 
@@ -896,7 +999,8 @@ export type ReportKind =
   | "sent_to_attorney"
   | "repeat_delinquencies"
   | "excluded_charges"
-  | "staff_activity";
+  | "staff_activity"
+  | "maintenance_summary";
 
 export interface ReportRow {
   label: string;

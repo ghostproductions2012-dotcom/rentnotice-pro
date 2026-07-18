@@ -23,6 +23,38 @@ publicDir = "artifacts/www/dist/public"
 serve = "static"
 
 [[services.production.rewrites]]
+from = "/features"
+to = "/features/index.html"
+
+[[services.production.rewrites]]
+from = "/how-it-works"
+to = "/how-it-works/index.html"
+
+[[services.production.rewrites]]
+from = "/integrations"
+to = "/integrations/index.html"
+
+[[services.production.rewrites]]
+from = "/faq"
+to = "/faq/index.html"
+
+[[services.production.rewrites]]
+from = "/guidelines"
+to = "/guidelines/index.html"
+
+[[services.production.rewrites]]
+from = "/support"
+to = "/support/index.html"
+
+[[services.production.rewrites]]
+from = "/privacy"
+to = "/privacy/index.html"
+
+[[services.production.rewrites]]
+from = "/terms"
+to = "/terms/index.html"
+
+[[services.production.rewrites]]
 from = "/*"
 to = "/index.html"
 

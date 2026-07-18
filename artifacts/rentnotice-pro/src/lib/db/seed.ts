@@ -99,6 +99,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       active: true,
       createdAt: SEED_TS,
       cloudUserId: null,
+      chatToken: null,
     },
     {
       id: "user-manager",
@@ -111,6 +112,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       active: true,
       createdAt: SEED_TS,
       cloudUserId: null,
+      chatToken: null,
     },
     {
       id: "user-staff",
@@ -123,6 +125,7 @@ async function seedUsers(db: AppDatabase): Promise<void> {
       active: true,
       createdAt: SEED_TS,
       cloudUserId: null,
+      chatToken: null,
     },
   ];
   for (const u of users) usersRepo.create(db, u);

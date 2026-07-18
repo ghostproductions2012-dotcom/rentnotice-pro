@@ -9,7 +9,11 @@
 export interface SubscriptionSummary {
   tier: string;
   tierName: string;
-  seats: number;
+  /**
+     * Seat limit for the tier; null means unlimited
+     * @nullable
+     */
+  seats: number | null;
   /** Raw Stripe subscription status (active, past_due, canceled, ...) */
   status: string;
   /** @nullable */
