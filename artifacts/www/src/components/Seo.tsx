@@ -4,6 +4,7 @@ interface SeoProps {
   title: string;
   description: string;
   path?: string;
+  noindex?: boolean;
 }
 
 function setMeta(attr: "name" | "property", key: string, content: string) {
@@ -28,7 +29,7 @@ function setCanonical(href: string) {
   el.setAttribute("href", href);
 }
 
-export default function Seo({ title, description, path = "" }: SeoProps) {
+export default function Seo({ title, description, path = "", noindex = false }: SeoProps) {
   useEffect(() => {
     const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     const origin = window.location.origin;
@@ -37,18 +38,21 @@ export default function Seo({ title, description, path = "" }: SeoProps) {
     const canonicalUrl = `${CANONICAL_ORIGIN}${path || "/"}`;
 
     document.title = title;
+    setMeta("name", "robots", noindex ? "noindex, nofollow" : "index, follow");
     setMeta("name", "description", description);
     setMeta("property", "og:title", title);
     setMeta("property", "og:description", description);
     setMeta("property", "og:type", "website");
     setMeta("property", "og:url", url);
+    setMeta("property", "og:site_name", "RentNotice Pro");
+    setMeta("property", "og:locale", "en_US");
     setCanonical(canonicalUrl);
     setMeta("property", "og:image", image);
     setMeta("name", "twitter:card", "summary_large_image");
     setMeta("name", "twitter:title", title);
     setMeta("name", "twitter:description", description);
     setMeta("name", "twitter:image", image);
-  }, [title, description, path]);
+  }, [title, description, path, noindex]);
 
   return null;
 }

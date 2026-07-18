@@ -9,6 +9,8 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SiteHeader from "@/components/SiteHeader";
+import Seo from "@/components/Seo";
+import { ROUTE_SEO } from "../../seo.config";
 
 const formSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
@@ -54,6 +56,12 @@ export default function Signup() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-muted/30">
+      <Seo
+        title={ROUTE_SEO["/signup"].title}
+        description={ROUTE_SEO["/signup"].description}
+        path="/signup"
+        noindex
+      />
       <div className="bg-background border-b">
         <SiteHeader />
       </div>

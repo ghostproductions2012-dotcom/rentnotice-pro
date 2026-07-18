@@ -1,10 +1,13 @@
 import ProsePage, { ProseSection } from "@/components/ProsePage";
 import { Link } from "wouter";
+import { ROUTE_SEO } from "../../seo.config";
 
 export default function Privacy() {
   return (
     <ProsePage
       path="/privacy"
+      title={ROUTE_SEO["/privacy"].title}
+      description={ROUTE_SEO["/privacy"].description}
       heading="Privacy Policy"
       subheading="Effective date: July 18, 2026"
     >

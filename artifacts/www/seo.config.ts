@@ -1,6 +1,7 @@
 export interface RouteSeo {
   title: string;
   description: string;
+  noindex?: boolean;
 }
 
 export const SITE_ORIGIN = "https://rentnoticepro.com";
@@ -57,19 +58,142 @@ export const ROUTE_SEO: Record<string, RouteSeo> = {
     description:
       "The terms that govern use of RentNotice Pro, including licensing, billing, acceptable use, and the scope of the software as document preparation — not legal advice.",
   },
+  "/pricing": {
+    title: "Pricing — RentNotice Pro",
+    description:
+      "Simple, transparent pricing for RentNotice Pro. Choose the plan that fits your property portfolio.",
+  },
+  "/download": {
+    title: "Download — RentNotice Pro",
+    description:
+      "Download RentNotice Pro for Windows and macOS. Get the desktop app for automated rent notices, deadline tracking, and court-ready evidence.",
+  },
+  "/login": {
+    title: "Log In — RentNotice Pro",
+    description: "Log in to your RentNotice Pro account to manage notices, licensing, and billing.",
+    noindex: true,
+  },
+  "/signup": {
+    title: "Create Account — RentNotice Pro",
+    description: "Start your RentNotice Pro subscription to generate pay-or-quit notices for all 50 states and DC.",
+    noindex: true,
+  },
 };
 
-export const SITEMAP_EXTRA_ROUTES = ["/pricing", "/download"];
+export const SITEMAP_EXTRA_ROUTES: string[] = [];
 
 export function buildSitemapXml(): string {
   const routes = [...Object.keys(ROUTE_SEO), ...SITEMAP_EXTRA_ROUTES];
   const entries = routes
+    .filter((routePath) => !ROUTE_SEO[routePath]?.noindex)
     .map((routePath) => {
       const loc = `${SITE_ORIGIN}${routePath === "/" ? "/" : routePath}`;
       return `  <url>\n    <loc>${loc}</loc>\n  </url>`;
     })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries}\n</urlset>\n`;
+}
+
+const FAQ_ITEMS = [
+  {
+    question: "Is RentNotice Pro considered legal advice?",
+    answer:
+      "No. RentNotice Pro is a software tool that calculates and formats pay-or-quit notices for all 50 states and DC. California templates are attorney-reviewed; templates for other states are generic starting points that are not attorney-reviewed. The software automates math and formatting, but does not substitute for the counsel of an attorney. We always recommend having your attorney review final notices before service.",
+  },
+  {
+    question: "Where is my tenant data stored?",
+    answer:
+      "RentNotice Pro is built with a local-first architecture. The desktop application stores your sensitive tenant data, property information, and ledgers locally on your machine. We do not aggregate or sell your proprietary management data.",
+  },
+  {
+    question: "How does team licensing work?",
+    answer:
+      "We offer seat-based team licensing. Administrators can purchase seats and send email invitations from the portal. Roles can be assigned (Admin vs. User) to restrict who can finalize documents or manage billing.",
+  },
+  {
+    question: "What platforms does the software support?",
+    answer:
+      "The desktop application is available for Mac, Windows, and Linux. The companion field application for process servers is available on mobile devices via web and progressive web app functionality.",
+  },
+  {
+    question: "How does the built-in court calendar work?",
+    answer:
+      "Many states prohibit eviction notices from expiring on weekends or judicial holidays. Our engine applies state-specific notice periods and court holiday calendars — with the deepest coverage for California, including a rigorously maintained calendar of California state court holidays. When you select a date of service, it automatically skips invalid days to determine the correct expiration date.",
+  },
+  {
+    question: "Can I cancel my subscription at any time?",
+    answer:
+      "Yes. You can manage your billing, update payment methods, or cancel your subscription at any time through our self-serve Stripe billing portal.",
+  },
+];
+
+function buildJsonLd(routePath: string): string | null {
+  if (routePath === "/") {
+    const schema = [
+      {
+        "@context": "https://schema.org",
+        "@type": "Organization",
+        name: "RentNotice Pro",
+        url: SITE_ORIGIN,
+        description:
+          "Eviction notice preparation software for property managers in all 50 states and DC. Attorney-reviewed California templates, plus built-in starting points for every other state.",
+        contactPoint: {
+          "@type": "ContactPoint",
+          contactType: "customer support",
+          email: "support@rentnoticepro.com",
+          url: `${SITE_ORIGIN}/support`,
+        },
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        name: "RentNotice Pro",
+        url: SITE_ORIGIN,
+      },
+    ];
+    return JSON.stringify(schema);
+  }
+
+  if (routePath === "/faq") {
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: FAQ_ITEMS.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.answer,
+        },
+      })),
+    };
+    return JSON.stringify(schema);
+  }
+
+  if (routePath === "/download") {
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "RentNotice Pro",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Windows 10, Windows 11, macOS 10.15 Catalina or later",
+      description:
+        "Pay-or-quit notice preparation software for property managers. Covers all 50 states and DC with attorney-reviewed California templates, automated deadline calculation, and court-ready evidence packets.",
+      url: `${SITE_ORIGIN}/download`,
+      offers: {
+        "@type": "Offer",
+        url: `${SITE_ORIGIN}/pricing`,
+      },
+      publisher: {
+        "@type": "Organization",
+        name: "RentNotice Pro",
+        url: SITE_ORIGIN,
+      },
+    };
+    return JSON.stringify(schema);
+  }
+
+  return null;
 }
 
 function escapeHtml(text: string): string {
@@ -104,10 +228,13 @@ export function applySeoToHtml(html: string, routePath: string): string {
     }
   };
 
+  setMeta("name", "robots", seo.noindex ? "noindex, nofollow" : "index, follow");
   setMeta("name", "description", description);
   setMeta("property", "og:title", title);
   setMeta("property", "og:description", description);
   setMeta("property", "og:url", url);
+  setMeta("property", "og:site_name", "RentNotice Pro");
+  setMeta("property", "og:locale", "en_US");
   setMeta("name", "twitter:title", title);
   setMeta("name", "twitter:description", description);
   setMeta("property", "og:image", `${SITE_ORIGIN}/opengraph.jpg`);
@@ -120,6 +247,14 @@ export function applySeoToHtml(html: string, routePath: string): string {
     out = out.replace(
       /<\/head>/,
       `  <link rel="canonical" href="${url}" />\n  </head>`,
+    );
+  }
+
+  const jsonLd = buildJsonLd(routePath);
+  if (jsonLd) {
+    out = out.replace(
+      /<\/head>/,
+      `  <script type="application/ld+json">${jsonLd}</script>\n  </head>`,
     );
   }
 

@@ -1,0 +1,18 @@
+# RentNotice Pro
+
+RentNotice Pro is pay-or-quit notice preparation software for property managers and landlords. It automates rent-only demand calculations, applies state-specific notice periods and court holiday calendars, and produces court-ready evidence packets — covering all 50 states and Washington DC, with attorney-reviewed California templates.
+
+The desktop application (Windows, macOS, Linux) stores tenant data locally. A companion mobile field app lets process servers capture GPS-tagged, timestamped photo evidence that syncs to the desktop.
+
+## Key pages
+
+- https://rentnoticepro.com/ — product overview and main landing page
+- https://rentnoticepro.com/features — full feature list
+- https://rentnoticepro.com/how-it-works — step-by-step workflow explanation
+- https://rentnoticepro.com/pricing — plans and pricing
+- https://rentnoticepro.com/download — download the Windows and macOS desktop app
+- https://rentnoticepro.com/coverage — state-by-state notice law coverage for all 50 states + DC
+- https://rentnoticepro.com/integrations — supported property management integrations (e.g. Buildium)
+- https://rentnoticepro.com/faq — frequently asked questions about the product, licensing, and data privacy
+- https://rentnoticepro.com/guidelines — practical eviction process guidelines for property managers
+- https://rentnoticepro.com/support — support contact and customer portal

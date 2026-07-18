@@ -1,6 +1,7 @@
 import ProsePage, { ProseSection } from "@/components/ProsePage";
 import { Link } from "wouter";
 import { Mail, BookOpen, Users, Download as DownloadIcon } from "lucide-react";
+import { ROUTE_SEO } from "../../seo.config";
 
 const CHANNELS = [
   {
@@ -41,6 +42,8 @@ export default function Support() {
   return (
     <ProsePage
       path="/support"
+      title={ROUTE_SEO["/support"].title}
+      description={ROUTE_SEO["/support"].description}
       heading="Support"
       subheading="We're here to help you get notices out the door — correctly."
     >

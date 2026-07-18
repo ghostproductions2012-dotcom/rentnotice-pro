@@ -19,7 +19,10 @@ const wwwDir = path.resolve(here, "..", "..", "artifacts", "www");
 const seoConfigPath = path.join(wwwDir, "seo.config.ts");
 const seo = (await import(seoConfigPath)) as {
   SITE_ORIGIN: string;
-  ROUTE_SEO: Record<string, { title: string; description: string }>;
+  ROUTE_SEO: Record<
+    string,
+    { title: string; description: string; noindex?: boolean }
+  >;
   SITEMAP_EXTRA_ROUTES: string[];
   buildSitemapXml: () => string;
   applySeoToHtml: (html: string, routePath: string) => string;
@@ -79,17 +82,30 @@ for (const route of covered) {
 // ---------------------------------------------------------------------------
 // 2. Sitemap XML contains exactly the covered routes
 // ---------------------------------------------------------------------------
+// noindex routes (e.g. /login, /signup) are deliberately excluded from the
+// sitemap — a page marked noindex must not be advertised to crawlers.
+const sitemapRoutes = [...covered].filter(
+  (route) => !seo.ROUTE_SEO[route]?.noindex,
+);
 const sitemap = seo.buildSitemapXml();
 const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-for (const route of covered) {
+for (const route of sitemapRoutes) {
   const expected = `${seo.SITE_ORIGIN}${route === "/" ? "/" : route}`;
   if (!locs.includes(expected)) {
     fail(`sitemap.xml is missing <loc>${expected}</loc>`);
   }
 }
-if (locs.length !== covered.size) {
+for (const loc of locs) {
+  const route = loc.replace(seo.SITE_ORIGIN, "") || "/";
+  if (!sitemapRoutes.includes(route)) {
+    fail(
+      `sitemap.xml contains <loc>${loc}</loc> but "${route}" is not an indexable configured route (noindex pages must not be listed).`,
+    );
+  }
+}
+if (locs.length !== sitemapRoutes.length) {
   fail(
-    `sitemap.xml has ${locs.length} entries but ${covered.size} routes are configured.`,
+    `sitemap.xml has ${locs.length} entries but ${sitemapRoutes.length} indexable routes are configured.`,
   );
 }
 
@@ -231,5 +247,5 @@ if (failures.length > 0) {
   process.exit(1);
 }
 console.log(
-  `Sitemap/SEO drift check passed: ${publicRoutes.length} public routes covered, ${covered.size} sitemap entries, canonical == og:url on all ${Object.keys(seo.ROUTE_SEO).length} SEO pages.`,
+  `Sitemap/SEO drift check passed: ${publicRoutes.length} public routes covered, ${sitemapRoutes.length} sitemap entries, canonical == og:url on all ${Object.keys(seo.ROUTE_SEO).length} SEO pages.`,
 );

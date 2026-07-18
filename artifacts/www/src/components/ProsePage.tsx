@@ -1,20 +1,20 @@
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import Seo from "@/components/Seo";
-import { ROUTE_SEO } from "../../seo.config";
 
 interface ProsePageProps {
   path: string;
+  title: string;
+  description: string;
   heading: string;
   subheading?: string;
   children: React.ReactNode;
 }
 
-export default function ProsePage({ path, heading, subheading, children }: ProsePageProps) {
-  const seo = ROUTE_SEO[path];
+export default function ProsePage({ path, title, description, heading, subheading, children }: ProsePageProps) {
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/30">
-      <Seo title={seo.title} description={seo.description} path={path} />
+      <Seo title={title} description={description} path={path} />
       <SiteHeader />
       <main className="flex-1">
         <section className="pt-24 pb-12 px-4 sm:px-8 border-b border-white/5">

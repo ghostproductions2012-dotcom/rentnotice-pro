@@ -10,6 +10,8 @@ import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQueryClient } from "@tanstack/react-query";
 import SiteHeader from "@/components/SiteHeader";
+import Seo from "@/components/Seo";
+import { ROUTE_SEO } from "../../seo.config";
 
 const formSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -44,6 +46,12 @@ export default function Login() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-muted/30">
+      <Seo
+        title={ROUTE_SEO["/login"].title}
+        description={ROUTE_SEO["/login"].description}
+        path="/login"
+        noindex
+      />
       <div className="bg-background border-b">
         <SiteHeader />
       </div>

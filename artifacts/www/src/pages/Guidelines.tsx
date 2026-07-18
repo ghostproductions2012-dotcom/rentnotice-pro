@@ -1,10 +1,13 @@
 import ProsePage, { ProseSection } from "@/components/ProsePage";
 import { Link } from "wouter";
+import { ROUTE_SEO } from "../../seo.config";
 
 export default function Guidelines() {
   return (
     <ProsePage
       path="/guidelines"
+      title={ROUTE_SEO["/guidelines"].title}
+      description={ROUTE_SEO["/guidelines"].description}
       heading="Eviction Guidelines"
       subheading="A practical overview of the nonpayment eviction process for property managers."
     >

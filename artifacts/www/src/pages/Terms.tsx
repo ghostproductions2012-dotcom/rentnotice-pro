@@ -1,10 +1,13 @@
 import ProsePage, { ProseSection } from "@/components/ProsePage";
 import { Link } from "wouter";
+import { ROUTE_SEO } from "../../seo.config";
 
 export default function Terms() {
   return (
     <ProsePage
       path="/terms"
+      title={ROUTE_SEO["/terms"].title}
+      description={ROUTE_SEO["/terms"].description}
       heading="Terms of Service"
       subheading="Effective date: July 18, 2026"
     >

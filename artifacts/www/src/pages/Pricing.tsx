@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import SiteHeader from "@/components/SiteHeader";
 import Seo from "@/components/Seo";
+import { ROUTE_SEO } from "../../seo.config";
 
 export default function Pricing() {
   const { data: plans, isLoading } = useListPlans();
@@ -13,8 +14,8 @@ export default function Pricing() {
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col">
       <Seo
-        title="Pricing — RentNotice Pro"
-        description="Simple, transparent pricing for RentNotice Pro. Choose the plan that fits your property portfolio."
+        title={ROUTE_SEO["/pricing"].title}
+        description={ROUTE_SEO["/pricing"].description}
         path="/pricing"
       />
       <SiteHeader />
