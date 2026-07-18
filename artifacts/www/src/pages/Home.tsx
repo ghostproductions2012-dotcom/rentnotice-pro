@@ -135,7 +135,7 @@ export default function Home() {
             <div className="p-8 md:p-12 rounded-2xl border border-white/10 bg-background shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/0 via-primary to-primary/0" />
               <p className="text-2xl md:text-3xl font-serif leading-snug mb-8">
-                "Now with Buildium integration — import your properties, tenants, and outstanding balances in one click, then generate notices instantly."
+                Import your properties, tenants, and outstanding balances from Buildium in one click and generate notices instantly — while Slack and Google Chat keep your whole team in the loop.
               </p>
               <Link href="/integrations" className="text-primary font-semibold hover:text-primary/80 flex items-center justify-center gap-2">
                 Explore integrations <ChevronRight className="w-4 h-4" />

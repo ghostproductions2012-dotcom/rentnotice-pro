@@ -199,7 +199,7 @@ router.post("/www/admin/login", async (req, res, next) => {
     if (!creds) {
       res.status(503).json({
         error:
-          "Admin panel is not configured. Set ADMIN_PANEL_EMAIL and ADMIN_PANEL_PASSWORD.",
+          "Admin panel is not configured. Set MASTER_ADMIN_EMAIL and MASTER_ADMIN_PASSWORD.",
         code: "admin_not_configured",
       });
       return;

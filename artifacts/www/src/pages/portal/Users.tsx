@@ -1,4 +1,4 @@
-import { useListCompanyUsers, useInviteCompanyUser, useUpdateCompanyUser, getListCompanyUsersQueryKey, useGetMe, useGetPortalOverview, useGetInviteCode, useRegenerateInviteCode, getGetInviteCodeQueryKey } from "@workspace/api-client-react";
+import { useListCompanyUsers, useInviteCompanyUser, useUpdateCompanyUser, useDeleteCompanyUser, getListCompanyUsersQueryKey, useGetMe, useGetPortalOverview, useGetInviteCode, useRegenerateInviteCode, getGetInviteCodeQueryKey } from "@workspace/api-client-react";
 import PortalLayout from "./PortalLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useState } from "react";
 import { Copy, MoreHorizontal, Shield, UserPlus, Users as UsersIcon } from "lucide-react";
 import type { CompanyUser } from "@workspace/api-client-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 
 const inviteSchema = z.object({
@@ -43,6 +44,8 @@ export default function Users() {
   const [usernameTarget, setUsernameTarget] = useState<CompanyUser | null>(null);
   const [usernameValue, setUsernameValue] = useState("");
   const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CompanyUser | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   
   const isAdmin = me?.role === 'admin';
   const unlimitedSeats = overview ? overview.subscription.seats === null : false;
@@ -82,6 +85,21 @@ export default function Users() {
       queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const deleteMutation = useDeleteCompanyUser();
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      await deleteMutation.mutateAsync({ userId: deleteTarget.id });
+      queryClient.invalidateQueries({ queryKey: getListCompanyUsersQueryKey() });
+      setDeleteTarget(null);
+    } catch (e: unknown) {
+      const data = (e as { data?: { error?: string } })?.data;
+      setDeleteError(data?.error ?? "Could not delete this team member. Please try again.");
     }
   };
 
@@ -350,7 +368,10 @@ export default function Users() {
                                 <DropdownMenuItem onClick={() => handleUpdateRole(user.id, "readonly")}>Read-only</DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 {user.status === 'deactivated' ? (
-                                  <DropdownMenuItem onClick={() => handleToggleActive(user.id, true)}>Reactivate User</DropdownMenuItem>
+                                  <>
+                                    <DropdownMenuItem onClick={() => handleToggleActive(user.id, true)}>Reactivate User</DropdownMenuItem>
+                                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => { setDeleteError(null); setDeleteTarget(user); }}>Delete Permanently…</DropdownMenuItem>
+                                  </>
                                 ) : (
                                   <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleToggleActive(user.id, false)}>Deactivate User</DropdownMenuItem>
                                 )}
@@ -484,6 +505,34 @@ export default function Users() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteError(null); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Permanently delete this team member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteTarget && (
+                <>This permanently removes {deleteTarget.name || deleteTarget.email} ({deleteTarget.email}) from your team. This cannot be undone, but their email address will be freed up so it can be invited again later.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => { e.preventDefault(); handleDeleteUser(); }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PortalLayout>
   );
 }

@@ -47,11 +47,16 @@ END
 
 pnpm --filter db push
 
-# Seed the admin@admin.com / admin test account (idempotent upsert).
-# Remove these two lines once the owner is done testing and deletes the account,
-# otherwise it will be recreated on the next merge.
-(cd artifacts/api-server && node_modules/.bin/esbuild scripts/seed-admin.ts --bundle --platform=node --format=esm --outfile=/tmp/seed-admin.mjs --external:pg-native --external:stripe-replit-sync --log-level=warning --banner:js="import { createRequire as __cr } from 'node:module'; globalThis.require = __cr(import.meta.url);")
-node /tmp/seed-admin.mjs
+# Provision the secure owner master-admin account from MASTER_ADMIN_EMAIL /
+# MASTER_ADMIN_PASSWORD and retire the legacy admin@admin.com test login
+# (idempotent; skips owner provisioning with a log line if secrets are unset).
+# The bundle must live inside the package dir (external deps can't resolve
+# from /tmp), and LOG_PRETTY=0 keeps the pino logger off its pino-pretty
+# transport — transports spawn worker threads that break inside an ESM bundle.
+(cd artifacts/api-server \
+  && node_modules/.bin/esbuild scripts/seed-admin.ts --bundle --platform=node --format=esm --outfile=.seed-admin.mjs --external:pg-native --external:stripe-replit-sync --log-level=warning --banner:js="import { createRequire as __cr } from 'node:module'; globalThis.require = __cr(import.meta.url);" \
+  && LOG_PRETTY=0 node .seed-admin.mjs \
+  && rm -f .seed-admin.mjs)
 
 # Seed Stripe products/prices from the tier catalog and sync them into this
 # environment's local stripe schema (idempotent; task-env DB state does not

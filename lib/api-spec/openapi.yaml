@@ -361,6 +361,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      operationId: deleteCompanyUser
+      tags:
+        - portal
+      summary: Permanently remove a deactivated team member (frees their email for re-invitation)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: User permanently deleted
+        '400':
+          description: Invalid deletion (user is still active, is the master admin, or is yourself)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Requires admin role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   '/www/portal/users/{userId}/invite-code':
     get:
       operationId: getInviteCode

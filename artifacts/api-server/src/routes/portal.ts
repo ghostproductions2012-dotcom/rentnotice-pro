@@ -5,6 +5,7 @@ import {
   cloudUsersTable,
   companiesTable,
   licenseKeysTable,
+  webSessionsTable,
   USER_ROLES,
 } from "@workspace/db";
 import type { CloudUser } from "@workspace/db";
@@ -511,6 +512,62 @@ router.patch(
       if (!updated) throw new Error("Failed to update user");
 
       res.json(companyUserPayload(updated));
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.delete(
+  "/www/portal/users/:userId",
+  requireAuth,
+  requireAdmin,
+  async (req, res, next) => {
+    try {
+      const admin = (req as AuthedRequest).user;
+      const userId = String(req.params["userId"]);
+
+      const [target] = await db
+        .select()
+        .from(cloudUsersTable)
+        .where(
+          and(
+            eq(cloudUsersTable.id, userId),
+            eq(cloudUsersTable.companyId, admin.companyId),
+          ),
+        );
+      if (!target) {
+        res.status(404).json({ error: "User not found", code: "not_found" });
+        return;
+      }
+      if (target.isMasterAdmin) {
+        res.status(400).json({
+          error: "The master admin cannot be deleted",
+          code: "master_admin_protected",
+        });
+        return;
+      }
+      if (target.id === admin.id) {
+        res.status(400).json({
+          error: "You cannot delete your own account",
+          code: "cannot_delete_self",
+        });
+        return;
+      }
+      if (target.active) {
+        res.status(400).json({
+          error: "Deactivate this team member before deleting them",
+          code: "user_still_active",
+        });
+        return;
+      }
+
+      await db
+        .delete(webSessionsTable)
+        .where(eq(webSessionsTable.userId, target.id));
+      await db.delete(cloudUsersTable).where(eq(cloudUsersTable.id, target.id));
+
+      res.status(204).end();
     } catch (err) {
       next(err);
     }

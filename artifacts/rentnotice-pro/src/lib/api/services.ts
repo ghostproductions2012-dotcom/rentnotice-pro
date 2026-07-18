@@ -43,6 +43,8 @@ import type {
   ReportResult,
   ServiceMethod,
   ServiceRecord,
+  SampleDataOptions,
+  SampleDataState,
   SessionInfo,
   StateRuleReview,
   StateRuleSummary,
@@ -235,6 +237,21 @@ export interface AppServices {
   getWorkspaceState(): Promise<WorkspaceState>;
   /** Explicit first-run choice: seed the local demo workspace. */
   enterDemoMode(): Promise<void>;
+
+  // --- sample data ---
+  /** Whether sample data is loaded and whether the current user may load it. */
+  getSampleDataState(): Promise<SampleDataState>;
+  /**
+   * Generate a realistic sample portfolio (admin only, empty-ish workspaces).
+   * Options are all optional — unset fields fall back to defaults (~1000
+   * doors). Strictly additive; every record is tagged for clean removal.
+   */
+  loadSampleData(
+    options?: SampleDataOptions | null,
+    onProgress?: (step: string, done: number, total: number) => void,
+  ): Promise<void>;
+  /** Remove every sample-tagged record. Never touches real data. */
+  removeSampleData(): Promise<void>;
   /** Check a license key online and return the company it belongs to. */
   validateLicenseKey(licenseKey: string): Promise<LicenseSummary>;
   /**

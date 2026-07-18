@@ -14,10 +14,10 @@ export function getAdminCredentials(): {
   email: string;
   password: string;
 } | null {
-  const email = process.env.ADMIN_PANEL_EMAIL?.trim();
-  const password = process.env.ADMIN_PANEL_PASSWORD;
-  if (!email || !password) return null;
-  return { email: email.toLowerCase(), password };
+  const ownerEmail = process.env.MASTER_ADMIN_EMAIL?.trim();
+  const ownerPassword = process.env.MASTER_ADMIN_PASSWORD;
+  if (!ownerEmail || !ownerPassword) return null;
+  return { email: ownerEmail.toLowerCase(), password: ownerPassword };
 }
 
 /** Constant-time string comparison that does not leak length. */

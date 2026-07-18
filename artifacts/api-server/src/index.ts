@@ -5,6 +5,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { getStripeSync } from "./lib/stripeClient";
 import { getTierPriceMismatches } from "./lib/stripeData";
+import { healOwnerAdminAccount } from "./lib/ownerAdmin";
 
 const rawPort = process.env["PORT"];
 
@@ -119,6 +120,17 @@ async function migrateFieldSyncTokenHashes(): Promise<void> {
 }
 
 await migrateFieldSyncTokenHashes();
+
+// Idempotent owner-admin self-heal: provisions the owner master-admin account
+// from secrets, deactivates the legacy admin@admin.com test login, and revokes
+// Test Company license keys. This is the write path that reaches production
+// data after a publish. Non-fatal so a transient DB error can't block boot.
+try {
+  await healOwnerAdminAccount();
+} catch (err) {
+  logger.error({ err }, "Owner admin self-heal failed (continuing to serve)");
+}
+
 await initStripe();
 
 app.listen(port, (err) => {

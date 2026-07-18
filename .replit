@@ -44,6 +44,10 @@ args = "chat-expiry-e2e"
 task = "workflow.run"
 args = "sitemap"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "sample-data-e2e"
+
 [[workflows.workflow]]
 name = "typecheck-rentnotice-pro"
 author = "agent"
@@ -121,6 +125,17 @@ args = "pnpm --filter @workspace/scripts run check:sitemap"
 [workflows.workflow.metadata]
 isValidation = true
 
+[[workflows.workflow]]
+name = "sample-data-e2e"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/scripts run check:sample-data"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
@@ -139,8 +154,6 @@ channel = "stable-25_05"
 EMAIL_FROM = "RentNotice Pro <noreply@rentnoticepro.com>"
 
 [userenv.development]
-ADMIN_PANEL_EMAIL = "admin@rentnoticepro.com"
-ADMIN_PANEL_PASSWORD = "rnp-dev-admin-2026"
 
 [[ports]]
 localPort = 8081

@@ -4,7 +4,7 @@ import Seo from "@/components/Seo";
 import { ROUTE_SEO } from "../../seo.config";
 import SiteFooter from "@/components/SiteFooter";
 import { motion } from "framer-motion";
-import { ArrowRight, RefreshCcw, DownloadCloud, Database, CreditCard, Users } from "lucide-react";
+import { ArrowRight, RefreshCcw, DownloadCloud, Database, CreditCard, Users, Webhook, MessageSquare } from "lucide-react";
 
 export default function Integrations() {
   return (
@@ -85,6 +85,68 @@ export default function Integrations() {
                     <div className="absolute top-0 left-0 w-full h-0.5 bg-primary animate-pulse" />
                     <span className="font-semibold text-foreground">Live Ledger Balance</span>
                     <RefreshCcw className="w-4 h-4 text-primary animate-spin" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Slack & Google Chat Feature */}
+        <section className="py-24 px-4 sm:px-8 border-t border-white/5">
+          <div className="max-w-6xl mx-auto">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.02] p-8 md:p-16 flex flex-col lg:flex-row-reverse gap-12 items-center relative overflow-hidden">
+              <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[100px] pointer-events-none" />
+
+              <div className="flex-1 relative z-10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary border border-primary/20 text-sm font-semibold mb-6">
+                  <Webhook className="w-4 h-4" />
+                  Team Notifications
+                </div>
+                <h2 className="text-4xl md:text-5xl font-serif text-foreground mb-6">Slack & Google Chat, in the loop.</h2>
+                <p className="text-lg text-muted-foreground mb-8 leading-relaxed">
+                  Connect Slack or Google Chat with an incoming webhook, configured right in the desktop app's Settings. Your whole team sees key activity from the communications hub the moment it happens — no one has to open RentNotice Pro to stay informed.
+                </p>
+                <ul className="space-y-4 mb-8">
+                  {[
+                    "Get notified when work orders are assigned or completed",
+                    "Alert the team the moment a notice is served in the field",
+                    "See when tenant emails and announcements go out",
+                    "Optionally mirror team chat messages to your channel",
+                    "Webhook URLs stored securely in the RentNotice cloud",
+                  ].map((item, i) => (
+                    <li key={i} className="flex items-start gap-3 text-foreground">
+                      <CheckCircleIcon className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex-1 w-full relative z-10">
+                <div className="aspect-square max-h-[400px] mx-auto bg-background rounded-2xl border border-white/10 shadow-2xl p-6 flex flex-col justify-center gap-4 relative overflow-hidden">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent" />
+                  <div className="flex items-start gap-3 p-4 border border-white/5 rounded-lg bg-white/5">
+                    <MessageSquare className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">Notice served</div>
+                      <div className="text-xs text-muted-foreground">Unit 4B — 3-Day Notice posted by field agent</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-4 border border-white/5 rounded-lg bg-white/5">
+                    <MessageSquare className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">Work order completed</div>
+                      <div className="text-xs text-muted-foreground">Leaking faucet — marked done by technician</div>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-4 border border-primary/30 rounded-lg bg-primary/10 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-0.5 bg-primary animate-pulse" />
+                    <MessageSquare className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">Tenant email sent</div>
+                      <div className="text-xs text-muted-foreground">Rent reminder delivered to 12 tenants</div>
+                    </div>
                   </div>
                 </div>
               </div>

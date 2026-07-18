@@ -6,9 +6,12 @@
  *     exceeds window.innerWidth), or
  *   - the expected mobile hamburger button is missing
  *     (data-testid "button-mobile-menu" on marketing pages,
- *      "button-portal-mobile-menu" on portal pages).
+ *      "button-portal-mobile-menu" on portal pages), or
+ *   - the hamburger menu doesn't actually work: clicking it must open the
+ *     drawer with its nav links visible, clicking a link must navigate to the
+ *     expected page, and the drawer must close after navigation.
  *
- * Portal pages authenticate with the seeded admin@admin.com/admin account via
+ * Portal pages authenticate with a self-provisioned fixture account via
  * the real login API. Admin pages authenticate by inserting a plaintext token
  * into the admin_sessions table and setting the rnp_admin_session cookie.
  *
@@ -20,11 +23,14 @@ import { execSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chromium, type Browser, type BrowserContext, type Page } from "playwright";
 import pg from "pg";
+import { ensureFixture } from "./e2e-fixture.js";
 
 const BASE_URL = process.env.MOBILE_CHECK_BASE_URL ?? "http://127.0.0.1:80";
 const VIEWPORT = { width: 375, height: 812 };
-const PORTAL_EMAIL = process.env.MOBILE_CHECK_PORTAL_EMAIL ?? "admin@admin.com";
-const PORTAL_PASSWORD = process.env.MOBILE_CHECK_PORTAL_PASSWORD ?? "admin";
+// Dedicated self-provisioned e2e fixture — the old seeded admin@admin.com
+// account was retired.
+const PORTAL_EMAIL = process.env.MOBILE_CHECK_PORTAL_EMAIL ?? "mobile-layout-check@example.com";
+const PORTAL_PASSWORD = process.env.MOBILE_CHECK_PORTAL_PASSWORD ?? "mobile-layout-check-pass-1";
 const NAV_TIMEOUT_MS = 30_000;
 
 interface PageCheck {
@@ -111,7 +117,116 @@ async function checkPage(page: Page, check: PageCheck): Promise<void> {
   }
 }
 
+interface MenuCheck {
+  name: string;
+  /** Page to load before clicking the hamburger. */
+  startPath: string;
+  /** data-testid of the hamburger button to click. */
+  hamburgerTestId: string;
+  /** Selectors (scoped to the open drawer) that must be visible once open. */
+  expectedLinkSelectors: string[];
+  /** Selector (scoped to the open drawer) of the link to click. */
+  clickLinkSelector: string;
+  /** Path the SPA must navigate to after clicking the link. */
+  expectedPath: string;
+}
+
+const MARKETING_MENU: MenuCheck = {
+  name: "Marketing mobile menu",
+  startPath: "/",
+  hamburgerTestId: "button-mobile-menu",
+  expectedLinkSelectors: [
+    '[data-testid="link-mobile-features"]',
+    '[data-testid="link-mobile-pricing"]',
+    '[data-testid="link-mobile-download"]',
+    '[data-testid="link-mobile-log-in"]',
+    '[data-testid="link-mobile-get-started"]',
+  ],
+  clickLinkSelector: '[data-testid="link-mobile-pricing"]',
+  expectedPath: "/pricing",
+};
+
+const PORTAL_MENU: MenuCheck = {
+  name: "Portal mobile menu",
+  startPath: "/portal",
+  hamburgerTestId: "button-portal-mobile-menu",
+  expectedLinkSelectors: ['a[href="/portal"]', 'a[href="/portal/users"]', 'a[href="/download"]'],
+  clickLinkSelector: 'a[href="/portal/users"]',
+  expectedPath: "/portal/users",
+};
+
+async function checkMobileMenu(page: Page, check: MenuCheck): Promise<void> {
+  const label = `${check.name} (${check.startPath})`;
+  await page.goto(`${BASE_URL}${check.startPath}`, { waitUntil: "load", timeout: NAV_TIMEOUT_MS });
+
+  const hamburger = page.locator(`[data-testid="${check.hamburgerTestId}"]`).first();
+  try {
+    await hamburger.waitFor({ state: "visible", timeout: NAV_TIMEOUT_MS });
+  } catch {
+    fail(`${label}: hamburger [data-testid="${check.hamburgerTestId}"] never became visible — cannot test the menu. Final URL: ${page.url()}`);
+    return;
+  }
+
+  await hamburger.click();
+
+  const drawer = page.locator('[role="dialog"]');
+  try {
+    await drawer.waitFor({ state: "visible", timeout: 5_000 });
+  } catch {
+    fail(`${label}: clicking the hamburger did not open the drawer (no visible [role="dialog"] within 5s)`);
+    return;
+  }
+  pass(`${label}: drawer opens on hamburger click`);
+
+  let linksOk = true;
+  for (const selector of check.expectedLinkSelectors) {
+    const visible = await drawer
+      .locator(selector)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    if (!visible) {
+      fail(`${label}: expected nav link ${selector} is not visible in the open drawer`);
+      linksOk = false;
+    }
+  }
+  if (linksOk) {
+    pass(`${label}: all ${check.expectedLinkSelectors.length} expected nav links visible in the drawer`);
+  }
+
+  const target = drawer.locator(check.clickLinkSelector).first();
+  if (!(await target.isVisible().catch(() => false))) {
+    fail(`${label}: cannot click ${check.clickLinkSelector} — not visible; skipping navigation check`);
+    return;
+  }
+  await target.click();
+
+  try {
+    await page.waitForURL((url) => url.pathname === check.expectedPath, { timeout: 10_000 });
+    pass(`${label}: clicking ${check.clickLinkSelector} navigated to ${check.expectedPath}`);
+  } catch {
+    fail(`${label}: clicking ${check.clickLinkSelector} did not navigate to ${check.expectedPath} within 10s (still at ${page.url()})`);
+    return;
+  }
+
+  try {
+    await drawer.waitFor({ state: "hidden", timeout: 5_000 });
+    pass(`${label}: drawer closed after navigation`);
+  } catch {
+    fail(`${label}: drawer is still open 5s after navigating to ${check.expectedPath}`);
+  }
+}
+
 async function loginPortal(context: BrowserContext): Promise<boolean> {
+  if (!process.env.MOBILE_CHECK_PORTAL_EMAIL) {
+    await ensureFixture({
+      companyName: "Mobile Layout Check Co",
+      email: PORTAL_EMAIL,
+      password: PORTAL_PASSWORD,
+      userName: "Mobile Layout Check",
+      username: "mobilecheck",
+    });
+  }
   const res = await context.request.post(`${BASE_URL}/api/www/auth/login`, {
     data: { email: PORTAL_EMAIL, password: PORTAL_PASSWORD },
   });
@@ -189,6 +304,7 @@ async function main(): Promise<void> {
       for (const check of MARKETING_PAGES) {
         await checkPage(page, check);
       }
+      await checkMobileMenu(page, MARKETING_MENU);
       await context.close();
     }
 
@@ -201,6 +317,7 @@ async function main(): Promise<void> {
         for (const check of PORTAL_PAGES) {
           await checkPage(page, check);
         }
+        await checkMobileMenu(page, PORTAL_MENU);
       }
       await context.close();
     }

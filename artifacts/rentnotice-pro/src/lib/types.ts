@@ -74,6 +74,38 @@ export interface SessionInfo {
   locked: boolean;
 }
 
+/** Availability and status of the built-in sample portfolio. */
+export interface SampleDataState {
+  /** True while a sample portfolio is loaded in this workspace. */
+  active: boolean;
+  /** True when the current user may load sample data right now. */
+  canLoad: boolean;
+  /** Human-readable reason when loading is unavailable (null when canLoad). */
+  blockedReason: string | null;
+}
+
+/**
+ * Optional knobs for the generated sample portfolio. Every field may be
+ * omitted or null — unset values fall back to sensible defaults, so a
+ * partially filled form still produces a complete portfolio.
+ */
+export interface SampleDataOptions {
+  /** Total rentable doors (units) to generate. Default 1000. */
+  totalDoors?: number | null;
+  /** Percent of buildings that are single-family homes (0–100). Default 62. */
+  singleFamilyPct?: number | null;
+  /** Average units per multi-unit building (2–4). Default 3. */
+  avgUnitsPerBuilding?: number | null;
+  /** Percent of units that are vacant (0–90). Default 5. */
+  vacancyPct?: number | null;
+  /** Percent of tenants behind on rent (0–100). Default 12. */
+  latePayerPct?: number | null;
+  /** Months of rent ledger history to generate (1–24). Default 6. */
+  monthsOfHistory?: number | null;
+  /** Target average monthly rent in dollars; unset uses per-city market bands. */
+  avgRentDollars?: number | null;
+}
+
 // ----------------------------- Company profile ----------------------------
 
 export interface CompanyProfile {
@@ -739,7 +771,9 @@ export type AuditAction =
   | "work_order_status_changed"
   | "work_order_deleted"
   | "chat_channel_created"
-  | "chat_channel_archived";
+  | "chat_channel_archived"
+  | "sample_data_loaded"
+  | "sample_data_removed";
 
 /** Audit actions recordable from the Communications hub UI. */
 export type CommsAuditAction =

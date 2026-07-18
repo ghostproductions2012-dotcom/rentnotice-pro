@@ -32,13 +32,19 @@
 import { execSync } from "node:child_process";
 import { chromium, type Browser, type Page } from "playwright";
 import pg from "pg";
+import { ensureFixture as ensureSharedFixture } from "./e2e-fixture.js";
 
 const BASE_URL = process.env.CHAT_EXPIRY_CHECK_BASE_URL ?? "http://127.0.0.1:80";
 const APP_PATH = "/app/";
 const EXPO_DOMAIN = process.env.REPLIT_EXPO_DEV_DOMAIN ?? "";
-const LICENSE_KEY = process.env.CHAT_EXPIRY_CHECK_LICENSE_KEY ?? "RNP-KX88-NHUR-ZZYQ-CCPS";
-const ADMIN_IDENTIFIER = process.env.CHAT_EXPIRY_CHECK_IDENTIFIER ?? "admin@admin.com";
-const ADMIN_PASSWORD = process.env.CHAT_EXPIRY_CHECK_PASSWORD ?? "admin";
+// Dedicated e2e fixture (self-provisioned below) — the old seeded
+// admin@admin.com / Test Company account was retired and its keys revoked.
+const LICENSE_KEY = process.env.CHAT_EXPIRY_CHECK_LICENSE_KEY ?? "RNP-E2EC-HATE-XPRY-CHCK";
+const ADMIN_IDENTIFIER =
+  process.env.CHAT_EXPIRY_CHECK_IDENTIFIER ?? "chat-expiry-check@example.com";
+const ADMIN_PASSWORD =
+  process.env.CHAT_EXPIRY_CHECK_PASSWORD ?? "chat-expiry-check-pass-1";
+const FIXTURE_COMPANY_NAME = "Chat Expiry Check Co";
 const TIMEOUT_MS = 30_000;
 // Desktop channel polling runs every 10s; allow a couple of cycles.
 const POLL_TIMEOUT_MS = 45_000;
@@ -86,6 +92,23 @@ async function withDb<T>(run: (c: pg.Client) => Promise<T>): Promise<T> {
 interface CompanyIds {
   companyId: string;
   memberKey: string;
+}
+
+/**
+ * Idempotently provision the dedicated e2e fixture: a company with an active
+ * license key and an admin cloud user. Skipped when the fixture is
+ * overridden via CHAT_EXPIRY_CHECK_* env vars.
+ */
+async function ensureFixture(): Promise<void> {
+  if (process.env.CHAT_EXPIRY_CHECK_LICENSE_KEY) return;
+  await ensureSharedFixture({
+    companyName: FIXTURE_COMPANY_NAME,
+    email: ADMIN_IDENTIFIER,
+    password: ADMIN_PASSWORD,
+    userName: "Chat Expiry Check",
+    username: "chatcheck",
+    licenseKey: LICENSE_KEY,
+  });
 }
 
 async function lookupIds(): Promise<CompanyIds> {
@@ -395,6 +418,7 @@ async function main(): Promise<void> {
   const executablePath = resolveChromiumPath();
   const browser = await chromium.launch({ executablePath });
   try {
+    await ensureFixture();
     ids = await lookupIds();
     console.log(
       `Chat expiry recovery check (license ${LICENSE_KEY}, member ${ids.memberKey}, tag ${RUN_TAG})`,

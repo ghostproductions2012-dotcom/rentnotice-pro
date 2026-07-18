@@ -1,6 +1,6 @@
 [package]
 name = "rentnotice-pro"
-version = "1.0.4"
+version = "1.1.0"
 description = "RentNotice Pro — California 3-Day Pay or Quit notice preparation suite"
 authors = ["RentNotice Pro"]
 edition = "2021"

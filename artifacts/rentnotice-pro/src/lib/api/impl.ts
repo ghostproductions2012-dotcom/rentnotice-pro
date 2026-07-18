@@ -43,6 +43,8 @@ import type {
   Property,
   ReportKind,
   ReportResult,
+  SampleDataOptions,
+  SampleDataState,
   ServiceRecord,
   SessionInfo,
   Tenant,
@@ -102,6 +104,12 @@ import {
   validationResultsRepo,
   workOrdersRepo,
 } from "../db";
+import {
+  countRealProperties,
+  isSampleDataLoaded,
+  loadSamplePortfolio,
+  removeSamplePortfolio,
+} from "../db/samplePortfolio";
 import {
   getLicensingClient,
   LicenseInvalidError,
@@ -191,6 +199,19 @@ function requirePermission(permission: Permission): void {
     throw new Error(LICENSE_BLOCK_MESSAGES[licenseGate.reason]);
   }
   checkPermission({ role: session.user?.role, locked: session.locked }, permission);
+}
+
+// Sample data may only be loaded into an empty-ish workspace: a handful of
+// hand-created properties is fine, a real portfolio is not.
+const SAMPLE_MAX_REAL_PROPERTIES = 5;
+
+// Sample data management is deliberately admin-only (beyond settings.manage,
+// which managers also hold): it inserts/deletes thousands of records.
+function requireSampleDataAdmin(): void {
+  requirePermission("settings.manage");
+  if (session.user?.role !== "admin") {
+    throw new Error("Only administrators can load or remove sample data.");
+  }
 }
 
 // Object URLs are session-scoped; rebuild them from stored bytes on demand.
@@ -840,6 +861,61 @@ function createServices(): AppServices {
         throw new Error("This workspace is already activated with a company license.");
       await seedDatabase(db);
       setWorkspaceMode(db, "demo");
+      await db.flush();
+    },
+
+    // --- sample data ---
+    async getSampleDataState(): Promise<SampleDataState> {
+      const db = await getDb();
+      const active = isSampleDataLoaded(db);
+      let blockedReason: string | null = null;
+      if (active) {
+        blockedReason = "Sample data is already loaded.";
+      } else if (!session.user || session.locked) {
+        blockedReason = "Sign in to manage sample data.";
+      } else if (session.user.role !== "admin") {
+        blockedReason = "Only administrators can load sample data.";
+      } else if (licenseGate.blocked && licenseGate.reason) {
+        blockedReason = LICENSE_BLOCK_MESSAGES[licenseGate.reason];
+      } else if (
+        // Demo workspaces are playgrounds — the seeded demo records aren't
+        // real data, so the "empty-ish" guard only applies once activated.
+        getWorkspaceMode(db) !== "demo" &&
+        countRealProperties(db) >= SAMPLE_MAX_REAL_PROPERTIES
+      ) {
+        blockedReason =
+          "This workspace already contains real property records. Sample data can only be loaded into an empty (or nearly empty) workspace.";
+      }
+      return { active, canLoad: blockedReason === null, blockedReason };
+    },
+    async loadSampleData(options?: SampleDataOptions | null, onProgress?): Promise<void> {
+      const db = await getDb();
+      requireSampleDataAdmin();
+      if (isSampleDataLoaded(db)) throw new Error("Sample data is already loaded.");
+      if (
+        getWorkspaceMode(db) !== "demo" &&
+        countRealProperties(db) >= SAMPLE_MAX_REAL_PROPERTIES
+      ) {
+        throw new Error(
+          "This workspace already contains real property records. Sample data can only be loaded into an empty (or nearly empty) workspace.",
+        );
+      }
+      const stats = await loadSamplePortfolio(db, session.user?.id ?? "", options, onProgress);
+      logAudit(
+        db,
+        "sample_data_loaded",
+        "settings",
+        null,
+        `Loaded sample portfolio: ${stats.properties} properties, ${stats.units} units, ${stats.tenants} tenants, ${stats.notices} notices`,
+      );
+      await db.flush();
+    },
+    async removeSampleData(): Promise<void> {
+      const db = await getDb();
+      requireSampleDataAdmin();
+      if (!isSampleDataLoaded(db)) throw new Error("No sample data is loaded.");
+      await removeSamplePortfolio(db);
+      logAudit(db, "sample_data_removed", "settings", null, "Removed all sample portfolio data");
       await db.flush();
     },
     async validateLicenseKey(licenseKey: string) {

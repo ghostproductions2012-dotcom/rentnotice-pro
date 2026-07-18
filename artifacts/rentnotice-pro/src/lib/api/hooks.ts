@@ -50,6 +50,7 @@ import type {
   NoticeType,
   Property,
   ReportKind,
+  SampleDataOptions,
   ServiceRecord,
   TemplateUpdateInput,
   Tenant,
@@ -98,6 +99,7 @@ export const qk = {
   workOrders: (filters?: WorkOrderFilters) => ["workOrders", filters ?? {}] as const,
   workOrder: (id: Id) => ["workOrder", id] as const,
   dashboard: ["dashboard"] as const,
+  sampleData: ["sampleData"] as const,
   report: (kind: ReportKind) => ["report", kind] as const,
   stateRules: ["stateRules"] as const,
   stateRuleReviews: ["stateRuleReviews"] as const,
@@ -184,6 +186,36 @@ export function useEnterDemoMode() {
   return useMutation({
     mutationFn: () => getServices().enterDemoMode(),
     // Seeding touches every table — refresh everything.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+// --- sample data ---
+
+export function useSampleDataState() {
+  return useQuery({
+    queryKey: qk.sampleData,
+    queryFn: () => getServices().getSampleDataState(),
+  });
+}
+
+export function useLoadSampleData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input?: {
+      options?: SampleDataOptions | null;
+      onProgress?: (step: string, done: number, total: number) => void;
+    }) => getServices().loadSampleData(input?.options, input?.onProgress),
+    // Loading inserts records across most tables — refresh everything.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useRemoveSampleData() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => getServices().removeSampleData(),
+    // Removal deletes records across most tables — refresh everything.
     onSuccess: () => qc.invalidateQueries(),
   });
 }

@@ -246,6 +246,16 @@ export const UpdateCompanyUserResponse = zod.object({
 
 
 /**
+ * @summary Permanently remove a deactivated team member (frees their email for re-invitation)
+ */
+export const DeleteCompanyUserParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const DeleteCompanyUserResponse = zod.void()
+
+
+/**
  * @summary View the pending invite code for an invited user
  */
 export const GetInviteCodeParams = zod.object({

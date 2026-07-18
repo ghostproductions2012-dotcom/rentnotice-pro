@@ -105,7 +105,7 @@ export const webSessionsTable = pgTable(
 );
 
 // Sessions for the platform owner's admin panel. Credentials live in env
-// secrets (ADMIN_PANEL_EMAIL / ADMIN_PANEL_PASSWORD), so this table has no
+// secrets (MASTER_ADMIN_EMAIL / MASTER_ADMIN_PASSWORD), so this table has no
 // user FK — a row simply proves the platform admin logged in.
 export const adminSessionsTable = pgTable("admin_sessions", {
   token: text("token").primaryKey(),

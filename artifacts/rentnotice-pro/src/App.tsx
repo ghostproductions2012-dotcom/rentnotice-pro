@@ -2,13 +2,13 @@ import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, useSyncLicense } from "@/lib/api/hooks";
+import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, useSyncLicense, useSampleDataState } from "@/lib/api/hooks";
 import { FirstRunScreen, ActivationWizard } from "@/components/first-run";
 import { StartupErrorScreen } from "@/components/startup-error";
 import { computeRouterBase } from "@/lib/router-base";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { evaluateGraceWarning } from "@/lib/licensing/gate";
-import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, MessageSquare, Wrench, X } from "lucide-react";
+import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, MessageSquare, Wrench, X, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -163,6 +163,7 @@ function Sidebar() {
   const lockApp = useLockApp();
   const { data: session } = useSession();
   const { isReadOnly } = usePermissions();
+  const { data: sampleData } = useSampleDataState();
 
   const navGroups = [
     {
@@ -231,6 +232,18 @@ function Sidebar() {
       </div>
 
       <div className="p-4 border-t space-y-4 shrink-0 bg-muted/20">
+        {sampleData?.active && (
+          <button
+            type="button"
+            onClick={() => setLocation("/settings")}
+            className="w-full flex items-center justify-center gap-1.5 rounded-md bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide hover:bg-amber-500/25 transition-colors"
+            title="A generated sample portfolio is loaded. Manage it in Settings."
+            data-testid="badge-sample-data"
+          >
+            <FlaskConical className="w-3 h-3" />
+            Sample data
+          </button>
+        )}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium border border-border/50">

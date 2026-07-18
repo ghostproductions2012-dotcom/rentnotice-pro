@@ -1159,6 +1159,76 @@ export const useUpdateCompanyUser = <TError = ErrorType<ErrorResponse>,
       return useMutation(getUpdateCompanyUserMutationOptions(options));
     }
 
+export const getDeleteCompanyUserUrl = (userId: string,) => {
+
+
+
+
+  return `/api/www/portal/users/${userId}`
+}
+
+/**
+ * @summary Permanently remove a deactivated team member (frees their email for re-invitation)
+ */
+export const deleteCompanyUser = async (userId: string, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteCompanyUserUrl(userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteCompanyUserMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompanyUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteCompanyUser>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['deleteCompanyUser'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteCompanyUser>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  deleteCompanyUser(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteCompanyUserMutationResult = NonNullable<Awaited<ReturnType<typeof deleteCompanyUser>>>
+
+    export type DeleteCompanyUserMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Permanently remove a deactivated team member (frees their email for re-invitation)
+ */
+export const useDeleteCompanyUser = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteCompanyUser>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteCompanyUser>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteCompanyUserMutationOptions(options));
+    }
+
 export const getGetInviteCodeUrl = (userId: string,) => {
 
 
