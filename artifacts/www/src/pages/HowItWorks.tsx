@@ -62,8 +62,8 @@ export default function HowItWorks() {
               transition={{ duration: 0.5 }}
               className="text-4xl sm:text-6xl md:text-7xl font-serif text-foreground leading-[1.1] tracking-tight mb-6"
             >
-              The unbroken <br className="hidden sm:block"/>
-              <span className="text-gradient italic">chain of custody.</span>
+              How Pay-or-Quit Notice <br className="hidden sm:block"/>
+              <span className="text-gradient italic">Software Works</span>
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
@@ -71,7 +71,7 @@ export default function HowItWorks() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
             >
-              See how RentNotice Pro transforms a messy, high-risk manual chore into a systematic, court-ready workflow.
+              The unbroken chain of custody. See how RentNotice Pro transforms a messy, high-risk manual chore into a systematic, court-ready workflow.
             </motion.p>
           </div>
         </section>

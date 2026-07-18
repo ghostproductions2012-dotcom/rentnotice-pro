@@ -28,6 +28,10 @@ import { PREREQUISITE_LABELS, getRulePack } from "@/lib/engine/rulepacks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
+import {
+  DocumentPreviewDialog,
+  type PreviewDocument,
+} from "@/components/document-preview-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -56,6 +60,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { saveDocument } from "@/lib/download";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -137,6 +142,7 @@ export default function NoticeView() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [serviceOpen, setServiceOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<PreviewDocument | null>(null);
   const [svc, setSvc] = useState({
     dateServed: "",
     timeServed: "",
@@ -173,14 +179,28 @@ export default function NoticeView() {
       variant: "destructive",
     });
 
+  const doDownloadDocument = async (fileName: string, blobUrl: string) => {
+    try {
+      const result = await saveDocument(fileName, blobUrl);
+      if (result === "saved") toast({ title: "PDF saved" });
+    } catch (e) {
+      fail("Could not save the PDF")(e);
+    }
+  };
+
   const doPreviewDraft = () =>
     generateDocs.mutate(
       { noticeId: notice.id, packetKind: "draft" },
       {
         onSuccess: (docs) => {
           const packet = docs.find((d) => d.kind === "packet") ?? docs[0];
-          if (packet) window.open(packet.blobUrl, "_blank");
-          toast({ title: "Draft preview generated", description: "Watermarked draft packet opened in a new tab." });
+          if (packet)
+            setPreviewDoc({
+              title: "Draft packet (watermarked)",
+              fileName: packet.fileName,
+              blobUrl: packet.blobUrl,
+            });
+          toast({ title: "Draft preview generated", description: "Review the watermarked draft packet below or download it." });
         },
         onError: fail("Could not generate draft"),
       },
@@ -756,29 +776,46 @@ export default function NoticeView() {
                 </p>
               ) : (
                 <div className="space-y-1.5 pt-1">
-                  {documents?.map((d) => (
-                    <a
-                      key={d.id}
-                      href={d.blobUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-2 text-sm p-2 rounded-md hover:bg-muted/40 transition-colors"
-                      data-testid={`link-document-${d.id}`}
-                    >
-                      {d.kind === "packet" ? (
-                        <Download className="w-4 h-4 text-primary shrink-0" />
-                      ) : (
-                        <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                      )}
-                      <span className="flex-1 truncate">
-                        {d.kind === "packet"
-                          ? `${d.packetKind === "draft" ? "Draft" : "Final"} packet`
-                          : DOCUMENT_KIND_LABELS[d.kind]}
-                        {d.watermarked ? " (draft)" : ""}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{d.pageCount}p</span>
-                    </a>
-                  ))}
+                  {documents?.map((d) => {
+                    const title = `${
+                      d.kind === "packet"
+                        ? `${d.packetKind === "draft" ? "Draft" : "Final"} packet`
+                        : DOCUMENT_KIND_LABELS[d.kind]
+                    }${d.watermarked ? " (draft)" : ""}`;
+                    return (
+                      <div key={d.id} className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewDoc({
+                              title,
+                              fileName: d.fileName,
+                              blobUrl: d.blobUrl,
+                            })
+                          }
+                          className="flex flex-1 min-w-0 items-center gap-2 text-sm p-2 rounded-md hover:bg-muted/40 transition-colors text-left"
+                          data-testid={`link-document-${d.id}`}
+                        >
+                          {d.kind === "packet" ? (
+                            <Eye className="w-4 h-4 text-primary shrink-0" />
+                          ) : (
+                            <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
+                          )}
+                          <span className="flex-1 truncate">{title}</span>
+                          <span className="text-xs text-muted-foreground">{d.pageCount}p</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void doDownloadDocument(d.fileName, d.blobUrl)}
+                          className="p-2 rounded-md hover:bg-muted/40 transition-colors shrink-0"
+                          title={`Download ${d.fileName}`}
+                          data-testid={`link-download-${d.id}`}
+                        >
+                          <Download className="w-4 h-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
@@ -1051,6 +1088,9 @@ export default function NoticeView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* In-app document preview (the desktop webview cannot open new tabs) */}
+      <DocumentPreviewDialog doc={previewDoc} onClose={() => setPreviewDoc(null)} />
     </div>
   );
 }

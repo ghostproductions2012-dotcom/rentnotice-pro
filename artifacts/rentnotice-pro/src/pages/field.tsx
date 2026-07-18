@@ -8,6 +8,7 @@ import {
   useSettings,
   usePermissions,
   useRecordService,
+  useUsers,
 } from "@/lib/api/hooks";
 import type { FieldAssignment, FieldEvidence, Notice } from "@/lib/types";
 import { NOTICE_TYPE_LABELS, formatCents } from "@/lib/types";
@@ -15,7 +16,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { FieldEvidenceGallery } from "@/components/field-evidence-gallery";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -32,6 +32,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -43,6 +57,9 @@ import {
   Ban,
   Smartphone,
   Loader2,
+  Check,
+  ChevronsUpDown,
+  UserPlus,
 } from "lucide-react";
 import { useLocation } from "wouter";
 import { downscalePhotoDataUrl } from "@/lib/images";
@@ -166,6 +183,7 @@ export default function FieldAssignmentsPage() {
   const { data: notices } = useNotices();
   const { data: tenants } = useTenants();
   const { data: settings } = useSettings();
+  const { data: users } = useUsers();
   const createAssignment = useCreateFieldAssignment();
   const updateAssignment = useUpdateFieldAssignment();
   const { toast } = useToast();
@@ -177,6 +195,8 @@ export default function FieldAssignmentsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [noticeId, setNoticeId] = useState("");
   const [assigneeName, setAssigneeName] = useState("");
+  const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  const [agentQuery, setAgentQuery] = useState("");
   const [instructions, setInstructions] = useState("");
   const [syncing, setSyncing] = useState<"push" | "pull" | null>(null);
   const [evidenceView, setEvidenceView] = useState<FieldAssignment | null>(null);
@@ -203,6 +223,22 @@ export default function FieldAssignmentsPage() {
       ),
     [notices],
   );
+
+  // Known field agents: active team members plus anyone previously assigned.
+  const agentOptions = useMemo(() => {
+    const names = new Map<string, string>();
+    (users ?? [])
+      .filter((u) => u.active)
+      .forEach((u) => {
+        const name = u.name.trim();
+        if (name) names.set(name.toLowerCase(), name);
+      });
+    (assignments ?? []).forEach((a) => {
+      const name = a.assigneeName.trim();
+      if (name && !names.has(name.toLowerCase())) names.set(name.toLowerCase(), name);
+    });
+    return Array.from(names.values()).sort((a, b) => a.localeCompare(b));
+  }, [users, assignments]);
 
   const syncEnabled = settings?.syncEnabled === true;
   const canManage = can ? can("field.manage") : true;
@@ -553,9 +589,13 @@ export default function FieldAssignmentsPage() {
                 <SelectTrigger data-testid="select-notice">
                   <SelectValue placeholder="Select a notice to serve" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-w-[min(var(--radix-select-content-available-width),28rem)]">
                   {eligibleNotices.map((n) => (
-                    <SelectItem key={n.id} value={n.id}>
+                    <SelectItem
+                      key={n.id}
+                      value={n.id}
+                      className="[&>span:last-child]:block [&>span:last-child]:min-w-0 [&>span:last-child]:truncate"
+                    >
                       {n.tenantNames.join(", ")} — {NOTICE_TYPE_LABELS[n.noticeType]} ({n.propertyAddress})
                     </SelectItem>
                   ))}
@@ -568,13 +608,86 @@ export default function FieldAssignmentsPage() {
               )}
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Process server name</label>
-              <Input
-                value={assigneeName}
-                onChange={(e) => setAssigneeName(e.target.value)}
-                placeholder="e.g. Marcus Delgado"
-                data-testid="input-assignee"
-              />
+              <label className="text-sm font-medium">Field agent</label>
+              <Popover
+                open={agentPickerOpen}
+                onOpenChange={(open) => {
+                  setAgentPickerOpen(open);
+                  if (!open) setAgentQuery("");
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={agentPickerOpen}
+                    className="w-full justify-between font-normal"
+                    data-testid="input-assignee"
+                  >
+                    <span className={cn("truncate", !assigneeName && "text-muted-foreground")}>
+                      {assigneeName || "Search or add a field agent…"}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput
+                      placeholder="Type a name to search or add…"
+                      value={agentQuery}
+                      onValueChange={setAgentQuery}
+                      data-testid="input-assignee-search"
+                    />
+                    <CommandList>
+                      <CommandEmpty>Type a name to add a new agent.</CommandEmpty>
+                      {agentOptions.length > 0 && (
+                        <CommandGroup heading="Known agents">
+                          {agentOptions.map((name) => (
+                            <CommandItem
+                              key={name}
+                              value={name}
+                              onSelect={() => {
+                                setAssigneeName(name);
+                                setAgentPickerOpen(false);
+                                setAgentQuery("");
+                              }}
+                              data-testid={`option-agent-${name.toLowerCase().replace(/\s+/g, "-")}`}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 shrink-0",
+                                  assigneeName === name ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <span className="truncate">{name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                      {agentQuery.trim().length > 0 &&
+                        !agentOptions.some(
+                          (n) => n.toLowerCase() === agentQuery.trim().toLowerCase(),
+                        ) && (
+                          <CommandGroup heading="New agent">
+                            <CommandItem
+                              value={agentQuery}
+                              onSelect={() => {
+                                setAssigneeName(agentQuery.trim());
+                                setAgentPickerOpen(false);
+                                setAgentQuery("");
+                              }}
+                              data-testid="option-agent-custom"
+                            >
+                              <UserPlus className="mr-2 h-4 w-4 shrink-0" />
+                              <span className="truncate">Use "{agentQuery.trim()}"</span>
+                            </CommandItem>
+                          </CommandGroup>
+                        )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Instructions (optional)</label>

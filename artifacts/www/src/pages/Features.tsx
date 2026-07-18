@@ -32,8 +32,8 @@ export default function Features() {
               transition={{ duration: 0.5 }}
               className="text-4xl sm:text-5xl md:text-7xl font-serif text-foreground leading-[1.1] tracking-tight"
             >
-              Engineered for <br/>
-              <span className="text-gradient italic">50-state coverage.</span>
+              Eviction Notice Software <br/>
+              <span className="text-gradient italic">Features for All 50 States</span>
             </motion.h1>
             
             <motion.p 
@@ -42,7 +42,7 @@ export default function Features() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl leading-relaxed"
             >
-              From complex ledger isolation to GPS-verified field service. Every feature is designed to eliminate the manual errors that cost property managers their cases.
+              Engineered for 50-state coverage. From complex ledger isolation to GPS-verified field service, every feature is designed to eliminate the manual errors that cost property managers their cases.
             </motion.p>
           </div>
         </section>

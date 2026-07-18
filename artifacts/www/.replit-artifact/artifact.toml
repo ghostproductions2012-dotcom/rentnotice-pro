@@ -35,6 +35,18 @@ from = "/integrations"
 to = "/integrations/index.html"
 
 [[services.production.rewrites]]
+from = "/coverage"
+to = "/coverage/index.html"
+
+[[services.production.rewrites]]
+from = "/pricing"
+to = "/pricing/index.html"
+
+[[services.production.rewrites]]
+from = "/download"
+to = "/download/index.html"
+
+[[services.production.rewrites]]
 from = "/faq"
 to = "/faq/index.html"
 

@@ -1,3 +1,5 @@
+import { STATE_COVERAGE } from "./src/lib/coverage-data";
+
 export interface RouteSeo {
   title: string;
   description: string;
@@ -14,17 +16,17 @@ export const ROUTE_SEO: Record<string, RouteSeo> = {
       "Eviction notice preparation software for property managers in all 50 states and DC. Attorney-reviewed California templates, plus built-in starting points for every other state.",
   },
   "/features": {
-    title: "Features — RentNotice Pro",
+    title: "Eviction Notice Software Features — RentNotice Pro",
     description:
       "Explore RentNotice Pro features: automated pay-or-quit notice generation for all 50 states and DC, fee calculators, deadline tracking, offline mobile field service, and court-ready evidence packets.",
   },
   "/how-it-works": {
-    title: "How It Works — RentNotice Pro",
+    title: "How Pay-or-Quit Notice Software Works — RentNotice Pro",
     description:
       "See how RentNotice Pro works: import your rent ledger, generate pay-or-quit notices for any of the 50 states and DC, serve them in the field with photo evidence, and track every deadline automatically.",
   },
   "/integrations": {
-    title: "Integrations — RentNotice Pro",
+    title: "Eviction Notice Software Integrations — RentNotice Pro",
     description:
       "RentNotice Pro connects with your property management stack — ledger imports, mobile field sync, billing, and team management — to streamline your pay-or-quit notice workflow.",
   },
@@ -165,6 +167,42 @@ function buildJsonLd(routePath: string): string | null {
           "@type": "Answer",
           text: item.answer,
         },
+      })),
+    };
+    return JSON.stringify(schema);
+  }
+
+  if (routePath === "/coverage") {
+    const schema = {
+      "@context": "https://schema.org",
+      "@type": "Dataset",
+      name: "Pay-or-Quit Notice Periods — All 50 States + DC",
+      description:
+        "Statutory pay-or-quit notice periods and citations for all 50 U.S. states and the District of Columbia, as supported by RentNotice Pro eviction notice software.",
+      url: `${SITE_ORIGIN}/coverage`,
+      publisher: {
+        "@type": "Organization",
+        name: "RentNotice Pro",
+        url: SITE_ORIGIN,
+      },
+      license: `${SITE_ORIGIN}/terms`,
+      distribution: {
+        "@type": "DataDownload",
+        encodingFormat: "text/html",
+        contentUrl: `${SITE_ORIGIN}/coverage`,
+      },
+      variableMeasured: [
+        "State name",
+        "Pay-or-quit notice period (days)",
+        "Statutory citation",
+        "Attorney-reviewed status",
+      ],
+      hasPart: STATE_COVERAGE.map((s) => ({
+        "@type": "StatisticalVariable",
+        name: `${s.name} Pay-or-Quit Notice Period`,
+        description: `${s.periodLabel}. ${s.citation}${s.attorneyReviewed ? " Attorney-reviewed template available." : ""}`,
+        measurementTechnique: "Statutory research",
+        statType: "pay-or-quit notice period",
       })),
     };
     return JSON.stringify(schema);

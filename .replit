@@ -156,12 +156,20 @@ EMAIL_FROM = "RentNotice Pro <noreply@rentnoticepro.com>"
 [userenv.development]
 
 [[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
 localPort = 8081
 externalPort = 80
 
 [[ports]]
 localPort = 8082
 externalPort = 3003
+
+[[ports]]
+localPort = 22228
+externalPort = 5000
 
 [[ports]]
 localPort = 24772

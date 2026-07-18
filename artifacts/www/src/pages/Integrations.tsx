@@ -26,8 +26,8 @@ export default function Integrations() {
               transition={{ duration: 0.5 }}
               className="text-4xl sm:text-6xl md:text-7xl font-serif text-foreground leading-[1.1] tracking-tight mb-6"
             >
-              Connect your data. <br />
-              <span className="text-gradient italic">Skip the data entry.</span>
+              Eviction Notice Software <br />
+              <span className="text-gradient italic">Integrations & Connected Tools</span>
             </motion.h1>
             <motion.p 
               initial={{ opacity: 0, y: 20 }}
@@ -35,7 +35,7 @@ export default function Integrations() {
               transition={{ duration: 0.5, delay: 0.1 }}
               className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto"
             >
-              RentNotice Pro pulls the exact ledger and tenant data you need directly from your property management system.
+              Connect your data. Skip the data entry. RentNotice Pro pulls the exact ledger and tenant data you need directly from your property management system.
             </motion.p>
           </div>
         </section>
