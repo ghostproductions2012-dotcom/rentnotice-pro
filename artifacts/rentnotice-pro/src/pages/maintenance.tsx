@@ -69,10 +69,11 @@ import {
 import { downscalePhotoDataUrl } from "@/lib/images";
 import {
   FIELD_SYNC_AUTH_REQUIRED_MESSAGE,
+  relayUrl,
   useFieldSyncAuth,
 } from "@/lib/field-sync";
 
-const SYNC_URL = "/api/field/work-orders";
+const SYNC_URL = relayUrl("/api/field/work-orders");
 
 type RemoteWorkOrderPhoto = {
   id: string;

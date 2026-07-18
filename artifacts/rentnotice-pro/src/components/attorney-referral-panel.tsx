@@ -10,7 +10,7 @@ import {
   usePermissions,
   useSaveAttorneyContact,
 } from "@/lib/api/hooks";
-import { FIELD_SYNC_AUTH_REQUIRED_MESSAGE, useFieldSyncAuth } from "@/lib/field-sync";
+import { FIELD_SYNC_AUTH_REQUIRED_MESSAGE, relayUrl, useFieldSyncAuth } from "@/lib/field-sync";
 import { bytesToBase64 } from "@/lib/db";
 import { NOTICE_TYPE_LABELS, type Notice } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -50,7 +50,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-const REFERRALS_URL = "/api/attorney-referrals";
+const REFERRALS_URL = relayUrl("/api/attorney-referrals");
 
 type ReferralEvent = { id: string; kind: string; detail: string; createdAt: string };
 type ReferralReply = { id: string; body: string; createdAt: string };

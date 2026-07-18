@@ -1861,6 +1861,17 @@ function createServices(): AppServices {
           suppressEvent: fromFieldSync,
         });
       }
+      // A locked final packet generated before service still shows blank
+      // fill-in lines on the Proof of Service. Regenerate it so the proof
+      // (and the packet) carry the recorded details. Best-effort: recording
+      // service must never fail because PDF regeneration did.
+      if (documentsRepo.listByNotice(db, id).some((d) => d.packetKind === "final")) {
+        try {
+          await services.generateDocuments({ noticeId: id, packetKind: "final" });
+        } catch (err) {
+          console.warn("Could not refresh the final packet after recording service", err);
+        }
+      }
       return next;
     },
 

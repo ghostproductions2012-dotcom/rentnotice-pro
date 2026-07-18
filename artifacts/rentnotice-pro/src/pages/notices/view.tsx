@@ -14,6 +14,7 @@ import {
   useUpdateNotice,
   useValidation,
 } from "@/lib/api/hooks";
+import { getServices } from "@/lib/api/services";
 import {
   DOCUMENT_KIND_LABELS,
   NOTICE_STATUS_LABELS,
@@ -159,6 +160,21 @@ export default function NoticeView() {
     [validation],
   );
 
+  // Once the locked final packet exists, earlier draft previews and superseded
+  // generations are noise — show only the final packet documents plus any
+  // attorney uploads (which are never part of a generated packet).
+  const hasFinalPacket = useMemo(
+    () => (documents ?? []).some((d) => d.packetKind === "final"),
+    [documents],
+  );
+  const visibleDocuments = useMemo(
+    () =>
+      (documents ?? []).filter(
+        (d) => !hasFinalPacket || d.packetKind === "final" || d.kind === "attorney_upload",
+      ),
+    [documents, hasFinalPacket],
+  );
+
   if (isLoading)
     return (
       <div className="animate-pulse space-y-4">
@@ -250,7 +266,10 @@ export default function NoticeView() {
       },
     );
 
-  const doRecordService = () =>
+  const doRecordService = () => {
+    // Regeneration replaces final-packet docs with fresh createdAt values;
+    // only surface the "updated" preview if the proof is actually newer.
+    const recordedAt = new Date().toISOString();
     recordService.mutate(
       {
         id: notice.id,
@@ -265,7 +284,7 @@ export default function NoticeView() {
         },
       },
       {
-        onSuccess: (n) => {
+        onSuccess: async (n) => {
           setServiceOpen(false);
           toast({
             title: "Service recorded",
@@ -273,10 +292,36 @@ export default function NoticeView() {
               ? `Compliance deadline computed: ${n.deadlineDate}.`
               : "Service details saved.",
           });
+          // recordService regenerates the final packet with the recorded
+          // details; surface the filled Proof of Service for reprinting.
+          try {
+            const docs = await getServices().listDocuments(n.id);
+            const proof = docs.find(
+              (d) =>
+                d.kind === "proof_of_service" &&
+                d.packetKind === "final" &&
+                d.generatedAt >= recordedAt,
+            );
+            if (proof) {
+              setPreviewDoc({
+                title: "Proof of Service (updated)",
+                fileName: proof.fileName,
+                blobUrl: proof.blobUrl,
+              });
+              toast({
+                title: "Proof of Service updated",
+                description:
+                  "Regenerated with the recorded service details — ready to reprint or download.",
+              });
+            }
+          } catch {
+            // Preview is a convenience; the service record already saved.
+          }
         },
         onError: fail("Could not record service"),
       },
     );
+  };
 
   const statusAction = (
     toStatus: Parameters<typeof changeStatus.mutate>[0]["toStatus"],
@@ -767,27 +812,29 @@ export default function NoticeView() {
               <CardTitle>Documents</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                disabled={generateDocs.isPending || !can("notice.generate")}
-                onClick={doPreviewDraft}
-                data-testid="button-preview-draft"
-              >
-                {generateDocs.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Eye className="w-4 h-4 mr-2 text-primary" />
-                )}
-                Preview Draft (watermarked)
-              </Button>
-              {(documents?.length ?? 0) === 0 ? (
+              {!hasFinalPacket && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start"
+                  disabled={generateDocs.isPending || !can("notice.generate")}
+                  onClick={doPreviewDraft}
+                  data-testid="button-preview-draft"
+                >
+                  {generateDocs.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Eye className="w-4 h-4 mr-2 text-primary" />
+                  )}
+                  Preview Draft (watermarked)
+                </Button>
+              )}
+              {visibleDocuments.length === 0 ? (
                 <p className="text-xs text-muted-foreground">
                   No documents generated yet. Finalizing produces the locked service packet.
                 </p>
               ) : (
                 <div className="space-y-1.5 pt-1">
-                  {documents?.map((d) => {
+                  {visibleDocuments.map((d) => {
                     const title = `${
                       d.kind === "packet"
                         ? `${d.packetKind === "draft" ? "Draft" : "Final"} packet`

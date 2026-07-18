@@ -65,10 +65,11 @@ import { useLocation } from "wouter";
 import { downscalePhotoDataUrl } from "@/lib/images";
 import {
   FIELD_SYNC_AUTH_REQUIRED_MESSAGE,
+  relayUrl,
   useFieldSyncAuth,
 } from "@/lib/field-sync";
 
-const SYNC_URL = "/api/field/assignments";
+const SYNC_URL = relayUrl("/api/field/assignments");
 
 type RemoteEvidence = {
   id: string;

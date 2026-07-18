@@ -36,6 +36,9 @@ import { KeyRound, CalendarPlus, Trash2, Smartphone, Ban, Copy, Check, FlaskConi
 import type { User } from "@/lib/types";
 import { ALL_RULE_PACKS } from "@/lib/engine/rulepacks";
 import { STATE_HOLIDAY_STATES, stateHolidaySource } from "@/lib/engine/stateHolidays";
+import { relayUrl } from "@/lib/field-sync";
+
+const DEVICES_URL = relayUrl("/api/field/devices");
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "Never";
@@ -89,7 +92,7 @@ function FieldDevicesSection({
   const { data: devices, isLoading, isError } = useQuery<FieldDevice[]>({
     queryKey: ["field-devices"],
     queryFn: async () => {
-      const res = await fetch("/api/field/devices", { headers });
+      const res = await fetch(DEVICES_URL, { headers });
       if (!res.ok) throw new Error(`Sync server responded ${res.status}`);
       return (await res.json()) as FieldDevice[];
     },
@@ -97,7 +100,7 @@ function FieldDevicesSection({
 
   const issueDevice = useMutation({
     mutationFn: async (name: string) => {
-      const res = await fetch("/api/field/devices", {
+      const res = await fetch(DEVICES_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ deviceName: name }),
@@ -121,7 +124,7 @@ function FieldDevicesSection({
 
   const revokeDevice = useMutation({
     mutationFn: async (id: string) => {
-      const res = await fetch(`/api/field/devices/${id}`, {
+      const res = await fetch(`${DEVICES_URL}/${id}`, {
         method: "DELETE",
         headers,
       });
