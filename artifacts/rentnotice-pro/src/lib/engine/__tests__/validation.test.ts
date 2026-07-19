@@ -60,6 +60,8 @@ function makeNotice(overrides: Partial<Notice> = {}): Notice {
     reviewerApprovedAt: null,
     finalizedBy: null,
     finalizedAt: null,
+    localOverlayVerifiedBy: null,
+    localOverlayVerifiedAt: null,
     attorneyExportFlag: false,
     service: {
       dateServed: null,
@@ -87,6 +89,20 @@ describe("notice validation engine", () => {
     const r = validateNotice({ notice: makeNotice() });
     expect(r.blockers).toBe(0);
     expect(r.passed).toBe(true);
+  });
+
+  it("skips the unit-number warnings for single-family properties", () => {
+    const singleFamily = {
+      id: "p1",
+      ownerName: "Owner LLC",
+      units: [],
+    } as unknown as ValidationContext["property"];
+    const r = validateNotice({ notice: makeNotice({ unit: "" }), property: singleFamily });
+    expect(codes(r)).not.toContain("unit_missing");
+    expect(codes(r)).not.toContain("content_unit_number_missing");
+
+    const noProperty = validateNotice({ notice: makeNotice({ unit: "" }) });
+    expect(codes(noProperty)).toContain("unit_missing");
   });
 
   it("blocks on missing tenant name and property address", () => {

@@ -98,7 +98,9 @@ export function validateNotice(ctx: ValidationContext): ValidationResult {
     add("tenant_name_missing", "blocker", "Tenant name is missing.", "tenantNames");
   if (!notice.propertyAddress.trim())
     add("property_address_missing", "blocker", "Property address is missing.", "propertyAddress");
-  if (!notice.unit.trim())
+  // Single-family properties (no unit list) legitimately have no unit number.
+  const singleFamily = !!ctx.property && (ctx.property.units?.length ?? 0) === 0;
+  if (!notice.unit.trim() && !singleFamily)
     add("unit_missing", "warning", "Unit number is missing.", "unit");
 
   if (ctx.property && !ctx.property.ownerName.trim())
@@ -323,8 +325,9 @@ function validateRequiredContentFields(
           missing("content_property_address_missing", "the property address.", "propertyAddress");
         break;
       case "unit_number":
-        // Unit may legitimately be absent (single-family) — warning only.
-        if (!notice.unit.trim())
+        // Unit may legitimately be absent (single-family) — warning only, and
+        // skipped entirely when the property has no unit list.
+        if (!notice.unit.trim() && !(ctx.property && (ctx.property.units?.length ?? 0) === 0))
           add(
             "content_unit_number_missing",
             "warning",
@@ -524,11 +527,18 @@ function validateRulePack(ctx: ValidationContext, add: AddIssue): void {
     add("stale_statute_source", "warning", pack.staleStatuteWarning, "jurisdiction");
 
   // ---- local overlays --------------------------------------------------------
-  for (const overlay of matchLocalOverlays(pack, ctx.property)) {
+  // Matched overlays require a persisted per-notice verification (checkbox in
+  // the compliance panel) instead of a typed acknowledgment reason. Unverified
+  // overlays block finalization; once verified, no issue is raised.
+  const overlays = matchLocalOverlays(pack, ctx.property);
+  if (overlays.length > 0 && !notice.localOverlayVerifiedAt) {
+    const list = overlays
+      .map((o) => `${o.jurisdiction} (${o.features.map((f) => f.replace(/_/g, " ")).join(", ")})`)
+      .join("; ");
     add(
-      "local_overlay",
-      "warning",
-      `Possible local overlay: ${overlay.jurisdiction} (${overlay.features.map((f) => f.replace(/_/g, " ")).join(", ")}). Local ordinances may add forms, longer periods, or just-cause requirements — verify before serving.`,
+      "local_overlay_unverified",
+      "blocker",
+      `Local ordinances must be verified before finalizing — matched overlay${overlays.length > 1 ? "s" : ""}: ${list}. Confirm the verification checkbox in the compliance panel.`,
       null,
     );
   }

@@ -6,6 +6,9 @@ import { useSession, useLogin, useLockApp, usePermissions, useWorkspaceState, us
 import { FirstRunScreen, ActivationWizard } from "@/components/first-run";
 import { StartupErrorScreen } from "@/components/startup-error";
 import { computeRouterBase } from "@/lib/router-base";
+import { useDesktopShell } from "@/lib/desktop";
+import { DB_EXTERNAL_CHANGE_EVENT, type DbExternalChangeDetail } from "@/lib/db/client";
+import { toast } from "@/hooks/use-toast";
 import { LICENSE_BLOCK_MESSAGES } from "@/lib/types";
 import { evaluateGraceWarning } from "@/lib/licensing/gate";
 import { BookOpen, Building, Users, FileText, Calendar as CalendarIcon, Settings as SettingsIcon, LogOut, Lock, LayoutDashboard, Database, Scale, ShieldAlert, BarChart, History, MapPin, MessageSquare, Wrench, X, FlaskConical } from "lucide-react";
@@ -419,6 +422,29 @@ function Layout({ children }: { children: React.ReactNode }) {
 }
 
 function Router() {
+  // Native desktop shell (Tauri): menu navigation, per-route window titles,
+  // and deep links for extra windows. No-op in the plain web build.
+  useDesktopShell();
+
+  // Multi-window coordination: when another window saves the shared local
+  // database, this window adopts the newer state — every cached query must
+  // then be re-fetched from the fresh sql.js instance.
+  useEffect(() => {
+    const onExternalChange = (event: Event) => {
+      void queryClient.invalidateQueries();
+      const detail = (event as CustomEvent<DbExternalChangeDetail>).detail;
+      if (detail?.droppedPendingWrite) {
+        toast({
+          title: "Updated from another window",
+          description:
+            "Another window saved changes at the same time; this window now shows the latest saved data.",
+        });
+      }
+    };
+    window.addEventListener(DB_EXTERNAL_CHANGE_EVENT, onExternalChange);
+    return () => window.removeEventListener(DB_EXTERNAL_CHANGE_EVENT, onExternalChange);
+  }, []);
+
   return (
     <Layout>
       <Switch>

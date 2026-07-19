@@ -1605,6 +1605,8 @@ function createServices(): AppServices {
         finalizedAt: null,
         rentOnlyAttestedBy: null,
         rentOnlyAttestedAt: null,
+        localOverlayVerifiedBy: null,
+        localOverlayVerifiedAt: null,
         attorneyExportFlag: false,
         prereqCompleted: input.prereqCompleted ?? {},
         ruleCardKey: input.ruleCardKey ?? null,
@@ -1759,6 +1761,31 @@ function createServices(): AppServices {
       );
       return next;
     },
+    async setLocalOverlayVerified(id: Id, verified: boolean): Promise<Notice> {
+      requirePermission("notice.status");
+      const db = await getDb();
+      const n = noticesRepo.get(db, id);
+      if (!n) throw new Error("Notice not found");
+      if (["finalized", "served", "mailed", "paid", "expired"].includes(n.status))
+        throw new Error(
+          "Local-ordinance verification cannot be changed after a notice is finalized",
+        );
+      const t = nowIso();
+      const next = noticesRepo.update(db, id, {
+        localOverlayVerifiedBy: verified ? session.user?.id ?? null : null,
+        localOverlayVerifiedAt: verified ? t : null,
+      });
+      logAudit(
+        db,
+        verified ? "local_overlay_verified" : "local_overlay_verification_cleared",
+        "notice",
+        id,
+        verified
+          ? `Confirmed local ordinances were verified for ${n.tenantNames.join(", ")}`
+          : `Cleared local-ordinance verification for ${n.tenantNames.join(", ")}`,
+      );
+      return next;
+    },
     async reviseNotice(id: Id, reason: string): Promise<Notice> {
       requirePermission("notice.status");
       const db = await getDb();
@@ -1777,6 +1804,8 @@ function createServices(): AppServices {
         finalizedAt: null,
         rentOnlyAttestedBy: null,
         rentOnlyAttestedAt: null,
+        localOverlayVerifiedBy: null,
+        localOverlayVerifiedAt: null,
         service: emptyService(),
         deadlineDate: null,
         createdAt: t,

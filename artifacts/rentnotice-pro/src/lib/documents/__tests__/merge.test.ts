@@ -85,6 +85,8 @@ const notice: Notice = {
   finalizedAt: null,
   rentOnlyAttestedBy: null,
   rentOnlyAttestedAt: null,
+  localOverlayVerifiedBy: null,
+  localOverlayVerifiedAt: null,
   attorneyExportFlag: false,
   service,
   deadlineDate: null,

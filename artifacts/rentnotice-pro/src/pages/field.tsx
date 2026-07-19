@@ -632,7 +632,7 @@ export default function FieldAssignmentsPage() {
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <PopoverContent className="w-(--radix-popover-trigger-width) p-0" align="start">
                   <Command>
                     <CommandInput
                       placeholder="Type a name to search or add…"

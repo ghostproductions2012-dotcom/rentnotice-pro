@@ -623,6 +623,15 @@ export function useFinalizeNotice() {
   });
 }
 
+export function useSetLocalOverlayVerified() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, verified }: { id: Id; verified: boolean }) =>
+      getServices().setLocalOverlayVerified(id, verified),
+    onSuccess: () => invalidate(qc, NOTICE_ROOTS),
+  });
+}
+
 export function useReviseNotice() {
   const qc = useQueryClient();
   return useMutation({

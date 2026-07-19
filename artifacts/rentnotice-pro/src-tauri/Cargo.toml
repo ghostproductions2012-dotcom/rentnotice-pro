@@ -1,6 +1,6 @@
 [package]
 name = "rentnotice-pro"
-version = "1.1.4"
+version = "1.1.5"
 description = "RentNotice Pro — California 3-Day Pay or Quit notice preparation suite"
 authors = ["RentNotice Pro"]
 edition = "2021"
@@ -27,6 +27,11 @@ serde_json = "1"
 # NOTE: the auto-updater (tauri-plugin-updater) is intentionally NOT included
 # in v1 — installed apps must never phone home to a placeholder endpoint.
 # See BUILDING.md §4 for how to re-enable it with real signing keys.
+
+[dev-dependencies]
+# muda is the menu library tauri uses internally; the unit test parses every
+# menu accelerator string with it so a typo cannot abort app startup.
+muda = "0.17"
 
 [features]
 # This feature is used for production builds or when a dev server is not

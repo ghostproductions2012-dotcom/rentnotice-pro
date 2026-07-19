@@ -75,6 +75,8 @@ function makeNotice(overrides: Partial<Notice> = {}): Notice {
     reviewerApprovedAt: null,
     finalizedBy: null,
     finalizedAt: null,
+    localOverlayVerifiedBy: null,
+    localOverlayVerifiedAt: null,
     attorneyExportFlag: false,
     service: {
       dateServed: null,
@@ -282,19 +284,33 @@ describe("lease-sensitive North Carolina branch", () => {
   });
 });
 
-describe("Los Angeles local-overlay warning", () => {
-  it("warns when the property is in the City of Los Angeles", () => {
-    const property = {
-      id: "p1",
-      city: "Los Angeles",
-      county: "Los Angeles",
-      isLosAngelesCity: true,
-      ownerName: "Owner LLC",
-    } as unknown as Property;
+describe("Los Angeles local-overlay verification", () => {
+  const property = {
+    id: "p1",
+    city: "Los Angeles",
+    county: "Los Angeles",
+    isLosAngelesCity: true,
+    ownerName: "Owner LLC",
+  } as unknown as Property;
+
+  it("blocks when the property matches an overlay and it is unverified", () => {
     const r = validateNotice({ notice: makeNotice({ jurisdiction: "CA" }), property });
-    const overlays = r.issues.filter((i) => i.code === "local_overlay");
-    expect(overlays.length).toBeGreaterThan(0);
-    expect(overlays.every((i) => i.level === "warning")).toBe(true);
+    const i = issue(r, "local_overlay_unverified");
+    expect(i).toBeTruthy();
+    expect(i!.level).toBe("blocker");
+  });
+
+  it("raises no overlay issue once verification is recorded", () => {
+    const r = validateNotice({
+      notice: makeNotice({
+        jurisdiction: "CA",
+        localOverlayVerifiedBy: "user-1",
+        localOverlayVerifiedAt: "2026-07-01T00:00:00.000Z",
+      }),
+      property,
+    });
+    expect(issue(r, "local_overlay_unverified")).toBeUndefined();
+    expect(r.issues.filter((i) => i.code === "local_overlay")).toHaveLength(0);
   });
 });
 

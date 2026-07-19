@@ -28,6 +28,7 @@ import type {
   SampleDataOptions,
   Tenant,
 } from "../types";
+import { getRulePack, matchLocalOverlays } from "../engine/rulepacks";
 
 export const SAMPLE_ID_PREFIX = "sample-";
 const SAMPLE_META_KEY = "sample_data_loaded_at";
@@ -474,6 +475,13 @@ function buildSampleNotice(
   const servedDate = `2026-07-${String(createdDay + 1).padStart(2, "0")}`;
   const advanced = status === "served" || status === "mailed" || status === "paid" || status === "expired";
   const reviewed = advanced || status === "reviewed" || status === "finalized";
+  // Already-progressed notices in overlay-matched areas are generated with
+  // local ordinances pre-verified so demo data reads clean; drafts stay
+  // unchecked so the verification checkbox is part of the demo story.
+  const overlayVerified =
+    (advanced || status === "finalized") &&
+    matchLocalOverlays(getRulePack(p.state), p).length > 0;
+  const method = pick(rng, ["personal", "substitute", "post_and_mail"] as const);
   const notice: Notice = {
     id: `${SAMPLE_ID_PREFIX}notice-${index + 1}`,
     noticeType: "pay_or_quit_3day",
@@ -512,15 +520,19 @@ function buildSampleNotice(
     finalizedAt: advanced || status === "finalized" ? createdAt : null,
     rentOnlyAttestedBy: null,
     rentOnlyAttestedAt: null,
+    localOverlayVerifiedBy: overlayVerified ? preparedBy : null,
+    localOverlayVerifiedAt: overlayVerified ? createdAt : null,
     attorneyExportFlag: false,
     service: advanced
       ? {
           dateServed: servedDate,
           timeServed: `${9 + Math.floor(rng() * 8)}:${rng() < 0.5 ? "15" : "40"}`,
-          method: pick(rng, ["personal", "substitute", "post_and_mail"] as const),
+          method,
           servedBy: pick(rng, ["Jamie Chen", "Morgan Lee", "Field Agent"] as const),
           serverNotes: "",
-          mailedDate: rng() < 0.5 ? servedDate : null,
+          // Mail-based service must always carry a mailing date; other
+          // methods sometimes mail a courtesy copy.
+          mailedDate: method === "post_and_mail" || rng() < 0.5 ? servedDate : null,
         }
       : { dateServed: null, timeServed: null, method: null, servedBy: "", serverNotes: "", mailedDate: null },
     deadlineDate: advanced ? `2026-07-${String(Math.min(28, createdDay + 5)).padStart(2, "0")}` : null,

@@ -345,6 +345,23 @@ export const MIGRATIONS: Migration[] = [
       `);
     },
   },
+  {
+    version: 15,
+    name: "local_overlay_verification",
+    up: (db) => {
+      // Fresh databases already get these columns from SCHEMA_SQL (migration 1).
+      const addColumnIfMissing = (table: string, column: string, ddl: string) => {
+        const exists = db
+          .all<{ name: string }>(`PRAGMA table_info(${table})`)
+          .some((c) => c.name === column);
+        if (!exists) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${ddl};`);
+      };
+      // Per-notice confirmation that local ordinances were verified for the
+      // property's matched overlay jurisdiction(s).
+      addColumnIfMissing("notices", "local_overlay_verified_by", "TEXT");
+      addColumnIfMissing("notices", "local_overlay_verified_at", "TEXT");
+    },
+  },
 ];
 
 function ensureMigrationsTable(db: AppDatabase): void {

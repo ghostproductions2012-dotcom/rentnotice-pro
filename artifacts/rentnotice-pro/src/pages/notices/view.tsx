@@ -9,9 +9,12 @@ import {
   useGenerateDocuments,
   useNotice,
   useNoticeDocuments,
+  useProperty,
   useRecordService,
   useReviseNotice,
   usePermissions,
+  useSetLocalOverlayVerified,
+  useUsers,
   useUpdateNotice,
   useValidation,
 } from "@/lib/api/hooks";
@@ -26,7 +29,7 @@ import {
   type FieldAssignmentStatus,
   type ServiceMethod,
 } from "@/lib/types";
-import { PREREQUISITE_LABELS, getRulePack } from "@/lib/engine/rulepacks";
+import { PREREQUISITE_LABELS, getRulePack, matchLocalOverlays } from "@/lib/engine/rulepacks";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AttorneyReferralPanel } from "@/components/attorney-referral-panel";
@@ -66,6 +69,7 @@ import { useToast } from "@/hooks/use-toast";
 import { saveDocument } from "@/lib/download";
 import {
   AlertTriangle,
+  AppWindow,
   ArrowLeft,
   BadgeCheck,
   Camera,
@@ -80,6 +84,7 @@ import {
   Stamp,
   Truck,
 } from "lucide-react";
+import { isDesktopShell, openInNewWindow } from "@/lib/desktop";
 
 
 function isElectronicMethod(method: ServiceMethod): boolean {
@@ -125,6 +130,9 @@ export default function NoticeView() {
 
   const { data: notice, isLoading } = useNotice(id);
   const { data: validation } = useValidation(id);
+  const { data: noticeProperty } = useProperty(notice?.propertyId ?? "");
+  const setOverlayVerified = useSetLocalOverlayVerified();
+  const { data: allUsers } = useUsers();
   const { data: documents } = useNoticeDocuments(id);
   const { data: fieldAssignments } = useFieldAssignments(id);
 
@@ -376,6 +384,18 @@ export default function NoticeView() {
             {notice.unit ? `, Unit ${notice.unit}` : ""}
           </p>
         </div>
+        {isDesktopShell() && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openInNewWindow(`/notices/${notice.id}`)}
+            title="Open this notice in a separate window"
+            data-testid="button-open-new-window"
+          >
+            <AppWindow className="w-4 h-4 mr-2" />
+            New Window
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -612,6 +632,59 @@ export default function NoticeView() {
                     ))}
                   </ul>
                 )}
+                {(() => {
+                  const overlays = noticeProperty
+                    ? matchLocalOverlays(getRulePack(notice.jurisdiction), noticeProperty)
+                    : [];
+                  if (overlays.length === 0) return null;
+                  const verified = !!notice.localOverlayVerifiedAt;
+                  const overlayLocked = ["finalized", "served", "mailed", "paid", "expired"].includes(
+                    notice.status,
+                  );
+                  return (
+                    <div className="mt-4 rounded-md border p-4 space-y-2" data-testid="section-local-overlay">
+                      <p className="text-sm font-medium">Local ordinance verification</p>
+                      <ul className="text-sm text-muted-foreground list-disc pl-5 space-y-1">
+                        {overlays.map((o) => (
+                          <li key={o.jurisdiction}>
+                            {o.jurisdiction} — {o.features.map((f) => f.replace(/_/g, " ")).join(", ")}
+                          </li>
+                        ))}
+                      </ul>
+                      <label
+                        className={`flex items-start gap-2 text-sm ${overlayLocked ? "cursor-default" : "cursor-pointer"}`}
+                      >
+                        <Checkbox
+                          checked={verified}
+                          disabled={overlayLocked || setOverlayVerified.isPending}
+                          onCheckedChange={(checked) =>
+                            setOverlayVerified.mutate({ id: notice.id, verified: checked === true })
+                          }
+                          data-testid="checkbox-local-overlay-verified"
+                        />
+                        <span>
+                          I verified the applicable local ordinances (forms, notice periods,
+                          just-cause requirements) for this property.
+                          {verified && notice.localOverlayVerifiedAt && (
+                            <span className="block text-xs text-muted-foreground mt-1">
+                              {(() => {
+                                const verifier = notice.localOverlayVerifiedBy
+                                  ? allUsers?.find((u) => u.id === notice.localOverlayVerifiedBy)
+                                  : undefined;
+                                const when = new Date(
+                                  notice.localOverlayVerifiedAt,
+                                ).toLocaleString();
+                                return verifier
+                                  ? `Verified by ${verifier.name} on ${when}`
+                                  : `Verified on ${when}`;
+                              })()}
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}

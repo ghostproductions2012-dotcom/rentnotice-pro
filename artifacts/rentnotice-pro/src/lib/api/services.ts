@@ -340,6 +340,8 @@ export interface AppServices {
     attestation: FinalizeAttestation,
   ): Promise<Notice>;
   reviseNotice(id: Id, reason: string): Promise<Notice>;
+  /** Set/clear the persisted "local ordinances verified" flag on a notice. */
+  setLocalOverlayVerified(id: Id, verified: boolean): Promise<Notice>;
   recordService(
     id: Id,
     service: ServiceRecord,

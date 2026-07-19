@@ -26,6 +26,7 @@ import {
 import { sha256Hex } from "./util";
 import { PAY_OR_QUIT_BODY } from "../templates-data/ca";
 import { extractMergeFields } from "../documents/merge";
+import { getRulePack, matchLocalOverlays } from "../engine/rulepacks";
 import type {
   AppSettings,
   CompanyProfile,
@@ -561,6 +562,12 @@ function buildNotice(seed: NoticeSeed): Notice {
   const tenant = findTenant(seed.tenantId);
   const property = findProperty(tenant.propertyId ?? "");
   const total = seed.months.reduce((s, m) => s + m.selectedAmountCents, 0);
+  // Already-progressed seed notices in overlay-matched areas ship with local
+  // ordinances pre-verified so the demo data reads clean; drafts stay
+  // unchecked.
+  const overlayVerified =
+    ["finalized", "served", "mailed", "paid", "expired"].includes(seed.status) &&
+    matchLocalOverlays(getRulePack("CA"), property).length > 0;
   const base: Notice = {
     id: seed.id,
     noticeType: seed.noticeType,
@@ -599,6 +606,8 @@ function buildNotice(seed: NoticeSeed): Notice {
     finalizedAt: null,
     rentOnlyAttestedBy: null,
     rentOnlyAttestedAt: null,
+    localOverlayVerifiedBy: overlayVerified ? "user-staff" : null,
+    localOverlayVerifiedAt: overlayVerified ? SEED_TS : null,
     attorneyExportFlag: false,
     service: emptyService(),
     deadlineDate: null,

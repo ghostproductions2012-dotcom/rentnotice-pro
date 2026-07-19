@@ -542,6 +542,11 @@ export interface Notice {
   // utilities, deposits, or other non-rent charges).
   rentOnlyAttestedBy: Id | null;
   rentOnlyAttestedAt: string | null;
+  // Local-overlay verification: when the property matches one or more local
+  // overlay jurisdictions, the preparer must confirm they verified local
+  // ordinances before the notice can be finalized.
+  localOverlayVerifiedBy: Id | null;
+  localOverlayVerifiedAt: string | null;
   attorneyExportFlag: boolean;
   // 50-state rule-pack fields
   /** Pre-filing prerequisite checklist (e.g. {"notice_of_intent": true}). */
@@ -780,6 +785,8 @@ export type AuditAction =
   | "notice_created"
   | "notice_updated"
   | "notice_finalized"
+  | "local_overlay_verified"
+  | "local_overlay_verification_cleared"
   | "notice_revised"
   | "pdf_exported"
   | "status_changed"

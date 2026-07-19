@@ -190,6 +190,8 @@ CREATE TABLE IF NOT EXISTS notices (
   reviewer_approved_at TEXT,
   finalized_by TEXT,
   finalized_at TEXT,
+  local_overlay_verified_by TEXT,
+  local_overlay_verified_at TEXT,
   attorney_export_flag INTEGER NOT NULL DEFAULT 0,
   prereq_completed TEXT NOT NULL DEFAULT '{}',
   rule_card_key TEXT,

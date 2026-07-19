@@ -10,6 +10,7 @@
     "check:state-prereq": "tsx ./src/state-prereq-check.ts",
     "check:work-order": "tsx ./src/work-order-check.ts",
     "check:sample-data": "tsx ./src/sample-data-check.ts",
+    "check:db-sync": "tsx ./src/db-sync-check.ts",
     "check:comms": "tsx ./src/comms-check.ts",
     "check:chat-expiry": "tsx ./src/chat-expiry-check.ts",
     "check:chat-token-expiry": "tsx ./src/chat-token-expiry-check.ts",
